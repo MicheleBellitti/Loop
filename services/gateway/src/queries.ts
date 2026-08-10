@@ -5,6 +5,7 @@ import {
   dateEyebrow,
   daysQuiet,
   displayStage,
+  formatDays,
   formatPercent,
   GATES,
   quietLabel,
@@ -673,9 +674,7 @@ export async function buildStats(sql: pg.PoolClient, user: UserContext, period: 
     first_response: {
       value: timing.rows[0]?.median_days ? Number(timing.rows[0].median_days) : null,
       n: Number(timing.rows[0]?.n ?? '0'),
-      display: timing.rows[0]?.median_days
-        ? `${Math.round(Number(timing.rows[0].median_days))} days`
-        : '—',
+      display: timing.rows[0]?.median_days ? formatDays(Number(timing.rows[0].median_days)) : '—',
       caption: 'median to first human reply',
     },
     ghost: { ...ghostRate, display: formatPercent(ghostRate.value), caption: 'closed by silence, not by a no' },
