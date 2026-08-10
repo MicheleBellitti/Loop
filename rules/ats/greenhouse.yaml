@@ -1,0 +1,40 @@
+# Greenhouse. The most common ATS in the corpus and the one whose auto-reply
+# wording has been stable for years.
+vendor: greenhouse
+match:
+  sender_domains: [greenhouse-mail.io, eu.greenhouse-mail.io, greenhouse.io, my.greenhouse.io]
+locale: [en]
+company_from: subject_capture
+patterns:
+  - intent: acknowledged
+    subject: '^Thank you for applying to (?<company>.+?)\s*$'
+    body: '(we have received your application|thanks for (your interest|applying))'
+    extract:
+      # The role is almost always named in the body of an acknowledgement, and
+      # "Unknown role" on every row is a worse answer than reading it.
+      role: 'application for the (?<role>[^,\.\n]+?) (?:position|role)'
+    confidence: 0.99
+  - intent: acknowledged
+    subject: '^Your application to (?<company>.+)$'
+    confidence: 0.97
+  - intent: schedule_screening
+    subject: '^(?<company>.+?)\s*\|\s*Interview availability'
+    extract:
+      role: 'for the (?<role>[^,\.]+?) (position|role)'
+    confidence: 0.94
+  - intent: interview_invite
+    subject: '^(Interview|Your interview) (with|at) (?<company>.+)$'
+    extract:
+      role: 'for the (?<role>[^,\.]+?) (position|role)'
+    confidence: 0.93
+  - intent: rejected
+    body: '(will not be moving forward|decided to move forward with other|not to move forward with your application)'
+    confidence: 0.97
+  - intent: offer
+    subject: '^(Offer|Your offer) (from|at) (?<company>.+)$'
+    confidence: 0.9
+tests:
+  - fixture: fixtures/ats/greenhouse-ack-01.eml
+    expect: { intent: acknowledged, company: Zalando, confidence: 0.99 }
+  - fixture: fixtures/ats/greenhouse-reject-01.eml
+    expect: { intent: rejected, confidence: 0.97 }

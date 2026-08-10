@@ -1,0 +1,36 @@
+# Caddy is the only thing exposed. Automatic Let's Encrypt, HSTS, and a
+# reverse proxy to the gateway — which is the single ingress for everything.
+#
+# Set LOOP_DOMAIN in the environment. For a box with no public IP, point a
+# Cloudflare tunnel at :80 instead and drop the TLS block.
+
+{$LOOP_DOMAIN:localhost} {
+	encode gzip zstd
+
+	# The SSE stream must not be buffered or it arrives in one lump at the end.
+	@stream path /api/stream
+	reverse_proxy @stream gateway:3000 {
+		flush_interval -1
+	}
+
+	reverse_proxy gateway:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# The metrics endpoint is internal-only (§16); it is not proxied here.
+	@metrics path /metrics
+	respond @metrics 404
+
+	log {
+		output stdout
+		format json
+		# Never log a query string: a posting URL is not sensitive, but the habit
+		# of logging them is how tokens end up in access logs.
+		level INFO
+	}
+}

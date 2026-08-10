@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/industry-5d9669ba-52c5-444b-9a17-67aa1664e37d/styles.css">
+<script src="_ds/industry-5d9669ba-52c5-444b-9a17-67aa1664e37d/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}
+a{color:var(--color-accent-700);text-decoration:none}
+a:hover{color:var(--color-accent)}
+.lp{scrollbar-width:none}
+.lp::-webkit-scrollbar{display:none;width:0;height:0}
+</style>
+</helmet>
+
+<div style="padding:var(--space-8) var(--space-8) 120px">
+
+  <div style="display:flex;align-items:baseline;gap:var(--space-4);margin-bottom:var(--space-8);flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:var(--space-3)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span style="font:600 17px var(--font-heading);letter-spacing:.03em;text-transform:uppercase">Loop</span>
+    </div>
+    <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">sheet 04 / 04 · onboarding, empty states, failure states</span>
+    <a href="Architecture.dc.html" style="font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase">System design →</a>
+    <a href="Tracker Mobile.dc.html" style="font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase">Mobile app →</a>
+  </div>
+
+  <!-- 01 · ONBOARDING -->
+  <section style="margin-bottom:var(--space-8);padding-bottom:var(--space-8);border-bottom:1px solid var(--color-divider)">
+    <div style="display:flex;align-items:baseline;gap:var(--space-4);margin-bottom:var(--space-3)">
+      <span style="font:600 28px var(--font-heading);line-height:1;color:var(--color-accent)">01</span>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0;text-transform:uppercase;letter-spacing:-.01em">Onboarding</h2>
+    </div>
+    <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:80ch;margin:0 0 var(--space-8)">Seven steps, and the whole flow exists to earn one permission. The mailbox scope is the biggest ask this product will ever make, so it is explained before it is requested, in plain words, with what Loop cannot do stated as prominently as what it can. Tap through it — the frame on the left is live.</p>
+
+    <div style="display:flex;gap:var(--space-8);align-items:flex-start;flex-wrap:wrap">
+
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text)">
+          <div class="lp" style="flex:1;overflow-y:auto;padding:58px 22px 10px">
+
+            <sc-if value="{{ s0 }}" hint-placeholder-val="{{ true }}">
+              <div style="padding-top:var(--space-8)">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <h1 style="font-family:var(--font-heading);font-size:40px;line-height:.98;margin:var(--space-6) 0 var(--space-4);text-transform:uppercase">You already<br>sent them</h1>
+                <p style="font-size:15px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);margin:0 0 var(--space-6)">Every application you have ever submitted left a trace in your inbox: a confirmation, an auto-reply, an invitation, a no. Loop reads those traces and keeps the pipeline for you.</p>
+                <div style="border:1px solid var(--color-divider);padding:var(--space-4)">
+                  <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+                    <div style="display:flex;gap:var(--space-3);align-items:flex-start"><svg width="13" height="13" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1" style="flex:none;margin-top:4px"><path d="M5.5 0v11M0 5.5h11"/></svg><span style="font-size:13.5px;line-height:1.45">No spreadsheet to update, ever</span></div>
+                    <div style="display:flex;gap:var(--space-3);align-items:flex-start"><svg width="13" height="13" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1" style="flex:none;margin-top:4px"><path d="M5.5 0v11M0 5.5h11"/></svg><span style="font-size:13.5px;line-height:1.45">Works with LinkedIn, Indeed and any company career page</span></div>
+                    <div style="display:flex;gap:var(--space-3);align-items:flex-start"><svg width="13" height="13" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1" style="flex:none;margin-top:4px"><path d="M5.5 0v11M0 5.5h11"/></svg><span style="font-size:13.5px;line-height:1.45">Runs on your own machine — nothing is sent anywhere</span></div>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ s1 }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Step 2 of 7</div>
+                <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-3) 0 var(--space-4);text-transform:uppercase">What Loop reads</h1>
+                <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);margin:0 0 var(--space-6)">Read this before you grant anything. It is the honest version, not the reassuring one.</p>
+
+                <div style="border:1px solid var(--color-divider);margin-bottom:var(--space-3)">
+                  <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);background:var(--color-accent-100);font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-800)">It can</div>
+                  <div style="padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2);font-size:13.5px;line-height:1.45">
+                    <div>Read message headers and bodies, to find applications</div>
+                    <div>Read calendar events, to detect interviews</div>
+                    <div>Keep the fields it extracts: company, role, stage, dates</div>
+                  </div>
+                </div>
+                <div style="border:1px solid var(--color-divider);margin-bottom:var(--space-4)">
+                  <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 60%, transparent)">It cannot</div>
+                  <div style="padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2);font-size:13.5px;line-height:1.45;color:color-mix(in srgb, var(--color-text) 72%, transparent)">
+                    <div>Send, reply, delete or label anything — the scope is read-only</div>
+                    <div>Store your email bodies: they live in memory for one parse</div>
+                    <div>Reach your contacts, Drive, or anything outside mail and calendar</div>
+                  </div>
+                </div>
+                <div style="font:600 11px var(--font-heading);letter-spacing:.1em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-2)">Scopes requested</div>
+                <div style="font-size:12.5px;line-height:1.7;color:color-mix(in srgb, var(--color-text) 70%, transparent)">gmail.readonly<br>calendar.readonly</div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ s2 }}" hint-placeholder-val="{{ false }}">
+              <div style="padding-top:var(--space-4)">
+                <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-bottom:var(--space-4)">Step 3 of 7 · leaving the app</div>
+                <div class="blueprint" style="padding:var(--space-6) var(--space-4);background:var(--color-neutral-100)">
+                  <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                  <div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin-bottom:var(--space-4)">accounts.google.com</div>
+                  <div style="font-size:17px;line-height:1.35;margin-bottom:var(--space-4)">Loop (self-hosted) wants access to your Google Account</div>
+                  <div style="font-size:13px;color:color-mix(in srgb, var(--color-text) 60%, transparent);margin-bottom:var(--space-4)">tu@gmail.com</div>
+                  <div style="display:flex;flex-direction:column;gap:var(--space-3);padding-top:var(--space-4);border-top:1px solid var(--color-divider)">
+                    <div style="display:flex;gap:var(--space-3);align-items:flex-start">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" style="flex:none;margin-top:2px"><path d="M4 6h16v12H4zM4 6l8 6 8-6"/></svg>
+                      <span style="font-size:13.5px;line-height:1.4">View your email messages and settings</span>
+                    </div>
+                    <div style="display:flex;gap:var(--space-3);align-items:flex-start">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" style="flex:none;margin-top:2px"><path d="M4 5h16v15H4zM4 9h16M9 3v4M15 3v4"/></svg>
+                      <span style="font-size:13.5px;line-height:1.4">See and download any calendar you can access</span>
+                    </div>
+                  </div>
+                  <p style="font-size:11.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin:var(--space-4) 0 0">This app is unverified because it runs on your own server. You can revoke access at any time in your Google Account.</p>
+                </div>
+                <p style="font-size:12.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 60%, transparent);margin:var(--space-4) 0 0">Loop never sees your password. The token it receives is encrypted with a key that lives outside the database.</p>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ s3 }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Step 4 of 7</div>
+                <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-3) 0 var(--space-4);text-transform:uppercase">How far back?</h1>
+                <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);margin:0 0 var(--space-6)">The first scan is the only slow part. It reads once, then only ever reads what is new.</p>
+                <div style="border:1px solid var(--color-divider)">
+                  <sc-for list="{{ depths }}" as="d" hint-placeholder-count="3">
+                    <button onClick="{{ d.pick }}" style="display:block;width:100%;text-align:left;padding:var(--space-4);min-height:64px;background:{{ d.bg }};border:0;border-bottom:1px solid var(--color-divider);cursor:pointer;font-family:var(--font-body);color:var(--color-text)">
+                      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3)">
+                        <span style="font:600 19px var(--font-heading)">{{ d.label }}</span>
+                        <span style="font-size:12px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ d.est }}</span>
+                      </div>
+                      <div style="font-size:12.5px;color:color-mix(in srgb, var(--color-text) 65%, transparent);margin-top:2px">{{ d.note }}</div>
+                    </button>
+                  </sc-for>
+                </div>
+                <p style="font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin:var(--space-4) 0 0">Messages that are clearly not about a job are dropped before anything is stored — roughly 95% of what it reads.</p>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ s4 }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Step 5 of 7 · reading</div>
+                <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-3) 0 var(--space-4);text-transform:uppercase">12 months, once</h1>
+                <div style="height:9px;background:color-mix(in srgb, var(--color-text) 10%, transparent);margin-bottom:var(--space-2)">
+                  <div style="height:9px;width:68%;background:var(--color-accent)"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-bottom:var(--space-6)">
+                  <span>August 2025 → today</span><span>about 3 minutes left</span>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--color-divider);margin-bottom:var(--space-6)">
+                  <div style="padding:var(--space-3);border-right:1px solid var(--color-divider)">
+                    <div style="font:600 26px var(--font-heading);line-height:1">2 418</div>
+                    <div style="font:600 10px var(--font-heading);letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">read</div>
+                  </div>
+                  <div style="padding:var(--space-3);border-right:1px solid var(--color-divider);background:var(--color-accent-100)">
+                    <div style="font:600 26px var(--font-heading);line-height:1;color:var(--color-accent-900)">14</div>
+                    <div style="font:600 10px var(--font-heading);letter-spacing:.1em;text-transform:uppercase;color:var(--color-accent-800)">found</div>
+                  </div>
+                  <div style="padding:var(--space-3)">
+                    <div style="font:600 26px var(--font-heading);line-height:1">3</div>
+                    <div style="font:600 10px var(--font-heading);letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">unsure</div>
+                  </div>
+                </div>
+
+                <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-2)">Just found</div>
+                <div style="display:flex;flex-direction:column">
+                  <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:1px solid var(--color-divider)">
+                    <svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1" style="flex:none"><path d="M5.5 0v11M0 5.5h11"/></svg>
+                    <span style="flex:1"><span style="display:block;font-size:14px;font-weight:500">Bending Spoons</span><span style="display:block;font-size:12px;color:color-mix(in srgb, var(--color-text) 58%, transparent)">offer received · 28 Jul</span></span>
+                    <span style="font-size:10.5px;padding:2px 6px;border:1px solid var(--color-divider);color:color-mix(in srgb, var(--color-text) 55%, transparent)">gmail</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:1px solid var(--color-divider)">
+                    <svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1" style="flex:none"><path d="M5.5 0v11M0 5.5h11"/></svg>
+                    <span style="flex:1"><span style="display:block;font-size:14px;font-weight:500">Nexi</span><span style="display:block;font-size:12px;color:color-mix(in srgb, var(--color-text) 58%, transparent)">onsite loop held · 24 Jul</span></span>
+                    <span style="font-size:10.5px;padding:2px 6px;border:1px solid var(--color-divider);color:color-mix(in srgb, var(--color-text) 55%, transparent)">calendar</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:1px solid var(--color-divider)">
+                    <svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1" style="flex:none"><path d="M5.5 0v11M0 5.5h11"/></svg>
+                    <span style="flex:1"><span style="display:block;font-size:14px;font-weight:500">Musement</span><span style="display:block;font-size:12px;color:color-mix(in srgb, var(--color-text) 58%, transparent)">rejected · 18 Jul</span></span>
+                    <span style="font-size:10.5px;padding:2px 6px;border:1px solid var(--color-divider);color:color-mix(in srgb, var(--color-text) 55%, transparent)">gmail</span>
+                  </div>
+                </div>
+                <p style="font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin:var(--space-4) 0 0">Showing what it finds while it works is the cheapest trust the product will ever buy. A spinner would have cost the same and earned nothing.</p>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ s5 }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Step 6 of 7</div>
+                <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-3) 0 var(--space-4);text-transform:uppercase">Is this your<br>history?</h1>
+                <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);margin:0 0 var(--space-6)">Untick anything that is not an application you sent. Two look ambiguous — those can wait.</p>
+                <div style="border:1px solid var(--color-divider)">
+                  <sc-for list="{{ haul }}" as="h" hint-placeholder-count="6">
+                    <button onClick="{{ h.toggle }}" style="display:flex;gap:var(--space-3);align-items:flex-start;width:100%;text-align:left;padding:var(--space-3) var(--space-4);min-height:56px;background:{{ h.bg }};border:0;border-bottom:1px solid var(--color-divider);cursor:pointer;font-family:var(--font-body);color:var(--color-text)">
+                      <span style="width:15px;height:15px;flex:none;margin-top:3px;border:1px solid {{ h.boxBorder }};background:{{ h.boxBg }}"></span>
+                      <span style="flex:1;min-width:0">
+                        <span style="display:block;font-size:14.5px;font-weight:500">{{ h.company }}</span>
+                        <span style="display:block;font-size:12px;color:color-mix(in srgb, var(--color-text) 60%, transparent);margin-top:1px">{{ h.detail }}</span>
+                      </span>
+                      <span style="font-size:10.5px;padding:2px 6px;border:1px solid {{ h.tagBorder }};color:{{ h.tagColor }};flex:none;margin-top:2px">{{ h.tag }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+                <p style="font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin:var(--space-4) 0 0">Every correction here is written back as a rule, so the same mistake does not survive to next month.</p>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ s6 }}" hint-placeholder-val="{{ false }}">
+              <div style="padding-top:var(--space-4)">
+                <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Step 7 of 7</div>
+                <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-3) 0 var(--space-4);text-transform:uppercase">One buzz<br>a day, at most</h1>
+                <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);margin:0 0 var(--space-6)">A job search is stressful enough. Loop is allowed to interrupt you for four things and nothing else.</p>
+                <div style="border:1px solid var(--color-divider);margin-bottom:var(--space-4)">
+                  <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);font-size:13.5px">An interview is booked or moved</div>
+                  <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);font-size:13.5px">A take-home deadline is near</div>
+                  <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);font-size:13.5px">An offer or a decision arrives</div>
+                  <div style="padding:var(--space-3) var(--space-4);font-size:13.5px">A thread has gone quiet past your own average</div>
+                </div>
+                <div style="border:1px solid var(--color-divider);background:var(--color-accent-100);padding:var(--space-4)">
+                  <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-800);margin-bottom:var(--space-2)">Fixed rules</div>
+                  <div style="font-size:13px;line-height:1.6;color:var(--color-accent-900)">One notification a day · nothing between 21:00 and 08:00 · never twice for the same thing · rejections are never pushed, they just appear in the log</div>
+                </div>
+              </div>
+            </sc-if>
+
+          </div>
+
+          <div style="flex:none;padding:var(--space-3) 22px 30px;border-top:1px solid var(--color-divider)">
+            <div style="display:flex;gap:4px;margin-bottom:var(--space-3)">
+              <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="7">
+                <span style="flex:1;height:3px;background:{{ t.bg }}"></span>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:var(--space-2)">
+              <sc-if value="{{ canBack }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ back }}" class="btn btn-secondary" style="min-height:50px;padding-inline:var(--space-6)">Back</button>
+              </sc-if>
+              <button onClick="{{ next }}" class="btn btn-primary" style="flex:1;min-height:50px">{{ cta }}</button>
+            </div>
+            <div style="text-align:center;margin-top:var(--space-2)">
+              <span style="font-size:12px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">{{ subCta }}</span>
+            </div>
+          </div>
+        </div>
+      </x-import>
+
+      <div style="flex:1;min-width:320px;max-width:520px">
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-4)">The seven steps</div>
+        <div style="border:1px solid var(--color-divider)">
+          <sc-for list="{{ steps }}" as="st" hint-placeholder-count="7">
+            <button onClick="{{ st.go }}" style="display:block;width:100%;text-align:left;padding:var(--space-3) var(--space-4);background:{{ st.bg }};border:0;border-bottom:1px solid var(--color-divider);cursor:pointer;font-family:var(--font-body);color:var(--color-text)" style-hover="background:color-mix(in srgb, var(--color-text) 5%, transparent)">
+              <div style="display:flex;gap:var(--space-4);align-items:baseline">
+                <span style="font:600 12px var(--font-heading);color:var(--color-accent);min-width:18px">{{ st.n }}</span>
+                <span style="flex:1">
+                  <span style="display:block;font:600 16px var(--font-heading);letter-spacing:.01em">{{ st.title }}</span>
+                  <span style="display:block;font-size:12.5px;line-height:1.45;color:color-mix(in srgb, var(--color-text) 62%, transparent);margin-top:1px">{{ st.note }}</span>
+                </span>
+              </div>
+            </button>
+          </sc-for>
+        </div>
+        <p style="font-size:12.5px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 60%, transparent);margin:var(--space-4) 0 0">The order matters: the explanation comes before the consent screen, and the confirmation of what was found comes before any statistic is shown. A user who has not yet seen Loop be right about their own history has no reason to trust a ratio it computes.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 · EMPTY STATES -->
+  <section style="margin-bottom:var(--space-8);padding-bottom:var(--space-8);border-bottom:1px solid var(--color-divider)">
+    <div style="display:flex;align-items:baseline;gap:var(--space-4);margin-bottom:var(--space-3)">
+      <span style="font:600 28px var(--font-heading);line-height:1;color:var(--color-accent)">02</span>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0;text-transform:uppercase;letter-spacing:-.01em">Empty states</h2>
+    </div>
+    <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:80ch;margin:0 0 var(--space-8)">Three different kinds of nothing, and only one of them is a problem. An automated tracker is empty far more often than a manual one — that is the point — so "empty" has to read as working, not as broken.</p>
+
+    <div style="display:flex;gap:var(--space-8);flex-wrap:wrap;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+        <div style="display:flex;align-items:baseline;gap:var(--space-3)">
+          <span style="font:600 11px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;background:var(--color-accent);color:var(--color-bg)">E1</span>
+          <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Day one · connected, nothing found</span>
+        </div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text);padding:58px 20px 30px">
+            <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Thursday 30 July</div>
+            <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-2) 0 var(--space-6);text-transform:uppercase">Nothing<br>to track yet</h1>
+            <div style="border:1px solid var(--color-divider);padding:var(--space-4);margin-bottom:var(--space-4)">
+              <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3)">
+                <span style="width:7px;height:7px;background:var(--color-accent);flex:none"></span>
+                <span style="font:600 12px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent-800)">Watching your mailbox</span>
+              </div>
+              <p style="margin:0;font-size:13px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 70%, transparent)">Last read 2 minutes ago. The moment a confirmation or an auto-reply arrives, it appears here on its own — you do not need to come back and check.</p>
+            </div>
+            <p style="font-size:13.5px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 70%, transparent);margin:0 0 var(--space-6)">Applied somewhere that never emailed you? That is the one case Loop cannot see.</p>
+            <button class="btn btn-primary" style="min-height:50px;width:100%">Add one by hand</button>
+            <div style="margin-top:auto;padding-top:var(--space-6);border-top:1px solid var(--color-divider)">
+              <p style="margin:0;font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Scanned 2 418 messages · 0 about a job. That is normal for a first day.</p>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+        <div style="display:flex;align-items:baseline;gap:var(--space-3)">
+          <span style="font:600 11px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;background:var(--color-accent);color:var(--color-bg)">E2</span>
+          <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">A quiet day · pipeline is full, nothing needs you</span>
+        </div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text);padding:58px 20px 30px">
+            <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Monday 3 August</div>
+            <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-2) 0 var(--space-6);text-transform:uppercase">You are<br>clear today</h1>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--color-divider);margin-bottom:var(--space-6)">
+              <div style="padding:var(--space-3);border-right:1px solid var(--color-divider)">
+                <div style="font:600 28px var(--font-heading);line-height:1">12</div>
+                <div style="font:600 10px var(--font-heading);letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">live</div>
+              </div>
+              <div style="padding:var(--space-3);border-right:1px solid var(--color-divider)">
+                <div style="font:600 28px var(--font-heading);line-height:1;color:var(--color-accent-700)">3</div>
+                <div style="font:600 10px var(--font-heading);letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">interviewing</div>
+              </div>
+              <div style="padding:var(--space-3)">
+                <div style="font:600 28px var(--font-heading);line-height:1">0</div>
+                <div style="font:600 10px var(--font-heading);letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">overdue</div>
+              </div>
+            </div>
+            <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);margin:0 0 var(--space-6)">No follow-ups due, no deadlines this week, nothing gone quiet past your own average. The next thing on the calendar is Thursday.</p>
+            <div style="border:1px solid var(--color-divider);padding:var(--space-4)">
+              <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-2)">Thursday 6 August</div>
+              <div style="font-family:var(--font-heading);font-size:20px">Zalando · system design</div>
+              <div style="font-size:12.5px;color:color-mix(in srgb, var(--color-text) 60%, transparent);margin-top:2px">14:00 · prep opens Wednesday</div>
+            </div>
+            <div style="margin-top:auto;padding-top:var(--space-6)">
+              <p style="margin:0;font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 50%, transparent)">A tracker that always has a task for you is inventing tasks. This screen is a feature.</p>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+        <div style="display:flex;align-items:baseline;gap:var(--space-3)">
+          <span style="font:600 11px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;background:var(--color-accent);color:var(--color-bg)">E3</span>
+          <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Statistics · not enough data to be honest</span>
+        </div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text);padding:58px 20px 30px">
+            <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Statistics</div>
+            <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-2) 0 var(--space-4);text-transform:uppercase">Too early<br>to mean<br>anything</h1>
+            <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);margin:0 0 var(--space-6)">Four applications have closed. A conversion rate computed on four is noise, so Loop shows the count instead of the ratio and waits.</p>
+            <div style="border:1px solid var(--color-divider);margin-bottom:var(--space-6)">
+              <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);display:flex;justify-content:space-between;align-items:baseline">
+                <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">Sent</span><span style="font:600 17px var(--font-heading)">9</span>
+              </div>
+              <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);display:flex;justify-content:space-between;align-items:baseline">
+                <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">Reached an interview</span><span style="font:600 17px var(--font-heading)">2</span>
+              </div>
+              <div style="padding:var(--space-3) var(--space-4);display:flex;justify-content:space-between;align-items:baseline">
+                <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">Closed</span><span style="font:600 17px var(--font-heading)">4</span>
+              </div>
+            </div>
+            <div style="border:1px solid var(--color-divider);background:var(--color-accent-100);padding:var(--space-4)">
+              <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-800);margin-bottom:var(--space-2)">Unlocks at</div>
+              <div style="font-size:13px;line-height:1.6;color:var(--color-accent-900)">Ratios · 8 closed applications<br>Time in stage · 5 stage changes<br>Seasonal shape · 2 quarters of history</div>
+            </div>
+            <div style="margin-top:auto;padding-top:var(--space-6)">
+              <p style="margin:0;font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Naming the threshold turns an empty chart into a progress bar.</p>
+            </div>
+          </div>
+        </x-import>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 · FAILURE STATES -->
+  <section>
+    <div style="display:flex;align-items:baseline;gap:var(--space-4);margin-bottom:var(--space-3)">
+      <span style="font:600 28px var(--font-heading);line-height:1;color:var(--color-accent)">03</span>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0;text-transform:uppercase;letter-spacing:-.01em">Failure states</h2>
+    </div>
+    <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:80ch;margin:0 0 var(--space-8)">An automated tracker fails silently by default — it just stops finding things, and you would not notice for a week. So every failure has to be loud in exactly one place, say when the data was last trustworthy, and state whether anything was lost. Three of these four self-heal; only one needs you.</p>
+
+    <div style="display:flex;gap:var(--space-8);flex-wrap:wrap;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+        <div style="display:flex;align-items:baseline;gap:var(--space-3)">
+          <span style="font:600 11px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;background:var(--color-accent);color:var(--color-bg)">F1</span>
+          <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Access revoked · needs you</span>
+        </div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text);padding:58px 0 30px">
+            <div style="border-top:1px solid var(--color-accent);border-bottom:1px solid var(--color-accent);background:var(--color-accent-100);padding:var(--space-4) 20px;margin-bottom:var(--space-6)">
+              <div style="display:flex;gap:var(--space-3);align-items:flex-start">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-800)" stroke-width="1.5" style="flex:none;margin-top:2px"><path d="M12 9v4M12 17h.01M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+                <div>
+                  <div style="font:600 17px var(--font-heading);color:var(--color-accent-900)">Loop stopped reading 4 days ago</div>
+                  <div style="font-size:12.5px;color:var(--color-accent-900);margin-top:2px">Google access was revoked or expired on 26 July</div>
+                </div>
+              </div>
+            </div>
+            <div style="padding:0 20px;flex:1;display:flex;flex-direction:column">
+              <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);margin:0 0 var(--space-4)">Nothing has been lost. Your 14 applications and their whole history are intact — Loop simply has not seen anything new since Saturday, and it will catch up on every missed message the moment you reconnect.</p>
+              <div style="border:1px solid var(--color-divider);margin-bottom:var(--space-6)">
+                <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);display:flex;justify-content:space-between"><span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Last successful read</span><span style="font:600 13px var(--font-heading)">26 Jul · 08:12</span></div>
+                <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);display:flex;justify-content:space-between"><span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Applications kept</span><span style="font:600 13px var(--font-heading)">14</span></div>
+                <div style="padding:var(--space-3) var(--space-4);display:flex;justify-content:space-between"><span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Estimated missed messages</span><span style="font:600 13px var(--font-heading)">~6</span></div>
+              </div>
+              <button class="btn btn-primary" style="min-height:50px;width:100%">Reconnect Google</button>
+              <button class="btn btn-secondary" style="min-height:50px;width:100%;margin-top:var(--space-2)">Use a different mailbox</button>
+              <p style="font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin:auto 0 0">The one failure the product cannot fix on its own, so it is the only one that gets a full screen.</p>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+        <div style="display:flex;align-items:baseline;gap:var(--space-3)">
+          <span style="font:600 11px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;background:var(--color-accent);color:var(--color-bg)">F2</span>
+          <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Watch lapsed · self-healing</span>
+        </div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text);padding:58px 20px 30px">
+            <div style="border:1px solid var(--color-divider);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-6);display:flex;gap:var(--space-3);align-items:center">
+              <span style="width:7px;height:7px;background:var(--color-accent);flex:none"></span>
+              <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 72%, transparent)">Catching up · 41 messages behind</span>
+            </div>
+            <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Thursday 30 July</div>
+            <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-2) 0 var(--space-6);text-transform:uppercase">Two moved<br>forward</h1>
+            <p style="font-size:13.5px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 72%, transparent);margin:0 0 var(--space-6)">The mailbox subscription expired overnight — a normal thing, they last a week — and Loop is re-reading from where it stopped. Today's view may be a few hours behind until it finishes.</p>
+            <div style="height:7px;background:color-mix(in srgb, var(--color-text) 10%, transparent);margin-bottom:var(--space-2)"><div style="height:7px;width:74%;background:var(--color-accent)"></div></div>
+            <div style="font-size:12px;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-bottom:var(--space-6)">about 40 seconds left · nothing needs doing</div>
+            <div style="border:1px solid var(--color-divider);opacity:.55">
+              <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);font-size:13.5px">Satispay · round 2 scheduled</div>
+              <div style="padding:var(--space-3) var(--space-4);font-size:13.5px">Personio · HR call booked</div>
+            </div>
+            <div style="margin-top:auto;padding-top:var(--space-6)">
+              <p style="margin:0;font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Degraded, not broken: the app keeps working and says how stale it is. No dialog, no action.</p>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+        <div style="display:flex;align-items:baseline;gap:var(--space-3)">
+          <span style="font:600 11px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;background:var(--color-accent);color:var(--color-bg)">F3</span>
+          <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">IMAP login refused</span>
+        </div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text);padding:58px 20px 30px">
+            <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Mailboxes · fastwebnet.it</div>
+            <h1 style="font-family:var(--font-heading);font-size:30px;line-height:1;margin:var(--space-2) 0 var(--space-4);text-transform:uppercase">The server<br>said no</h1>
+            <div style="border:1px solid var(--color-divider);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4)">
+              <div style="font:600 10px var(--font-heading);letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin-bottom:4px">Server response</div>
+              <div style="font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 75%, transparent)">AUTHENTICATIONFAILED — invalid credentials (2 attempts, then paused)</div>
+            </div>
+            <p style="font-size:13.5px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 72%, transparent);margin:0 0 var(--space-4)">Almost always one of two things, and almost never your real password being wrong.</p>
+            <div style="border:1px solid var(--color-divider);margin-bottom:var(--space-6)">
+              <div style="padding:var(--space-4);border-bottom:1px solid var(--color-divider)">
+                <div style="font-family:var(--font-heading);font-size:17px;margin-bottom:3px">Two-factor is on</div>
+                <div style="font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Generate an app-specific password and paste that instead. Loop only ever wants one of those.</div>
+              </div>
+              <div style="padding:var(--space-4)">
+                <div style="font-family:var(--font-heading);font-size:17px;margin-bottom:3px">IMAP is disabled</div>
+                <div style="font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Some providers ship it off. It is one switch in the webmail settings.</div>
+              </div>
+            </div>
+            <button class="btn btn-primary" style="min-height:50px;width:100%">Enter a new password</button>
+            <p style="font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin:auto 0 0">Retries stop after two attempts so the provider does not lock the account.</p>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+        <div style="display:flex;align-items:baseline;gap:var(--space-3)">
+          <span style="font:600 11px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;background:var(--color-accent);color:var(--color-bg)">F4</span>
+          <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Model offline · rules still running</span>
+        </div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text);padding:58px 20px 30px">
+            <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Review queue</div>
+            <h1 style="font-family:var(--font-heading);font-size:30px;line-height:1;margin:var(--space-2) 0 var(--space-4);text-transform:uppercase">Four waiting<br>on the model</h1>
+            <p style="font-size:13.5px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 72%, transparent);margin:0 0 var(--space-6)">The local model is not answering, so four unusual messages are parked. Everything with a known template — 78% of your mail — is being read as normal, and the queue drains itself when the model comes back.</p>
+            <div style="border:1px solid var(--color-divider);margin-bottom:var(--space-4)">
+              <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);display:flex;justify-content:space-between;align-items:baseline">
+                <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Template rules</span>
+                <span style="font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;color:var(--color-accent-800)">running</span>
+              </div>
+              <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);display:flex;justify-content:space-between;align-items:baseline">
+                <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Calendar detection</span>
+                <span style="font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;color:var(--color-accent-800)">running</span>
+              </div>
+              <div style="padding:var(--space-3) var(--space-4);display:flex;justify-content:space-between;align-items:baseline;background:color-mix(in srgb, var(--color-text) 5%, transparent)">
+                <span style="font:600 13px var(--font-body)">Local model</span>
+                <span style="font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 60%, transparent)">unreachable · 22 min</span>
+              </div>
+            </div>
+            <p style="font-size:13px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 68%, transparent);margin:0 0 var(--space-4)">You can also just answer them yourself — it takes two taps each and teaches the rules either way.</p>
+            <button class="btn btn-primary" style="min-height:50px;width:100%">Review the four by hand</button>
+            <p style="font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin:auto 0 0">Partial failure is named per component, so a stalled model never reads as "the app is broken".</p>
+          </div>
+        </x-import>
+      </div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:1100}}">
+const STEPS = [
+  ['01', 'Welcome', 'What it is, in one screen. No account, no email required.'],
+  ['02', 'What Loop reads', 'Can / cannot, side by side. The scopes named in full.'],
+  ['03', 'Google consent', 'The real system screen. Unverified-app warning explained in advance.'],
+  ['04', 'History depth', '3, 6 or 12 months. The only slow operation in the product.'],
+  ['05', 'First scan', 'Live progress with what it is finding, not a spinner.'],
+  ['06', 'Confirm the haul', 'You approve what it found before it becomes your pipeline.'],
+  ['07', 'Notifications', 'One ask, with the quiet-hours promise attached.'],
+];
+
+const DEPTHS = [
+  ['3 months', '~2 minutes', 'Enough for what is live right now'],
+  ['12 months', '~8 minutes', 'Enough for ratios, timing and seasonal shape'],
+  ['Everything', '~25 minutes', 'Full history. Runs in the background, you can leave.'],
+];
+
+const HAUL = [
+  ['Satispay', 'Backend Engineer · applied 2 Jul · technical round', 'sure', 'ok'],
+  ['Nexi', 'Platform Engineer · applied 12 Jun · onsite loop', 'sure', 'ok'],
+  ['Bending Spoons', 'Software Engineer · applied 2 Jun · offer', 'sure', 'ok'],
+  ['Zalando', 'Senior Backend Engineer · applied 18 Jun · system design', 'sure', 'ok'],
+  ['Iliad Italia', 'Software Engineer · applied 19 Jul · is this a rejection?', 'unsure', 'review'],
+  ['Talent Garden', 'Newsletter, or a recruiter reach-out?', 'unsure', 'review'],
+];
+
+class Component extends DCLogic {
+  state = { step: 0, depth: 1, dropped: ['Talent Garden'] };
+
+  renderVals() {
+    const { step, depth, dropped } = this.state;
+    const ctas = ['Connect a mailbox', 'Continue with Google', 'Allow', 'Start the scan', 'Keep scanning', 'Looks right', 'Turn on notifications'];
+    const subs = ['or add applications by hand', 'or connect an IMAP mailbox instead', 'you can revoke this at any time', 'you can leave the app while it runs', '3 need a look — later is fine', '2 to review · you can fix these any time', 'not now — Loop still works silently'];
+    return {
+      s0: step === 0, s1: step === 1, s2: step === 2, s3: step === 3,
+      s4: step === 4, s5: step === 5, s6: step === 6,
+      cta: ctas[step], subCta: subs[step], canBack: step > 0,
+      next: () => this.setState({ step: Math.min(6, step + 1) }),
+      back: () => this.setState({ step: Math.max(0, step - 1) }),
+      ticks: STEPS.map((_, i) => ({ bg: i <= step ? 'var(--color-accent)' : 'color-mix(in srgb, var(--color-text) 12%, transparent)' })),
+      steps: STEPS.map(([n, title, note], i) => ({
+        n, title, note,
+        bg: i === step ? 'var(--color-accent-100)' : 'transparent',
+        go: () => this.setState({ step: i }),
+      })),
+      haul: HAUL.map(([company, detail, , tag]) => {
+        const kept = dropped.indexOf(company) < 0;
+        const review = tag === 'review';
+        return {
+          company, detail, tag: review ? 'review' : 'kept',
+          bg: kept ? 'transparent' : 'color-mix(in srgb, var(--color-text) 5%, transparent)',
+          boxBg: kept ? 'var(--color-accent)' : 'transparent',
+          boxBorder: kept ? 'var(--color-accent)' : 'color-mix(in srgb, var(--color-text) 30%, transparent)',
+          tagBorder: review ? 'var(--color-accent-400)' : 'var(--color-divider)',
+          tagColor: review ? 'var(--color-accent-800)' : 'color-mix(in srgb, var(--color-text) 55%, transparent)',
+          toggle: () => this.setState({ dropped: kept ? dropped.concat(company) : dropped.filter((d) => d !== company) }),
+        };
+      }),
+      depths: DEPTHS.map(([label, est, note], i) => ({
+        label, est, note,
+        bg: i === depth ? 'var(--color-accent-100)' : 'transparent',
+        pick: () => this.setState({ depth: i }),
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>

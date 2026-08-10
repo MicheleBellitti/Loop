@@ -1,0 +1,42 @@
+{
+  "name": "loop",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "client"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --build --force",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:corpus": "tsx scripts/run-corpus.ts",
+    "lint:no-send-path": "node scripts/assert-no-send-path.mjs",
+    "migrate": "node --experimental-strip-types packages/db/src/migrate.ts",
+    "seed:user": "node --experimental-strip-types scripts/seed-user.ts",
+    "dev": "node scripts/dev.mjs",
+    "client:dev": "npm run dev -w @loop/client",
+    "client:build": "npm run build -w @loop/client",
+    "fixtures": "tsx scripts/gen-fixtures.ts",
+    "test:db:up": "node scripts/test-db.mjs up",
+    "test:db:down": "node scripts/test-db.mjs down",
+    "e2e": "node scripts/e2e.mjs",
+    "anonymise": "tsx scripts/anonymise.ts",
+    "rotate:kek": "tsx scripts/rotate-kek.ts",
+    "up": "docker compose -f infra/compose.yaml --env-file .env up -d --build",
+    "down": "docker compose -f infra/compose.yaml --env-file .env down",
+    "logs": "docker compose -f infra/compose.yaml --env-file .env logs -f"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
+  }
+}

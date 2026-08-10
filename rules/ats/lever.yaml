@@ -1,0 +1,27 @@
+vendor: lever
+match:
+  sender_domains: [hire.lever.co, lever.co, mail.lever.co]
+locale: [en]
+company_from: subject_capture
+patterns:
+  - intent: acknowledged
+    subject: '^(?<company>.+?) (has received your application|received your application)'
+    confidence: 0.98
+  - intent: acknowledged
+    subject: '^Thanks for applying to (?<company>.+)$'
+    confidence: 0.98
+  - intent: schedule_screening
+    subject: '^(Scheduling|Availability) .*(?<company>)'
+    body: '(let us know (your|what) availability|find a time that works)'
+    confidence: 0.92
+  - intent: interview_invite
+    subject: '^Interview confirmation'
+    extract:
+      role: '(?:for|as) (?:the )?(?<role>[A-Z][^,\.\n]{2,60}?) (?:position|role)'
+    confidence: 0.93
+  - intent: rejected
+    body: '(moving forward with other candidates|not be moving forward|decided not to proceed)'
+    confidence: 0.96
+tests:
+  - fixture: fixtures/ats/lever-ack-01.eml
+    expect: { intent: acknowledged, company: Docebo, confidence: 0.98 }

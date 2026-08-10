@@ -1,0 +1,15 @@
+vendor: bamboohr
+match:
+  sender_domains: [bamboohr.com, mail.bamboohr.com]
+locale: [en]
+company_from: subject_capture
+patterns:
+  - intent: acknowledged
+    subject: '^(?<company>.+?) (?:Application Confirmation|has received your application)$'
+    confidence: 0.98
+  - intent: rejected
+    body: '(chosen to move forward with other|position has been filled)'
+    confidence: 0.95
+tests:
+  - fixture: fixtures/ats/bamboohr-ack-01.eml
+    expect: { intent: acknowledged, confidence: 0.98 }

@@ -1,0 +1,10 @@
+From: billing@hosting.example.com
+To: you@example.com
+Subject: Your invoice for July
+Date: Thu, 30 Jul 2026 09:12:00 +0200
+Message-ID: <invoice-01@fixture.loop>
+Precedence: bulk
+List-Id: billing
+Content-Type: text/plain; charset=utf-8
+
+Your invoice is attached. No action is required.

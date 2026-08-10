@@ -1,0 +1,30 @@
+vendor: ashby
+match:
+  sender_domains: [ashbyhq.com, mail.ashbyhq.com, notifications.ashbyhq.com]
+locale: [en]
+company_from: subject_capture
+patterns:
+  - intent: acknowledged
+    subject: '^(?<company>.+?) — Application Received$'
+    extract:
+      role: 'application for (?:the )?(?<role>[^,\.\n]{3,60}?)(?:[\.\n]|$)'
+    confidence: 0.99
+  - intent: acknowledged
+    subject: '^We received your application to (?<company>.+)$'
+    confidence: 0.98
+  - intent: interview_invite
+    subject: '^(Interview|Chat) with (?<company>.+)$'
+    extract:
+      role: 'for (?:the )?(?<role>[^,\.\n]{2,60}?) (?:position|role|team)'
+    confidence: 0.93
+  - intent: take_home
+    body: '(take[- ]home|coding (exercise|challenge)|technical assignment)'
+    extract:
+      deadline: '(?:by|before|due) (?<deadline>[A-Z][a-z]+day[^\.\n]{0,30}|\d{1,2} [A-Z][a-z]+[^\.\n]{0,20})'
+    confidence: 0.92
+  - intent: rejected
+    body: '(not moving forward|decided to pursue other candidates)'
+    confidence: 0.96
+tests:
+  - fixture: fixtures/ats/ashby-ack-01.eml
+    expect: { intent: acknowledged, company: Satispay, confidence: 0.99 }

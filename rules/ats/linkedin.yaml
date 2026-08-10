@@ -1,0 +1,25 @@
+# Not an ATS — LinkedIn's own confirmation for Easy Apply. It is bulk-flagged
+# and therefore the single most common false negative in the whole system, so
+# the classifier whitelists these domains before the bulk penalty applies.
+vendor: linkedin
+match:
+  sender_domains: [linkedin.com, e.linkedin.com, bounce.linkedin.com]
+locale: [en, it]
+company_from: subject_capture
+patterns:
+  - intent: applied
+    subject: '^(?:Your application was sent to|La tua candidatura è stata inviata a) (?<company>.+)$'
+    confidence: 0.98
+  - intent: applied
+    subject: '^(?:Application sent|Candidatura inviata)'
+    extract:
+      company: '(?:sent to|inviata a) (?<company>[^\n]{2,60})'
+    confidence: 0.96
+  - intent: acknowledged
+    subject: '^(?:Your application was viewed by|La tua candidatura è stata visualizzata da) (?<company>.+)$'
+    confidence: 0.9
+tests:
+  - fixture: fixtures/ats/linkedin-applied-01.eml
+    expect: { intent: applied, company: Nexi, confidence: 0.98 }
+  - fixture: fixtures/ats/linkedin-applied-it-01.eml
+    expect: { intent: applied, company: Casavo, confidence: 0.98 }

@@ -1,0 +1,15 @@
+vendor: icims
+match:
+  sender_domains: [icims.com, talent.icims.com]
+locale: [en]
+company_from: subject_capture
+patterns:
+  - intent: acknowledged
+    subject: '^(?:Thank you for your interest in|Application confirmation).*?(?:at (?<company>.+))?$'
+    confidence: 0.96
+  - intent: rejected
+    body: '(pursuing other candidates|position has been filled)'
+    confidence: 0.95
+tests:
+  - fixture: fixtures/ats/icims-ack-01.eml
+    expect: { intent: acknowledged, confidence: 0.96 }

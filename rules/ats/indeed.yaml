@@ -1,0 +1,19 @@
+# Same story as LinkedIn: relevant mail that arrives bulk-flagged.
+vendor: indeed
+match:
+  sender_domains: [indeed.com, indeedemail.com, match.indeed.com]
+locale: [en, it]
+company_from: subject_capture
+patterns:
+  - intent: applied
+    subject: '^(?:Indeed Application|Candidatura Indeed):\s*(?<role>.+?)(?:\s*[-–]\s*(?<company>.+))?$'
+    confidence: 0.97
+  - intent: applied
+    subject: '^(?:You applied to|Ti sei candidato a) (?<role>.+?) (?:at|presso) (?<company>.+)$'
+    confidence: 0.97
+  - intent: acknowledged
+    subject: '^(?:Your application to|La tua candidatura a) (?<company>.+?) (?:was viewed|è stata visualizzata)'
+    confidence: 0.88
+tests:
+  - fixture: fixtures/ats/indeed-applied-01.eml
+    expect: { intent: applied, company: Everli, confidence: 0.97 }

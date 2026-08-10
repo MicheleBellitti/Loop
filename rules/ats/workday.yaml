@@ -1,0 +1,27 @@
+# Workday sends from a per-tenant subdomain, so the match is on the shared
+# suffix and the company comes from the subject.
+vendor: workday
+match:
+  sender_domains: [myworkday.com, workday.com, myworkdayjobs.com]
+locale: [en, it]
+company_from: subject_capture
+patterns:
+  - intent: acknowledged
+    subject: '^(Thank you for your (interest|application)|Application Received).*?(?:[-–|]\s*(?<company>.+))?$'
+    confidence: 0.97
+  - intent: acknowledged
+    subject: '^(?<company>.+?): Application Received$'
+    confidence: 0.98
+  - intent: schedule_screening
+    body: '(schedule (an|your) interview|select a time slot|choose an interview time)'
+    confidence: 0.9
+  - intent: rejected
+    body: '(no longer under consideration|other candidates whose|not selected for this position)'
+    confidence: 0.95
+  - intent: rejected
+    body: '(la sua candidatura non|non è stata selezionata|abbiamo deciso di proseguire con altri)'
+    locale: it
+    confidence: 0.94
+tests:
+  - fixture: fixtures/ats/workday-ack-01.eml
+    expect: { intent: acknowledged, company: Nexi, confidence: 0.98 }

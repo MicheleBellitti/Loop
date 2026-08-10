@@ -1,0 +1,22 @@
+vendor: workable
+match:
+  sender_domains: [workablemail.com, workable.com, candidates.workablemail.com]
+locale: [en, it]
+company_from: subject_capture
+patterns:
+  - intent: acknowledged
+    subject: '^(?:Thank you for applying to|Your application to) (?<company>.+?)(?: has been received)?$'
+    extract:
+      role: '(?:application for|candidatura per) (?:the |la |il )?(?<role>[^,\.\n]{3,60}?)(?:\s+(?:position|role|posizione)|[\.\n])'
+    confidence: 0.98
+  - intent: take_home
+    subject: '(assignment|assessment|take[- ]home|esercizio)'
+    extract:
+      deadline: '(?:by|before|entro|due) (?<deadline>[^\.\n]{3,40})'
+    confidence: 0.93
+  - intent: rejected
+    body: '(not to move forward|unsuccessful on this occasion|non è andata a buon fine)'
+    confidence: 0.95
+tests:
+  - fixture: fixtures/ats/workable-ack-01.eml
+    expect: { intent: acknowledged, company: Prima Assicurazioni, confidence: 0.98 }

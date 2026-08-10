@@ -1,0 +1,32 @@
+From: Marta <talent@nexi.it>
+To: you@example.com
+Subject: Invitation: System & code review @ Fri 31 Jul
+Date: Thu, 30 Jul 2026 09:12:00 +0200
+Message-ID: <calendar-invite-01@fixture.loop>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset=utf-8
+
+Looking forward to it.
+
+--b1
+Content-Type: text/calendar; method=REQUEST; charset=utf-8
+Content-Disposition: attachment; filename="invite.ics"
+
+BEGIN:VCALENDAR
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:nexi-round-2@nexi.it
+SUMMARY:System & code review
+DTSTART:20260731T100000Z
+DTEND:20260731T110000Z
+ORGANIZER:mailto:talent@nexi.it
+ATTENDEE:mailto:you@example.com
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR
+
+--b1--

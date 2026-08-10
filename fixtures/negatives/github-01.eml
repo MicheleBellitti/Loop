@@ -1,0 +1,10 @@
+From: notifications@github.com
+To: you@example.com
+Subject: [acme/repo] Pull request merged (#412)
+Date: Thu, 30 Jul 2026 09:12:00 +0200
+Message-ID: <github-01@fixture.loop>
+List-Id: acme/repo
+Precedence: bulk
+Content-Type: text/plain; charset=utf-8
+
+The pull request was merged into main.

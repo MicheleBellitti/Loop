@@ -1,0 +1,33 @@
+name: ci
+
+# The gates from Engineering Spec §17, run on every commit.
+on: [push, pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+
+      - run: npm ci
+      - run: npx tsc --build
+      - run: npm run -w @loop/client typecheck
+
+      # Loop drafts follow-ups and never sends one. This is the assertion.
+      - run: npm run lint:no-send-path
+
+      - run: npm test
+
+      # Intent precision ≥ 0.97, recall ≥ 0.90, and zero false negatives on the
+      # LinkedIn/Indeed fixtures. Prints the confusion matrix either way.
+      - run: npm run test:corpus
+
+      # RLS, append-only, idempotency, rebuild, erasure — against a real
+      # Postgres, because the interesting bugs live in SQL.
+      - run: docker build -t loop-postgres:16 infra/postgres
+      - run: npm run test:db:up
+      - run: npm run test:integration
+
+      - run: npm run -w @loop/client build

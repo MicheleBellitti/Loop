@@ -1,0 +1,18 @@
+vendor: smartrecruiters
+match:
+  sender_domains: [smartrecruiters.com, mail.smartrecruiters.com]
+locale: [en, it]
+company_from: subject_capture
+patterns:
+  - intent: acknowledged
+    subject: '^(Thank you for applying|Application received)(?:.*?(?:at|to) (?<company>.+))?$'
+    confidence: 0.97
+  - intent: schedule_screening
+    body: '(would like to schedule|propose a time|are you available)'
+    confidence: 0.9
+  - intent: rejected
+    body: '(we will not be proceeding|other applicants|non proseguiremo)'
+    confidence: 0.95
+tests:
+  - fixture: fixtures/ats/smartrecruiters-ack-01.eml
+    expect: { intent: acknowledged, company: Sportradar, confidence: 0.97 }

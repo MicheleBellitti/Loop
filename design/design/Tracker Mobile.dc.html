@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/industry-5d9669ba-52c5-444b-9a17-67aa1664e37d/styles.css">
+<script src="_ds/industry-5d9669ba-52c5-444b-9a17-67aa1664e37d/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}
+a{color:var(--color-accent-700);text-decoration:none}
+a:hover{color:var(--color-accent)}
+.lp{scrollbar-width:none}
+.lp::-webkit-scrollbar{display:none;width:0;height:0}
+</style>
+</helmet>
+
+<div style="min-height:100vh;padding:var(--space-8) var(--space-6);display:flex;flex-direction:column;align-items:center;gap:var(--space-6)">
+
+  <div style="display:flex;align-items:center;gap:var(--space-3)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <span style="font:600 17px var(--font-heading);letter-spacing:.03em;text-transform:uppercase">Loop</span>
+    <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">mobile · sheet 02 / 03 · tap anything</span>
+  </div>
+
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+    <div style="position:relative;height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text)">
+
+      <!-- ══ TODAY ══ -->
+      <sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+      <div class="lp" style="flex:1;overflow-y:auto;padding:60px 18px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-6)">
+          <div>
+            <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Thursday 30 July</div>
+            <h1 style="font-family:var(--font-heading);font-size:34px;line-height:1;letter-spacing:-.01em;margin:var(--space-2) 0 0;text-transform:uppercase">Three moved<br>forward<br>this week</h1>
+          </div>
+          <button onClick="{{ openReview }}" style="position:relative;width:44px;height:44px;border:1px solid var(--color-divider);background:transparent;color:var(--color-text);cursor:pointer;display:grid;place-items:center;flex:none" style-hover="background:color-mix(in srgb, var(--color-text) 7%, transparent)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7h18v11a2 2 0 01-2 2H5a2 2 0 01-2-2V7zM3 7l3-3h12l3 3M9 12h6"/></svg>
+            <span style="position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;background:var(--color-accent);color:var(--color-bg);font:600 11px var(--font-heading);display:grid;place-items:center;padding:0 4px">2</span>
+          </button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--color-divider);margin-bottom:var(--space-6)">
+          <div style="padding:var(--space-3);border-right:1px solid var(--color-divider)">
+            <div style="font:600 30px var(--font-heading);line-height:1">14</div>
+            <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">live</div>
+          </div>
+          <div style="padding:var(--space-3);border-right:1px solid var(--color-divider)">
+            <div style="font:600 30px var(--font-heading);line-height:1;color:var(--color-accent-700)">4</div>
+            <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">interviewing</div>
+          </div>
+          <div style="padding:var(--space-3);background:var(--color-accent-100)">
+            <div style="font:600 30px var(--font-heading);line-height:1;color:var(--color-accent-900)">1</div>
+            <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-800)">offer</div>
+          </div>
+        </div>
+
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">Next up</div>
+        <button onClick="{{ openNext }}" class="blueprint" style="width:100%;text-align:left;display:block;padding:var(--space-4);background:var(--color-accent-100);color:var(--color-text);cursor:pointer;margin-bottom:var(--space-6);font-family:var(--font-body)">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-2)">
+            <span style="font:600 22px var(--font-heading);color:var(--color-accent-900)">Satispay</span>
+            <span style="font:600 13px var(--font-heading);letter-spacing:.04em;text-transform:uppercase;color:var(--color-accent-800)">Tomorrow 10:00</span>
+          </div>
+          <div style="font-size:13.5px;color:var(--color-accent-900);margin-top:3px">Technical interview · Backend Engineer</div>
+          <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3);flex-wrap:wrap">
+            <span style="font-size:11px;padding:3px 8px;border:1px solid var(--color-accent-400);color:var(--color-accent-800)">2 rounds done</span>
+            <span style="font-size:11px;padding:3px 8px;border:1px solid color-mix(in srgb, var(--color-text) 18%, transparent);color:color-mix(in srgb, var(--color-text) 60%, transparent)">from calendar invite</span>
+          </div>
+        </button>
+
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--space-3)">
+          <span style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700)">Suggested</span>
+          <span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 45%, transparent)">{{ nudgeCount }} left</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-6)">
+          <sc-for list="{{ nudges }}" as="n" hint-placeholder-count="2">
+            <div style="border:1px solid var(--color-divider);padding:var(--space-4)">
+              <div style="display:flex;justify-content:space-between;gap:var(--space-2);align-items:baseline">
+                <span class="tag tag-accent">{{ n.kind }}</span>
+                <span style="font-size:11px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">{{ n.meta }}</span>
+              </div>
+              <div style="font-family:var(--font-heading);font-size:19px;line-height:1.15;margin:var(--space-3) 0 var(--space-2)">{{ n.title }}</div>
+              <p style="margin:0;font-size:13px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">{{ n.body }}</p>
+              <div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">
+                <button onClick="{{ n.act }}" class="btn btn-primary" style="flex:1;min-height:44px">{{ n.cta }}</button>
+                <button onClick="{{ n.skip }}" class="btn btn-secondary" style="min-height:44px;padding-inline:var(--space-4)">Later</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-bottom:var(--space-1)">Picked up this week</div>
+        <div style="display:flex;flex-direction:column">
+          <sc-for list="{{ recent }}" as="r" hint-placeholder-count="4">
+            <button onClick="{{ r.open }}" style="display:flex;align-items:center;gap:var(--space-3);width:100%;min-height:56px;text-align:left;padding:var(--space-3) 0;background:transparent;border:0;border-bottom:1px solid var(--color-divider);color:var(--color-text);cursor:pointer;font-family:var(--font-body)" style-hover="background:color-mix(in srgb, var(--color-text) 4%, transparent)">
+              <svg width="11" height="11" viewBox="0 0 11 11" stroke="{{ r.mark }}" stroke-width="1" style="flex:none"><path d="M5.5 0v11M0 5.5h11"/></svg>
+              <span style="flex:1;min-width:0">
+                <span style="display:block;font-size:15px;font-weight:500">{{ r.company }}</span>
+                <span style="display:block;font-size:12.5px;color:color-mix(in srgb, var(--color-text) 60%, transparent);margin-top:1px">{{ r.what }}</span>
+              </span>
+              <span style="font:600 11px var(--font-heading);letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 45%, transparent);flex:none">{{ r.when }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <p style="font-size:12.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin:var(--space-4) 0 0">Everything above was read from your mailbox and calendar. You have not typed anything this week.</p>
+      </div>
+      </sc-if>
+
+      <!-- ══ PIPELINE ══ -->
+      <sc-if value="{{ isPipeline }}" hint-placeholder-val="{{ false }}">
+      <div class="lp" style="flex:1;overflow-y:auto;padding:60px 0 14px">
+        <div style="padding:0 18px">
+          <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Pipeline</div>
+          <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-2) 0 var(--space-4);text-transform:uppercase">16 applications</h1>
+        </div>
+        <div class="lp" style="display:flex;gap:var(--space-2);overflow-x:auto;padding:0 18px var(--space-4)">
+          <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+            <button onClick="{{ f.set }}" style="flex:none;min-height:36px;padding:0 var(--space-4);border:1px solid var(--color-divider);background:{{ f.bg }};color:{{ f.fg }};font:600 12px var(--font-heading);letter-spacing:.06em;text-transform:uppercase;cursor:pointer">{{ f.label }}</button>
+          </sc-for>
+        </div>
+
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+          <div style="margin-bottom:var(--space-6)">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;padding:var(--space-2) 18px;border-top:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider);background:var(--color-accent-100)">
+              <span style="font:600 12px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-800)">{{ g.label }}</span>
+              <span style="font:600 12px var(--font-heading);color:var(--color-accent-800)">{{ g.count }}</span>
+            </div>
+            <sc-for list="{{ g.apps }}" as="a" hint-placeholder-count="3">
+              <button onClick="{{ a.open }}" style="display:block;width:100%;text-align:left;padding:var(--space-4) 18px;background:transparent;border:0;border-bottom:1px solid var(--color-divider);cursor:pointer;color:var(--color-text);font-family:var(--font-body);opacity:{{ a.dim }}" style-hover="background:color-mix(in srgb, var(--color-text) 4%, transparent)">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3)">
+                  <span style="font:600 19px var(--font-heading);line-height:1.1">{{ a.company }}</span>
+                  <span style="font:600 11px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;color:var(--color-accent-700);flex:none">{{ a.stage }}</span>
+                </div>
+                <div style="font-size:13.5px;color:color-mix(in srgb, var(--color-text) 70%, transparent);margin-top:2px">{{ a.role }}</div>
+                <div style="display:flex;gap:var(--space-3);align-items:center;margin-top:var(--space-3);font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">
+                  <span>{{ a.channel }}</span>
+                  <span style="width:1px;height:10px;background:var(--color-divider)"></span>
+                  <span>quiet {{ a.days }}</span>
+                  <span style="margin-left:auto;color:var(--color-accent-700);font-weight:500">{{ a.flag }}</span>
+                </div>
+              </button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      </sc-if>
+
+      <!-- ══ STATS ══ -->
+      <sc-if value="{{ isStats }}" hint-placeholder-val="{{ false }}">
+      <div class="lp" style="flex:1;overflow-y:auto;padding:60px 18px 14px">
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Statistics</div>
+        <h1 style="font-family:var(--font-heading);font-size:32px;line-height:1;margin:var(--space-2) 0 var(--space-4);text-transform:uppercase">Last {{ periodLabel }}</h1>
+        <div style="display:flex;border:1px solid var(--color-divider);margin-bottom:var(--space-6)">
+          <button onClick="{{ setP90 }}" style="flex:1;min-height:40px;border:0;border-right:1px solid var(--color-divider);background:{{ p90bg }};color:{{ p90fg }};font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;cursor:pointer">90 days</button>
+          <button onClick="{{ setP12 }}" style="flex:1;min-height:40px;border:0;background:{{ p12bg }};color:{{ p12fg }};font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;cursor:pointer">12 months</button>
+        </div>
+
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">Funnel</div>
+        <div style="border:1px solid var(--color-divider);margin-bottom:var(--space-6)">
+          <sc-for list="{{ funnel }}" as="f" hint-placeholder-count="5">
+            <div style="padding:var(--space-3) var(--space-3) var(--space-2);border-bottom:1px solid var(--color-divider)">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
+                <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 75%, transparent)">{{ f.label }}</span>
+                <span style="font:600 17px var(--font-heading)">{{ f.n }}</span>
+              </div>
+              <div style="height:8px;background:color-mix(in srgb, var(--color-text) 8%, transparent)">
+                <div style="height:8px;width:{{ f.w }};background:var(--color-accent)"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr;border:1px solid var(--color-divider);margin-bottom:var(--space-6)">
+          <sc-for list="{{ ratios }}" as="r" hint-placeholder-count="2">
+            <div style="padding:var(--space-4);border-bottom:1px solid var(--color-divider)">
+              <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <span style="font:600 13px var(--font-heading);letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 70%, transparent)">{{ r.label }}</span>
+                <span style="font:600 30px var(--font-heading);line-height:1;color:var(--color-accent-800)">{{ r.value }}</span>
+              </div>
+              <div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin-top:4px">{{ r.note }}</div>
+            </div>
+          </sc-for>
+          <div style="display:grid;grid-template-columns:1fr 1fr">
+            <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+              <div style="font:600 26px var(--font-heading);line-height:1">{{ firstResponse }}</div>
+              <div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-top:2px">median to first human reply</div>
+            </div>
+            <div style="padding:var(--space-4)">
+              <div style="font:600 26px var(--font-heading);line-height:1">{{ ghost }}</div>
+              <div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-top:2px">closed by silence, not by a no</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">By channel</div>
+        <table class="table" style="margin-bottom:var(--space-6)">
+          <thead><tr><th>Channel</th><th style="text-align:right">Sent</th><th style="text-align:right">→ IV</th><th style="text-align:right">→ Offer</th><th style="text-align:right">Ghost</th></tr></thead>
+          <tbody>
+            <sc-for list="{{ channels }}" as="c" hint-placeholder-count="4">
+              <tr>
+                <td style="font-weight:500;font-size:13px">{{ c.name }}</td>
+                <td style="text-align:right;font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">{{ c.sent }}</td>
+                <td style="text-align:right;font:600 14px var(--font-heading);color:var(--color-accent-800)">{{ c.iv }}</td>
+                <td style="text-align:right;font-size:13px">{{ c.of }}</td>
+                <td style="text-align:right;font-size:13px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ c.ghost }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">Median time in stage</div>
+        <div style="border:1px solid var(--color-divider);margin-bottom:var(--space-6)">
+          <sc-for list="{{ timing }}" as="t" hint-placeholder-count="5">
+            <div style="display:grid;grid-template-columns:118px minmax(0,1fr) 42px;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--color-divider)">
+              <span style="font-size:12px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">{{ t.label }}</span>
+              <span style="height:6px;background:color-mix(in srgb, var(--color-text) 8%, transparent);display:block">
+                <span style="height:6px;width:{{ t.w }};background:var(--color-accent-500);display:block"></span>
+              </span>
+              <span style="font:600 13px var(--font-heading);text-align:right">{{ t.days }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div class="blueprint" style="padding:var(--space-4);margin-bottom:var(--space-3)">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">Compensation</div>
+          <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span style="color:color-mix(in srgb, var(--color-text) 70%, transparent)">Median posted range</span><span style="font-weight:500">€52–66k</span></div>
+              <div style="height:6px;background:color-mix(in srgb, var(--color-text) 8%, transparent);position:relative"><div style="position:absolute;left:18%;width:44%;height:6px;background:var(--color-accent-300)"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span style="color:color-mix(in srgb, var(--color-text) 70%, transparent)">Your ask</span><span style="font-weight:500">€65k</span></div>
+              <div style="height:6px;background:color-mix(in srgb, var(--color-text) 8%, transparent);position:relative"><div style="position:absolute;left:58%;width:2px;height:6px;background:var(--color-text)"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span style="color:color-mix(in srgb, var(--color-text) 70%, transparent)">Offers received</span><span style="font-weight:500">€62k · €68k</span></div>
+              <div style="height:6px;background:color-mix(in srgb, var(--color-text) 8%, transparent);position:relative"><div style="position:absolute;left:52%;width:2px;height:6px;background:var(--color-accent)"></div><div style="position:absolute;left:66%;width:2px;height:6px;background:var(--color-accent)"></div></div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size:12px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin:0">Seasonal averages need two more quarters of history before they mean anything, so they are hidden rather than shown noisy.</p>
+      </div>
+      </sc-if>
+
+      <!-- ══ DETAIL ══ -->
+      <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+      <div class="lp" style="flex:1;overflow-y:auto;padding:52px 0 0">
+        <div style="display:flex;align-items:center;gap:var(--space-2);padding:0 12px var(--space-3);border-bottom:1px solid var(--color-divider)">
+          <button onClick="{{ back }}" style="display:flex;align-items:center;gap:6px;min-height:44px;padding:0 var(--space-2);background:transparent;border:0;cursor:pointer;color:var(--color-accent-700);font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;font-family:var(--font-heading)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 18l-6-6 6-6"/></svg>Back
+          </button>
+          <span style="margin-left:auto;font-size:11.5px;color:color-mix(in srgb, var(--color-text) 45%, transparent)">tracked automatically</span>
+        </div>
+
+        <div style="padding:var(--space-6) 18px var(--space-4)">
+          <h1 style="font-family:var(--font-heading);font-size:36px;line-height:1;margin:0;text-transform:uppercase">{{ app.company }}</h1>
+          <div style="font-size:15px;color:color-mix(in srgb, var(--color-text) 72%, transparent);margin-top:var(--space-2)">{{ app.role }}</div>
+          <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3);flex-wrap:wrap">
+            <span class="tag tag-accent">{{ app.stage }}</span>
+            <span class="tag tag-neutral">{{ app.channel }}</span>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--color-divider)">
+          <div style="padding:var(--space-3) 18px;border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+            <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Applied</div>
+            <div style="font-size:14px">{{ app.applied }}</div>
+          </div>
+          <div style="padding:var(--space-3) 18px;border-bottom:1px solid var(--color-divider)">
+            <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">ATS</div>
+            <div style="font-size:14px">{{ app.ats }}</div>
+          </div>
+          <div style="padding:var(--space-3) 18px;border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+            <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Location</div>
+            <div style="font-size:14px">{{ app.loc }}</div>
+          </div>
+          <div style="padding:var(--space-3) 18px;border-bottom:1px solid var(--color-divider)">
+            <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Posted range</div>
+            <div style="font-size:14px">{{ app.comp }}</div>
+          </div>
+        </div>
+
+        <div style="padding:var(--space-6) 18px var(--space-3)">
+          <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700)">Event log</div>
+        </div>
+        <div style="padding:0 18px var(--space-6)">
+          <sc-for list="{{ events }}" as="e" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:58px 18px minmax(0,1fr);gap:var(--space-2);padding-bottom:var(--space-4)">
+              <div style="font:600 12px var(--font-heading);letter-spacing:.04em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);text-align:right;padding-top:2px">{{ e.when }}</div>
+              <div style="display:flex;flex-direction:column;align-items:center">
+                <svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1" style="flex:none;margin-top:3px"><path d="M5.5 0v11M0 5.5h11"/></svg>
+                <span style="flex:1;width:1px;background:var(--color-divider);margin-top:3px"></span>
+              </div>
+              <div>
+                <div style="font-size:14.5px;font-weight:500;line-height:1.25">{{ e.what }}</div>
+                <div style="font-size:12.5px;line-height:1.45;color:color-mix(in srgb, var(--color-text) 65%, transparent);margin-top:2px">{{ e.detail }}</div>
+                <div style="display:flex;gap:var(--space-2);align-items:center;margin-top:var(--space-2)">
+                  <span style="font-size:10.5px;padding:2px 6px;border:1px solid var(--color-divider);color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ e.source }}</span>
+                  <span style="font:600 10.5px var(--font-heading);letter-spacing:.06em;color:var(--color-accent-700)">conf {{ e.conf }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="padding:0 18px var(--space-8);display:flex;flex-direction:column;gap:var(--space-2)">
+          <button onClick="{{ openDraftSheet }}" class="btn btn-primary" style="min-height:48px;width:100%">Draft a follow-up</button>
+          <div style="display:flex;gap:var(--space-2)">
+            <button class="btn btn-secondary" style="flex:1;min-height:48px">Open thread</button>
+            <button class="btn btn-secondary" style="flex:1;min-height:48px">Correct stage</button>
+          </div>
+          <p style="font-size:11.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin:var(--space-2) 0 0">Correcting the stage writes a <em>human_corrected</em> event at confidence 1.0 — the agent will not overwrite it.</p>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ══ SHEET · ADD ══ -->
+      <sc-if value="{{ isAdd }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:30;background:color-mix(in srgb, var(--color-neutral-900) 45%, transparent);display:flex;flex-direction:column;justify-content:flex-end">
+        <div style="background:var(--color-bg);border-top:1px solid var(--color-divider);padding:var(--space-6) 18px 40px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--space-4)">
+            <h2 style="font-family:var(--font-heading);font-size:26px;margin:0;text-transform:uppercase">Add manually</h2>
+            <button onClick="{{ closeSheet }}" style="min-height:44px;padding:0 var(--space-2);background:transparent;border:0;cursor:pointer;color:var(--color-accent-700);font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase">Close</button>
+          </div>
+          <p style="font-size:13px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 65%, transparent);margin:0 0 var(--space-4)">Paste the posting URL and the rest is fetched: company, role, location, posted range and the ATS behind it. Everything after this point is automatic.</p>
+          <div class="field" style="margin-bottom:var(--space-4)">
+            <label>Posting URL</label>
+            <input class="input" style="min-height:48px" value="https://boards.greenhouse.io/…" readonly="readonly">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-6)">
+            <div class="field"><label>Channel</label><input class="input" style="min-height:48px" value="LinkedIn" readonly="readonly"></div>
+            <div class="field"><label>Applied on</label><input class="input" style="min-height:48px" value="30 Jul 2026" readonly="readonly"></div>
+          </div>
+          <button onClick="{{ closeSheet }}" class="btn btn-primary" style="width:100%;min-height:50px">Track it</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ══ SHEET · REVIEW ══ -->
+      <sc-if value="{{ isReview }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:30;background:var(--color-bg);display:flex;flex-direction:column;padding:52px 0 0">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 12px var(--space-3);border-bottom:1px solid var(--color-divider)">
+          <span style="font:600 12px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;padding-left:6px">Review queue · 2</span>
+          <button onClick="{{ closeSheet }}" style="min-height:44px;padding:0 var(--space-2);background:transparent;border:0;cursor:pointer;color:var(--color-accent-700);font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase">Done</button>
+        </div>
+        <div class="lp" style="flex:1;overflow-y:auto;padding:var(--space-6) 18px 40px">
+          <p style="font-size:13px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 65%, transparent);margin:0 0 var(--space-6)">Two messages the agent could not place confidently. Each answer is written back as a rule, so this queue shrinks over time instead of growing.</p>
+
+          <div class="blueprint" style="padding:var(--space-4);margin-bottom:var(--space-4)">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700)">Same application?</div>
+            <div style="font-family:var(--font-heading);font-size:20px;margin:var(--space-2) 0 var(--space-3);line-height:1.15">Two candidates within 0.03</div>
+            <div style="font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 65%, transparent);border-left:2px solid var(--color-accent-300);padding-left:var(--space-3);margin-bottom:var(--space-4)">"Regarding your application for the Backend role — are you available Thursday?" — <em>talent@nexi.it</em>, 29 Jul</div>
+            <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+              <button onClick="{{ closeSheet }}" style="text-align:left;padding:var(--space-3);min-height:48px;border:1px solid var(--color-divider);background:transparent;cursor:pointer;font-family:var(--font-body);color:var(--color-text)" style-hover="background:var(--color-accent-100)">
+                <span style="display:block;font-size:14px;font-weight:500">Nexi · Platform Engineer</span>
+                <span style="display:block;font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">applied 12 Jun · onsite loop · cosine 0.81</span>
+              </button>
+              <button onClick="{{ closeSheet }}" style="text-align:left;padding:var(--space-3);min-height:48px;border:1px solid var(--color-divider);background:transparent;cursor:pointer;font-family:var(--font-body);color:var(--color-text)" style-hover="background:var(--color-accent-100)">
+                <span style="display:block;font-size:14px;font-weight:500">Nexi · Backend Engineer</span>
+                <span style="display:block;font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">applied 3 Jul · acknowledged · cosine 0.78</span>
+              </button>
+              <button onClick="{{ closeSheet }}" class="btn btn-secondary" style="min-height:44px">Neither — new application</button>
+            </div>
+          </div>
+
+          <div style="border:1px solid var(--color-divider);padding:var(--space-4)">
+            <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700)">Unknown template</div>
+            <div style="font-family:var(--font-heading);font-size:20px;margin:var(--space-2) 0 var(--space-3);line-height:1.15">Is this a rejection?</div>
+            <div style="font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 65%, transparent);border-left:2px solid var(--color-accent-300);padding-left:var(--space-3);margin-bottom:var(--space-4)">"Ti terremo in considerazione per future opportunità" — <em>hr@iliad.it</em>, 28 Jul · confidence 0.54</div>
+            <div style="display:flex;gap:var(--space-2)">
+              <button onClick="{{ closeSheet }}" class="btn btn-primary" style="flex:1;min-height:48px">Yes, rejected</button>
+              <button onClick="{{ closeSheet }}" class="btn btn-secondary" style="flex:1;min-height:48px">No, still live</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ══ SHEET · DRAFT ══ -->
+      <sc-if value="{{ isDraft }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:30;background:color-mix(in srgb, var(--color-neutral-900) 45%, transparent);display:flex;flex-direction:column;justify-content:flex-end">
+        <div style="background:var(--color-bg);border-top:1px solid var(--color-divider);padding:var(--space-6) 18px 40px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--space-3)">
+            <h2 style="font-family:var(--font-heading);font-size:26px;margin:0;text-transform:uppercase">Follow-up draft</h2>
+            <button onClick="{{ closeSheet }}" style="min-height:44px;padding:0 var(--space-2);background:transparent;border:0;cursor:pointer;color:var(--color-accent-700);font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase">Close</button>
+          </div>
+          <div style="font-size:12px;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-bottom:var(--space-3)">To Nexi · in reply to the onsite thread · written in the thread's language</div>
+          <div style="border:1px solid var(--color-divider);padding:var(--space-4);font-size:14px;line-height:1.6;margin-bottom:var(--space-4)">
+            Hi Marta,<br><br>thanks again for Thursday's sessions — I enjoyed the discussion about the settlement pipeline. Is there anything you need from my side while the team decides?<br><br>Best,<br>—
+          </div>
+          <p style="font-size:11.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin:0 0 var(--space-4)">Loop holds a read-only scope, so it cannot send this. Copying opens your own mail client with the thread already selected.</p>
+          <div style="display:flex;gap:var(--space-2)">
+            <button onClick="{{ closeSheet }}" class="btn btn-primary" style="flex:1;min-height:50px">Copy &amp; open thread</button>
+            <button onClick="{{ closeSheet }}" class="btn btn-secondary" style="min-height:50px;padding-inline:var(--space-4)">Edit</button>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ══ TAB BAR ══ -->
+      <sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:none;display:flex;padding:var(--space-2) var(--space-2) 30px;border-top:1px solid var(--color-divider);background:var(--color-bg)">
+        <button onClick="{{ goToday }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:var(--space-2) 0;min-height:44px;background:transparent;border:0;cursor:pointer;color:{{ todayColor }};font-family:var(--font-body)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10l9-7 9 7v10a1 1 0 01-1 1h-5v-7H9v7H4a1 1 0 01-1-1V10z"/></svg>
+          <span style="font:600 10.5px var(--font-heading);letter-spacing:.08em;text-transform:uppercase">Today</span>
+        </button>
+        <button onClick="{{ goPipeline }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:var(--space-2) 0;min-height:44px;background:transparent;border:0;cursor:pointer;color:{{ pipelineColor }};font-family:var(--font-body)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h16M4 12h11M4 18h6"/></svg>
+          <span style="font:600 10.5px var(--font-heading);letter-spacing:.08em;text-transform:uppercase">Pipeline</span>
+        </button>
+        <button onClick="{{ goStats }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:var(--space-2) 0;min-height:44px;background:transparent;border:0;cursor:pointer;color:{{ statsColor }};font-family:var(--font-body)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+          <span style="font:600 10.5px var(--font-heading);letter-spacing:.08em;text-transform:uppercase">Stats</span>
+        </button>
+        <button onClick="{{ openAdd }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:var(--space-2) 0;min-height:44px;background:transparent;border:0;cursor:pointer;color:color-mix(in srgb, var(--color-text) 50%, transparent);font-family:var(--font-body)" style-hover="color:var(--color-accent)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14"/></svg>
+          <span style="font:600 10.5px var(--font-heading);letter-spacing:.08em;text-transform:uppercase">Add</span>
+        </button>
+      </div>
+      </sc-if>
+
+    </div>
+  </x-import>
+
+  <p style="max-width:520px;text-align:center;font-size:13px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin:0">Four surfaces: a daily view that only shows what needs you, the pipeline as one thumb-scroll, statistics with visible denominators, and a two-tap review queue for the ~1% the agent is unsure about.</p>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:600,&quot;height&quot;:1100}}">
+const A = (id, company, role, stage, phase, channel, days, applied, extra) => Object.assign({
+  id, company, role, stage, phase, channel, days, applied,
+}, extra || {});
+
+const APPS = [
+  A('satispay', 'Satispay', 'Backend Engineer', 'Technical', 'interviewing', 'Career page', 1, '2 Jul', { comp: '€55–70k', ats: 'Ashby', loc: 'Milan · hybrid', next: 'Tomorrow 10:00' }),
+  A('nexi', 'Nexi', 'Platform Engineer', 'Onsite loop', 'interviewing', 'LinkedIn', 6, '12 Jun', { comp: '€60–75k', ats: 'Workday', loc: 'Milan · onsite' }),
+  A('zalando', 'Zalando', 'Senior Backend Engineer', 'System design', 'interviewing', 'Career page', 5, '18 Jun', { comp: '€75–90k', ats: 'Greenhouse', loc: 'Berlin · remote EU' }),
+  A('personio', 'Personio', 'Backend Engineer', 'HR call', 'interviewing', 'LinkedIn', 2, '9 Jul', { comp: '€65–80k', ats: 'Greenhouse', loc: 'Munich · remote' }),
+  A('docebo', 'Docebo', 'Software Engineer', 'HR call', 'screening', 'Indeed', 2, '21 Jul', { comp: '€45–58k', ats: 'Lever', loc: 'Biassono · hybrid' }),
+  A('prima', 'Prima Assicurazioni', 'Backend Engineer', 'Take-home', 'screening', 'LinkedIn', 1, '23 Jul', { comp: '€50–65k', ats: 'Workable', loc: 'Milan · remote', due: 'Due Sunday 23:59' }),
+  A('scalapay', 'Scalapay', 'Engineer, Payments', 'Recruiter reach-out', 'screening', 'Referral', 4, '24 Jul', { comp: 'not posted', ats: 'Greenhouse', loc: 'Milan · hybrid' }),
+  A('bending', 'Bending Spoons', 'Software Engineer', 'Offer', 'decided', 'Career page', 2, '2 Jun', { comp: '€68k + equity', ats: 'in-house', loc: 'Milan · onsite', offer: true }),
+  A('getyourguide', 'GetYourGuide', 'Backend Engineer', 'Applied', 'sent', 'LinkedIn', 6, '24 Jul', { comp: '€70–85k', ats: 'Greenhouse', loc: 'Berlin · hybrid' }),
+  A('translated', 'Translated', 'Platform Engineer', 'Acknowledged', 'sent', 'Career page', 8, '22 Jul', { comp: 'not posted', ats: 'Recruitee', loc: 'Rome · remote' }),
+  A('everli', 'Everli', 'Backend Engineer', 'Acknowledged', 'sent', 'Indeed', 9, '21 Jul', { comp: '€45–55k', ats: 'Workable', loc: 'Milan · remote' }),
+  A('iliad', 'Iliad Italia', 'Software Engineer', 'Applied', 'sent', 'Career page', 11, '19 Jul', { comp: 'not posted', ats: 'Taleo', loc: 'Milan · onsite' }),
+  A('casavo', 'Casavo', 'Senior Engineer', 'Applied', 'sent', 'LinkedIn', 14, '16 Jul', { comp: '€60–72k', ats: 'Lever', loc: 'Milan · hybrid', quiet: true }),
+  A('sportradar', 'Sportradar', 'Backend Engineer', 'Acknowledged', 'sent', 'Indeed', 17, '13 Jul', { comp: '€50–62k', ats: 'SmartRecruiters', loc: 'Trento · hybrid', quiet: true }),
+  A('musement', 'Musement', 'Backend Engineer', 'Rejected', 'decided', 'LinkedIn', 12, '28 Jun', { comp: '€48–58k', ats: 'Workable', loc: 'Milan · hybrid', closed: true }),
+  A('vodafone', 'Vodafone Italia', 'Cloud Engineer', 'Dormant', 'decided', 'Career page', 41, '15 Jun', { comp: 'not posted', ats: 'Workday', loc: 'Milan · hybrid', closed: true }),
+];
+
+const EVENTS = {
+  satispay: [
+    ['2 Jul', 'Applied', 'You submitted through satispay.com/careers', 'quick add', '1.0'],
+    ['2 Jul', 'Acknowledged', '"We have received your application" — Ashby auto-reply', 'gmail · template', '0.99'],
+    ['9 Jul', 'Recruiter reach-out', 'Giulia P. asked for a 20-minute intro call', 'gmail · model', '0.88'],
+    ['14 Jul', 'HR call held', 'Calendar event ended, no reschedule followed', 'calendar', '0.95'],
+    ['22 Jul', 'Technical round 1 held', 'Live coding with the payments team', 'calendar', '0.95'],
+    ['29 Jul', 'Round 2 scheduled', 'Invite for 31 Jul 10:00 — "System & code review"', 'calendar · ics', '0.97'],
+  ],
+  bending: [
+    ['2 Jun', 'Applied', 'Career page form', 'quick add', '1.0'],
+    ['4 Jun', 'Screening call', 'Recruiter intro, 30 minutes', 'calendar', '0.95'],
+    ['13 Jun', 'Take-home submitted', 'Deadline detected and met with 2 days to spare', 'gmail · template', '0.92'],
+    ['26 Jun', 'Onsite loop', 'Four sessions in one day', 'calendar', '0.95'],
+    ['28 Jul', 'Offer received', '€68k base + equity, decision requested by 8 Aug', 'gmail · model', '0.90'],
+  ],
+  prima: [
+    ['23 Jul', 'Applied', 'Easy Apply on LinkedIn', 'gmail · linkedin', '0.98'],
+    ['23 Jul', 'Acknowledged', 'Workable auto-reply', 'gmail · template', '0.99'],
+    ['29 Jul', 'Take-home sent', 'CodeSubmit link, deadline Sunday 3 Aug 23:59', 'gmail · template', '0.94'],
+  ],
+  nexi: [
+    ['12 Jun', 'Applied', 'LinkedIn Easy Apply', 'gmail · linkedin', '0.98'],
+    ['13 Jun', 'Acknowledged', 'Workday auto-reply', 'gmail · template', '0.99'],
+    ['1 Jul', 'HR call held', '30 minutes with talent acquisition', 'calendar', '0.95'],
+    ['15 Jul', 'Technical round', 'Two engineers, 90 minutes', 'calendar', '0.95'],
+    ['24 Jul', 'Onsite loop held', 'Three sessions, Milan office', 'calendar', '0.95'],
+  ],
+};
+
+const STATS = {
+  '12m': {
+    label: '12 months',
+    funnel: [['Applied', 68, 100], ['Acknowledged', 61, 90], ['Screening', 22, 32], ['Interviewing', 11, 16], ['Offer', 3, 4]],
+    ratios: [['Application → interview', '16.2%', '11 of 68 · 5 too recent to count'], ['Interview → offer', '27%', '3 of 11 · small sample']],
+    firstResponse: '9 days',
+    ghost: '46%',
+    channels: [['Career page', 16, '25%', '6%', '25%'], ['LinkedIn', 34, '12%', '3%', '47%'], ['Indeed', 14, '7%', '0%', '64%'], ['Referral', 4, '75%', '25%', '0%']],
+    timing: [['Applied → ack', 0.4, 8], ['Ack → screening', 9, 100], ['Screening → tech', 6, 67], ['Tech → final', 8, 89], ['Final → offer', 5, 56]],
+  },
+  '90d': {
+    label: '90 days',
+    funnel: [['Applied', 31, 100], ['Acknowledged', 28, 90], ['Screening', 12, 39], ['Interviewing', 6, 19], ['Offer', 2, 6]],
+    ratios: [['Application → interview', '19.4%', '6 of 31 · 5 too recent to count'], ['Interview → offer', '33%', '2 of 6 · very small sample']],
+    firstResponse: '7 days',
+    ghost: '38%',
+    channels: [['Career page', 8, '38%', '13%', '13%'], ['LinkedIn', 15, '13%', '0%', '40%'], ['Indeed', 6, '0%', '0%', '67%'], ['Referral', 2, '100%', '50%', '0%']],
+    timing: [['Applied → ack', 0.3, 6], ['Ack → screening', 7, 100], ['Screening → tech', 5, 71], ['Tech → final', 6, 86], ['Final → offer', 4, 57]],
+  },
+};
+
+const PHASES = [
+  ['interviewing', 'Interviewing'],
+  ['screening', 'Screening'],
+  ['sent', 'Sent'],
+  ['decided', 'Decided'],
+];
+
+class Component extends DCLogic {
+  state = { tab: 'today', open: null, sheet: null, skipped: [], period: '12m', filter: 'all' };
+
+  go = (tab) => this.setState({ tab, open: null, sheet: null });
+  openApp = (id) => this.setState({ open: id, sheet: null });
+  close = () => this.setState({ sheet: null });
+  back = () => this.setState({ open: null });
+
+  renderVals() {
+    const { tab, open, sheet, skipped, period, filter } = this.state;
+    const on = 'var(--color-accent)', off = 'color-mix(in srgb, var(--color-text) 50%, transparent)';
+
+    const nudgeDefs = [
+      { id: 'n1', kind: 'follow-up due', meta: '6 days quiet', title: 'Nexi has gone quiet since the loop', body: 'You finished the onsite on 24 July and their median reply at this stage is 3 days. A short nudge is normal here.', cta: 'Draft follow-up', sheet: 'draft' },
+      { id: 'n2', kind: 'deadline', meta: 'in 3 days', title: 'Prima take-home due Sunday', body: 'Parsed from the CodeSubmit email. This is the only alert allowed to interrupt you.', cta: 'Open brief', app: 'prima' },
+      { id: 'n3', kind: 'let it go', meta: '2 applications', title: 'Casavo and Sportradar look finished', body: 'Silent past twice your usual wait. Archiving keeps your ratios honest — they stay in the statistics as ghosted.', cta: 'Archive both', app: 'casavo' },
+    ];
+    const nudges = nudgeDefs.filter((n) => skipped.indexOf(n.id) < 0).map((n) => ({
+      kind: n.kind, meta: n.meta, title: n.title, body: n.body, cta: n.cta,
+      act: () => (n.sheet ? this.setState({ sheet: n.sheet }) : this.openApp(n.app)),
+      skip: () => this.setState({ skipped: skipped.concat(n.id) }),
+    }));
+
+    const recentDefs = [
+      ['satispay', 'Satispay', 'Technical round 2 scheduled for 31 Jul', 'Tue', 'var(--color-accent)'],
+      ['bending', 'Bending Spoons', 'Offer received · €68k + equity', 'Mon', 'var(--color-accent)'],
+      ['personio', 'Personio', 'Recruiter reach-out → HR call booked', 'Mon', 'var(--color-accent)'],
+      ['musement', 'Musement', 'Rejected after the take-home', 'Sun', 'color-mix(in srgb, var(--color-text) 35%, transparent)'],
+    ];
+
+    const visible = APPS.filter((a) => filter === 'all' || a.phase === filter);
+    const groups = PHASES.filter((p) => visible.some((a) => a.phase === p[0])).map(([key, label]) => ({
+      label, count: visible.filter((a) => a.phase === key).length,
+      apps: visible.filter((a) => a.phase === key).map((a) => ({
+        company: a.company, role: a.role, stage: a.stage, channel: a.channel,
+        days: a.days === 1 ? '1 day' : a.days + ' days',
+        flag: a.due || (a.quiet ? 'quiet · past your p90' : (a.offer ? 'decide by 8 Aug' : '')),
+        dim: a.closed ? '0.55' : '1',
+        open: () => this.openApp(a.id),
+      })),
+    }));
+
+    const filters = [['all', 'All 16'], ['interviewing', 'Interviewing'], ['screening', 'Screening'], ['sent', 'Sent'], ['decided', 'Decided']];
+    const st = STATS[period];
+
+    const app = open ? APPS.find((a) => a.id === open) : null;
+    const evs = app ? (EVENTS[app.id] || [[app.applied, 'Applied', 'Submitted via ' + app.channel, app.channel === 'LinkedIn' ? 'gmail · linkedin' : 'quick add', '0.98'], [app.applied, 'Acknowledged', 'Automated reply from ' + app.ats, 'gmail · template', '0.99']]) : [];
+
+    return {
+      isToday: tab === 'today' && !open, isPipeline: tab === 'pipeline' && !open,
+      isStats: tab === 'stats' && !open, isDetail: !!open, showTabs: !open,
+      todayColor: tab === 'today' ? on : off,
+      pipelineColor: tab === 'pipeline' ? on : off,
+      statsColor: tab === 'stats' ? on : off,
+      goToday: () => this.go('today'), goPipeline: () => this.go('pipeline'), goStats: () => this.go('stats'),
+      openAdd: () => this.setState({ sheet: 'add' }),
+      openReview: () => this.setState({ sheet: 'review' }),
+      openNext: () => this.openApp('satispay'),
+      closeSheet: this.close, back: this.back,
+      openDraftSheet: () => this.setState({ sheet: 'draft' }),
+      isAdd: sheet === 'add', isReview: sheet === 'review', isDraft: sheet === 'draft',
+      nudges, nudgeCount: nudges.length,
+      recent: recentDefs.map(([id, company, what, when, mark]) => ({ company, what, when, mark, open: () => this.openApp(id) })),
+      groups,
+      filters: filters.map(([key, label]) => ({
+        label,
+        set: () => this.setState({ filter: key }),
+        bg: filter === key ? 'var(--color-accent)' : 'transparent',
+        fg: filter === key ? 'var(--color-bg)' : 'color-mix(in srgb, var(--color-text) 70%, transparent)',
+      })),
+      periodLabel: st.label,
+      setP12: () => this.setState({ period: '12m' }), setP90: () => this.setState({ period: '90d' }),
+      p12bg: period === '12m' ? 'var(--color-accent)' : 'transparent',
+      p12fg: period === '12m' ? 'var(--color-bg)' : 'color-mix(in srgb, var(--color-text) 70%, transparent)',
+      p90bg: period === '90d' ? 'var(--color-accent)' : 'transparent',
+      p90fg: period === '90d' ? 'var(--color-bg)' : 'color-mix(in srgb, var(--color-text) 70%, transparent)',
+      funnel: st.funnel.map(([label, n, pct]) => ({ label, n, w: pct + '%' })),
+      ratios: st.ratios.map(([label, value, note]) => ({ label, value, note })),
+      firstResponse: st.firstResponse, ghost: st.ghost,
+      channels: st.channels.map(([name, sent, iv, of, ghost]) => ({ name, sent, iv, of, ghost })),
+      timing: st.timing.map(([label, days, w]) => ({ label, days: days + ' d', w: w + '%' })),
+      app: app || {}, events: evs.map(([when, what, detail, source, conf]) => ({ when, what, detail, source, conf })),
+    };
+  }
+}
+</script>
+</body>
+</html>

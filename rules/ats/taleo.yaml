@@ -1,0 +1,15 @@
+vendor: taleo
+match:
+  sender_domains: [taleo.net, oraclecloud.com, taleo.com]
+locale: [en, it]
+company_from: subject_capture
+patterns:
+  - intent: acknowledged
+    subject: '^(?:Candidatura ricevuta|Application (?:Received|Acknowledgement))(?:\s*[-–]\s*(?<company>.+))?$'
+    confidence: 0.96
+  - intent: rejected
+    body: '(no longer being considered|non è stato selezionato)'
+    confidence: 0.94
+tests:
+  - fixture: fixtures/ats/taleo-ack-01.eml
+    expect: { intent: acknowledged, company: Iliad Italia, confidence: 0.96 }

@@ -1,0 +1,576 @@
+/* Loop, on top of the Industry design system.
+   Nothing here invents a colour, a font or a spacing step: every value is a
+   var(--*) from industry.css, and the few literals are the sizes the handoff
+   states exactly (44px touch targets, 18px gutters, 402px reference width). */
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+
+/* Focus is themed, never the browser default. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+::selection { background: var(--color-accent-200); }
+
+/* ── shared atoms ────────────────────────────────────────────────────────── */
+
+.eyebrow {
+  font: 600 11px var(--font-heading);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.section-label {
+  font: 600 11px var(--font-heading);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent-700);
+}
+
+.muted-45 { color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.muted-50 { color: color-mix(in srgb, var(--color-text) 50%, transparent); }
+.muted-55 { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.muted-60 { color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+.muted-65 { color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.muted-68 { color: color-mix(in srgb, var(--color-text) 68%, transparent); }
+.muted-70 { color: color-mix(in srgb, var(--color-text) 70%, transparent); }
+.muted-72 { color: color-mix(in srgb, var(--color-text) 72%, transparent); }
+.muted-75 { color: color-mix(in srgb, var(--color-text) 75%, transparent); }
+
+/* The registration glyph on every derived claim. */
+.mark {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  stroke: var(--color-accent);
+  stroke-width: 1;
+}
+.mark-muted { stroke: color-mix(in srgb, var(--color-text) 35%, transparent); }
+
+/* Provenance: shown on every automatically-derived claim. It is what makes the
+   automation trustworthy, so it is never optional and never truncated away. */
+.provenance {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--color-divider);
+  padding: 1px var(--space-2);
+  font-size: 10.5px;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  white-space: nowrap;
+}
+.conf {
+  font: 600 10.5px var(--font-heading);
+  color: var(--color-accent-700);
+}
+
+/* ── mobile shell ────────────────────────────────────────────────────────── */
+
+.phone {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--color-bg);
+}
+
+.phone-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 18px 14px;
+}
+
+.tabbar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--color-divider);
+  padding: var(--space-2) var(--space-2) calc(env(safe-area-inset-bottom, 0px) + 12px);
+  background: var(--color-bg);
+}
+.tabbar button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-height: 44px;
+  background: none;
+  border: 0;
+  padding: var(--space-2) 0;
+}
+.tabbar span {
+  font: 600 10.5px var(--font-heading);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── Today ───────────────────────────────────────────────────────────────── */
+
+.today-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-6);
+  gap: var(--space-4);
+}
+.headline {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 34px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  margin: var(--space-2) 0 0;
+}
+.review-button {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-divider);
+  background: transparent;
+}
+.review-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font: 600 11px var(--font-heading);
+  padding: 0 3px;
+}
+
+.counters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--color-divider);
+  margin-bottom: var(--space-4);
+}
+.counters > div {
+  padding: var(--space-3);
+  border-right: 1px solid var(--color-divider);
+}
+.counters > div:last-child { border-right: 0; }
+.counter-n {
+  font: 600 30px var(--font-heading);
+  line-height: 1;
+}
+.counter-label {
+  font: 600 10px var(--font-heading);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  margin-top: 2px;
+}
+/* The offer cell is the only tinted fill on the screen. */
+.counter-offer { background: var(--color-accent-100); }
+.counter-offer .counter-n { color: var(--color-accent-900); }
+.counter-offer .counter-label { color: var(--color-accent-800); }
+.counter-interviewing .counter-n { color: var(--color-accent-700); }
+
+.next-up {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--color-accent-100);
+  padding: var(--space-4);
+  margin-bottom: var(--space-6);
+  border: 1px solid var(--color-divider);
+}
+.next-up-company {
+  font: 600 22px var(--font-heading);
+  color: var(--color-accent-900);
+}
+.next-up-time {
+  font: 600 13px var(--font-heading);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-accent-800);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-3);
+  font-size: 11.5px;
+  border: 1px solid var(--color-divider);
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.chip-accent {
+  border-color: var(--color-accent-400);
+  color: var(--color-accent-800);
+}
+
+.suggestion {
+  border: 1px solid var(--color-divider);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+.suggestion-title {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 19px;
+  line-height: 1.15;
+}
+.suggestion-body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--color-text) 68%, transparent);
+}
+
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-divider);
+  background: transparent;
+  text-align: left;
+}
+
+/* ── Pipeline ────────────────────────────────────────────────────────────── */
+
+.filter-row {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 18px var(--space-4);
+}
+.filter-row::-webkit-scrollbar { display: none; }
+.filter-chip {
+  flex: none;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-divider);
+  background: transparent;
+  font: 600 12px var(--font-heading);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.filter-chip[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border-color: var(--color-accent);
+}
+
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  background: var(--color-accent-100);
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+  padding: var(--space-2) 18px;
+  font: 600 12px var(--font-heading);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--color-accent-800);
+}
+
+.pipeline-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-4) 18px;
+  border: 0;
+  border-bottom: 1px solid var(--color-divider);
+  background: transparent;
+}
+.pipeline-company { font: 600 19px var(--font-heading); }
+.pipeline-stage {
+  font: 600 11px var(--font-heading);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-accent-700);
+}
+/* Closed applications are dimmed, never hidden. */
+.closed { opacity: 0.55; }
+
+/* ── Stats ───────────────────────────────────────────────────────────────── */
+
+.seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--color-divider);
+  min-height: 40px;
+}
+.seg button {
+  border: 0;
+  background: transparent;
+  font: 600 12px var(--font-heading);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.seg button[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.bar-track {
+  height: 8px;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+.bar-fill { height: 100%; background: var(--color-accent); }
+
+.ratio-value {
+  font: 600 30px var(--font-heading);
+  color: var(--color-accent-800);
+  line-height: 1;
+}
+/* The note is not decoration: shipping the ratio without it is a bug. */
+.ratio-note {
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  margin-top: 3px;
+}
+
+table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.table th {
+  text-align: left;
+  font: 600 10px var(--font-heading);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  padding: var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+table.table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+td.emphasis { font: 600 14px var(--font-heading); color: var(--color-accent-800); }
+
+/* ── sheets and drawers ──────────────────────────────────────────────────── */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-neutral-900) 45%, transparent);
+  z-index: 40;
+}
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-divider);
+  padding: var(--space-6) 18px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  max-height: 88vh;
+  overflow-y: auto;
+  /* Under 200ms: this is a utility, not a showcase. */
+  animation: sheet-up 180ms ease-out;
+}
+@keyframes sheet-up {
+  from { transform: translateY(12%); opacity: 0.6; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.sheet-full {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+  background: var(--color-bg);
+  overflow-y: auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 18px 40px;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 520px;
+  max-width: 92vw;
+  z-index: 41;
+  background: var(--color-bg);
+  border-left: 1px solid var(--color-divider);
+  overflow-y: auto;
+  padding: var(--space-8);
+  animation: drawer-in 180ms ease-out;
+}
+@keyframes drawer-in {
+  from { transform: translateX(20px); opacity: 0.6; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet, .drawer { animation: none; }
+}
+
+/* ── event log ───────────────────────────────────────────────────────────── */
+
+.event {
+  display: grid;
+  grid-template-columns: 58px 18px 1fr;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+}
+.event-when {
+  text-align: right;
+  font: 600 12px var(--font-heading);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  padding-top: 1px;
+}
+.event-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.event-rail-line {
+  flex: 1;
+  width: 1px;
+  background: var(--color-divider);
+}
+
+/* ── desktop ─────────────────────────────────────────────────────────────── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-4) var(--space-8);
+  border-bottom: 1px solid var(--color-divider);
+}
+.nav-item {
+  background: none;
+  border: 0;
+  padding: var(--space-2) 0;
+  font: 600 12px var(--font-heading);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+  border-bottom: 2px solid transparent;
+}
+.nav-item[aria-current='page'] {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
+}
+
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border: 1px solid var(--color-divider);
+  margin: var(--space-6) var(--space-8);
+}
+.kpi-strip > div {
+  padding: var(--space-4);
+  border-right: 1px solid var(--color-divider);
+}
+.kpi-strip > div:last-child { border-right: 0; }
+.kpi-n { font: 600 34px var(--font-heading); line-height: 1; }
+.kpi-label {
+  font: 600 10px var(--font-heading);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  margin-top: var(--space-2);
+}
+.kpi-offer { background: var(--color-accent-100); }
+
+.desk-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: var(--space-8);
+  padding: 0 var(--space-8) var(--space-8);
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .desk-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+.checkbox {
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--color-divider);
+  background: transparent;
+  display: inline-block;
+  padding: 0;
+}
+.checkbox[aria-checked='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  background: var(--color-accent-100);
+  border: 1px solid var(--color-divider);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.stale { color: var(--color-accent-700); }
+
+/* Skeletons for the first paint the prototypes only imply. */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-text) 6%, transparent),
+    color-mix(in srgb, var(--color-text) 12%, transparent),
+    color-mix(in srgb, var(--color-text) 6%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+  height: 14px;
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 90px;
+  transform: translateX(-50%);
+  z-index: 60;
+  background: var(--color-neutral-900);
+  color: var(--color-neutral-100);
+  padding: var(--space-3) var(--space-4);
+  font-size: 13px;
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  max-width: 92vw;
+}
+
+/* Below ~700px the dashboard defers to the mobile layout rather than
+   compressing further. */
+.desktop-only { display: block; }
+.mobile-only { display: none; }
+@media (max-width: 700px) {
+  .desktop-only { display: none; }
+  .mobile-only { display: block; }
+}

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.local
+client/dist/
+coverage/
+models/
+.DS_Store
+fixtures/private/
+infra/data/

@@ -1,0 +1,22 @@
+vendor: recruitee
+match:
+  sender_domains: [recruitee.com, mail.recruitee.com]
+locale: [en, it]
+company_from: subject_capture
+patterns:
+  - intent: acknowledged
+    subject: '^(?<company>.+?) - (?:Application received|Candidatura ricevuta)$'
+    confidence: 0.98
+  - intent: acknowledged
+    subject: '^Thanks for applying at (?<company>.+)$'
+    confidence: 0.97
+  - intent: interview_invite
+    subject: '^(?:Invitation|Invito).*(?<company>)'
+    body: '(interview|colloquio)'
+    confidence: 0.9
+  - intent: rejected
+    body: '(we have decided not to|purtroppo non)'
+    confidence: 0.94
+tests:
+  - fixture: fixtures/ats/recruitee-ack-01.eml
+    expect: { intent: acknowledged, company: Translated, confidence: 0.98 }

@@ -1,0 +1,207 @@
+[
+  {
+    "file": "fixtures/ats/greenhouse-ack-01.eml",
+    "expect": {
+      "intent": "acknowledged",
+      "company": "Zalando",
+      "vendor": "greenhouse"
+    }
+  },
+  {
+    "file": "fixtures/ats/greenhouse-reject-01.eml",
+    "expect": {
+      "intent": "rejected",
+      "vendor": "greenhouse"
+    }
+  },
+  {
+    "file": "fixtures/ats/greenhouse-screening-01.eml",
+    "expect": {
+      "intent": "schedule_screening",
+      "company": "Personio",
+      "vendor": "greenhouse"
+    }
+  },
+  {
+    "file": "fixtures/ats/lever-ack-01.eml",
+    "expect": {
+      "intent": "acknowledged",
+      "company": "Docebo",
+      "vendor": "lever"
+    }
+  },
+  {
+    "file": "fixtures/ats/workday-ack-01.eml",
+    "expect": {
+      "intent": "acknowledged",
+      "company": "Nexi",
+      "vendor": "workday"
+    }
+  },
+  {
+    "file": "fixtures/ats/workday-reject-it-01.eml",
+    "expect": {
+      "intent": "rejected",
+      "vendor": "workday"
+    }
+  },
+  {
+    "file": "fixtures/ats/ashby-ack-01.eml",
+    "expect": {
+      "intent": "acknowledged",
+      "company": "Satispay",
+      "vendor": "ashby"
+    }
+  },
+  {
+    "file": "fixtures/ats/ashby-takehome-01.eml",
+    "expect": {
+      "intent": "take_home",
+      "vendor": "ashby"
+    }
+  },
+  {
+    "file": "fixtures/ats/smartrecruiters-ack-01.eml",
+    "expect": {
+      "intent": "acknowledged",
+      "company": "Sportradar",
+      "vendor": "smartrecruiters"
+    }
+  },
+  {
+    "file": "fixtures/ats/workable-ack-01.eml",
+    "expect": {
+      "intent": "acknowledged",
+      "company": "Prima Assicurazioni",
+      "vendor": "workable"
+    }
+  },
+  {
+    "file": "fixtures/ats/icims-ack-01.eml",
+    "expect": {
+      "intent": "acknowledged",
+      "vendor": "icims"
+    }
+  },
+  {
+    "file": "fixtures/ats/taleo-ack-01.eml",
+    "expect": {
+      "intent": "acknowledged",
+      "company": "Iliad Italia",
+      "vendor": "taleo"
+    }
+  },
+  {
+    "file": "fixtures/ats/recruitee-ack-01.eml",
+    "expect": {
+      "intent": "acknowledged",
+      "company": "Translated",
+      "vendor": "recruitee"
+    }
+  },
+  {
+    "file": "fixtures/ats/bamboohr-ack-01.eml",
+    "expect": {
+      "intent": "acknowledged",
+      "vendor": "bamboohr"
+    }
+  },
+  {
+    "file": "fixtures/ats/linkedin-applied-01.eml",
+    "expect": {
+      "intent": "applied",
+      "company": "Nexi",
+      "vendor": "linkedin"
+    }
+  },
+  {
+    "file": "fixtures/ats/linkedin-applied-it-01.eml",
+    "expect": {
+      "intent": "applied",
+      "company": "Casavo",
+      "vendor": "linkedin"
+    }
+  },
+  {
+    "file": "fixtures/ats/indeed-applied-01.eml",
+    "expect": {
+      "intent": "applied",
+      "company": "Everli",
+      "vendor": "indeed"
+    }
+  },
+  {
+    "file": "fixtures/ats/calendar-invite-01.eml",
+    "expect": {
+      "intent": "interview_invite"
+    }
+  },
+  {
+    "file": "fixtures/ats/calendar-invite-hr-01.eml",
+    "expect": {
+      "intent": "interview_invite"
+    }
+  },
+  {
+    "file": "fixtures/ats/human-offer-01.eml",
+    "expect": {
+      "intent": "offer",
+      "requires_model": true
+    }
+  },
+  {
+    "file": "fixtures/ats/human-italian-reject-01.eml",
+    "expect": {
+      "intent": "rejected",
+      "requires_model": true
+    }
+  },
+  {
+    "file": "fixtures/negatives/newsletter-01.eml",
+    "expect": {
+      "drop": true
+    }
+  },
+  {
+    "file": "fixtures/negatives/github-01.eml",
+    "expect": {
+      "drop": true
+    }
+  },
+  {
+    "file": "fixtures/negatives/social-01.eml",
+    "expect": {
+      "drop": true
+    }
+  },
+  {
+    "file": "fixtures/negatives/invoice-01.eml",
+    "expect": {
+      "drop": true
+    }
+  },
+  {
+    "file": "fixtures/negatives/linkedin-jobalert-01.eml",
+    "expect": {
+      "drop": false
+    }
+  },
+  {
+    "file": "fixtures/negatives/calendar-personal-01.eml",
+    "expect": {
+      "drop": true
+    }
+  },
+  {
+    "file": "fixtures/negatives/marketing-01.eml",
+    "expect": {
+      "drop": true
+    }
+  },
+  {
+    "file": "fixtures/negatives/security-alert-01.eml",
+    "expect": {
+      "drop": true
+    }
+  }
+]

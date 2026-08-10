@@ -1,0 +1,154 @@
+# Loop — one box, Docker Compose, Caddy terminating TLS.
+#
+# Services are separate containers so they restart and log independently, but
+# they share one Postgres and are reachable only on the internal network: the
+# gateway is the single ingress. Total idle footprint is under 700 MB with the
+# model unloaded.
+#
+# Each service connects as its own database role, so the grants in migration 003
+# are the enforcement of "only the pipeline writes to the event log" — and RLS
+# actually applies, which it does not for a superuser.
+
+name: loop
+
+x-service: &service
+  build:
+    context: ..
+    dockerfile: infra/Dockerfile
+  restart: always
+  env_file: ../.env
+  depends_on:
+    postgres:
+      condition: service_healthy
+  networks: [internal]
+  environment: &service-env
+    NODE_ENV: production
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [internal, edge]
+    depends_on: [gateway]
+
+  postgres:
+    build:
+      context: ./postgres
+    restart: always
+    environment:
+      POSTGRES_USER: loop
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: loop
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U loop -d loop']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+    # Publishes nothing: only the containers on `internal` can reach it.
+
+  migrate:
+    <<: *service
+    restart: 'no'
+    command: ['node', 'packages/db/dist/migrate.js']
+
+  gateway:
+    <<: *service
+    command: ['node', 'services/gateway/dist/index.js']
+    environment:
+      <<: *service-env
+      DB_ROLE: loop_gateway
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    expose: ['3000']
+
+  connector:
+    <<: *service
+    command: ['node', 'services/connector/dist/index.js']
+    environment:
+      <<: *service-env
+      DB_ROLE: loop_connector
+
+  classifier:
+    <<: *service
+    command: ['node', 'services/classifier/dist/index.js']
+    environment:
+      <<: *service-env
+      DB_ROLE: loop_classifier
+
+  extractor:
+    <<: *service
+    command: ['node', 'services/extractor/dist/index.js']
+    environment:
+      <<: *service-env
+      DB_ROLE: loop_extractor
+
+  resolver:
+    <<: *service
+    command: ['node', 'services/resolver/dist/index.js']
+    environment:
+      <<: *service-env
+      DB_ROLE: loop_resolver
+
+  pipeline:
+    <<: *service
+    command: ['node', 'services/pipeline/dist/index.js']
+    environment:
+      <<: *service-env
+      DB_ROLE: loop_pipeline
+
+  nudge:
+    <<: *service
+    command: ['node', 'services/nudge/dist/index.js']
+    environment:
+      <<: *service-env
+      DB_ROLE: loop_nudge
+
+  notifier:
+    <<: *service
+    command: ['node', 'services/notifier/dist/index.js']
+    environment:
+      <<: *service-env
+      DB_ROLE: loop_notifier
+
+  # Rung 3, off unless asked for. Steady state is a trickle of three messages a
+  # day, and the model unloads when idle — which is 99% of the time.
+  #   docker compose --profile model up -d llama
+  llama:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    profiles: [model]
+    restart: unless-stopped
+    command: ['--host', '0.0.0.0', '--port', '8080', '-ngl', '0', '-m', '/models/model.gguf']
+    volumes:
+      - ../models:/models:ro
+    networks: [internal]
+    expose: ['8080']
+
+  # The backfill profile. Continuous batching turns a 12-month first scan from
+  # hours into minutes; it is brought up on demand and stopped again.
+  #   docker compose --profile batch up vllm
+  vllm:
+    image: vllm/vllm-openai:latest
+    profiles: [batch]
+    restart: 'no'
+    command: ['--model', '${VLLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}', '--port', '8000']
+    networks: [internal]
+    expose: ['8000']
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+
+volumes:
+  caddy_data:
+  caddy_config:

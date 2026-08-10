@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/industry-5d9669ba-52c5-444b-9a17-67aa1664e37d/styles.css">
+<script src="_ds/industry-5d9669ba-52c5-444b-9a17-67aa1664e37d/_ds_bundle.js"></script>
+<script src="./doc-page.js"></script>
+<style>
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}
+a{color:var(--color-accent-700);text-decoration:none}
+doc-page:not(:defined){visibility:hidden}
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+*{animation-delay:-99s !important;animation-duration:.001s !important;animation-iteration-count:1 !important;animation-fill-mode:both !important;animation-play-state:running !important;transition-duration:0s !important}
+@media print{section{break-inside:avoid}table{break-inside:avoid}}
+</style>
+</helmet>
+
+<doc-page orientation="landscape" margin="0.5in" style="font-family:var(--font-body)">
+
+<!-- title block -->
+<header>
+  <div class="blueprint" style="padding:0">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 148px 148px 148px">
+      <div style="padding:var(--space-4) var(--space-6);display:flex;align-items:center;gap:var(--space-3)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span style="font-family:var(--font-heading);font-weight:600;font-size:19px;letter-spacing:.02em;text-transform:uppercase">Loop</span>
+        <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">universal application tracker</span>
+      </div>
+      <div style="padding:var(--space-3) var(--space-4);border-left:1px solid var(--color-divider)">
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Document</div>
+        <div style="font-family:var(--font-heading);font-size:15px">System design</div>
+      </div>
+      <div style="padding:var(--space-3) var(--space-4);border-left:1px solid var(--color-divider)">
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Revision</div>
+        <div style="font-family:var(--font-heading);font-size:15px">A · 30.07.26</div>
+      </div>
+      <div style="padding:var(--space-3) var(--space-4);border-left:1px solid var(--color-divider)">
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Sheets</div>
+        <div style="font-family:var(--font-heading);font-size:15px">01 / 03</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:var(--space-8);align-items:end;margin-top:var(--space-8)">
+    <div>
+      <h1 style="font-family:var(--font-heading);font-size:54px;line-height:1;letter-spacing:-.02em;margin:0 0 var(--space-4);max-width:15ch;text-transform:uppercase">Every application tracks itself</h1>
+      <p style="font-size:15px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 78%, transparent);max-width:60ch;margin:0;text-wrap:pretty">A tracker you never update by hand. Your mailbox already knows every application you sent, every auto-acknowledgement, every invitation and every rejection — it is just unstructured. Loop reads those signals, resolves them into one application per real job, and derives the pipeline instead of asking you to maintain it.</p>
+    </div>
+    <div class="blueprint" style="padding:var(--space-4)">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">Constraints taken as given</div>
+      <div style="display:flex;flex-direction:column;gap:var(--space-2);font-size:13.5px;line-height:1.4">
+        <div style="display:flex;gap:var(--space-3);align-items:baseline"><span style="font:600 11px var(--font-heading);color:var(--color-accent);min-width:14px">01</span><span>Self-hosted, multi-tenant-ready</span></div>
+        <div style="display:flex;gap:var(--space-3);align-items:baseline"><span style="font:600 11px var(--font-heading);color:var(--color-accent);min-width:14px">02</span><span>≈25 live applications</span></div>
+        <div style="display:flex;gap:var(--space-3);align-items:baseline"><span style="font:600 11px var(--font-heading);color:var(--color-accent);min-width:14px">03</span><span>Email + calendar as the only crawl surface</span></div>
+        <div style="display:flex;gap:var(--space-3);align-items:baseline"><span style="font:600 11px var(--font-heading);color:var(--color-accent);min-width:14px">04</span><span>Manual add as the fallback</span></div>
+        <div style="display:flex;gap:var(--space-3);align-items:baseline"><span style="font:600 11px var(--font-heading);color:var(--color-accent);min-width:14px">05</span><span>Running cost target: €0</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div>
+
+<!-- 01 -->
+<section style="margin-top:var(--space-8);padding-top:var(--space-8);border-top:1px solid var(--color-divider)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">01</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">Where truth comes from</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">Scraping the job boards themselves is the obvious idea and the wrong one: it needs your credentials, breaks on every layout change, is against most terms of service, and LinkedIn's "My jobs" list does not know that a recruiter replied. The high-signal, low-maintenance surface is the one place every platform must reach you — your inbox — plus the calendar it writes to.</p>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--color-divider)">
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--space-3)">
+            <span class="tag tag-accent">primary</span>
+            <span style="font:600 11px var(--font-heading);color:var(--color-accent)">0.7–0.98</span>
+          </div>
+          <div style="font-family:var(--font-heading);font-size:21px;margin-bottom:var(--space-2)">Mailbox</div>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Gmail API history + IMAP IDLE. Auto-acks, recruiter threads, rejections, offer letters. Covers every platform and every private career page for free.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--space-3)">
+            <span class="tag tag-accent">primary</span>
+            <span style="font:600 11px var(--font-heading);color:var(--color-accent)">0.95</span>
+          </div>
+          <div style="font-family:var(--font-heading);font-size:21px;margin-bottom:var(--space-2)">Calendar</div>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Every <em>.ics</em> invite from a company domain is a near-certain interview, with its exact stage often in the title. The cheapest stage detector that exists.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--space-3)">
+            <span class="tag tag-neutral">fallback</span>
+            <span style="font:600 11px var(--font-heading);color:color-mix(in srgb, var(--color-text) 55%, transparent)">1.0</span>
+          </div>
+          <div style="font-family:var(--font-heading);font-size:21px;margin-bottom:var(--space-2)">Quick add</div>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Share-sheet from the job posting URL, or two taps in the app. Fills the gap for applications that never generate an email at all.</p>
+        </div>
+        <div style="padding:var(--space-4);background:repeating-linear-gradient(135deg,transparent,transparent 7px,color-mix(in srgb, var(--color-text) 5%, transparent) 7px,color-mix(in srgb, var(--color-text) 5%, transparent) 8px)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--space-3)">
+            <span class="tag tag-neutral">rejected</span>
+            <span style="font:600 11px var(--font-heading);color:color-mix(in srgb, var(--color-text) 45%, transparent)">—</span>
+          </div>
+          <div style="font-family:var(--font-heading);font-size:21px;margin-bottom:var(--space-2);color:color-mix(in srgb, var(--color-text) 60%, transparent)">Portal crawling</div>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Credential custody, CAPTCHA, ToS risk, constant breakage — for a status field that lags the email by days. Kept out of v1 on purpose.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 -->
+<section style="margin-top:var(--space-8);padding-top:var(--space-8);border-top:1px solid var(--color-divider)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">02</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">System map</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">Seven small services, one Postgres, one queue. They are separate because they fail and scale differently — a mailbox connector holding long-lived OAuth tokens should not share a process with an LLM call that can hang for thirty seconds — not because microservices are fashionable. All of them fit on one free-tier box.</p>
+
+      <div class="blueprint" style="padding:0">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+
+        <div style="display:grid;grid-template-columns:104px repeat(4,1fr);border-bottom:1px solid var(--color-divider)">
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Sources</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+          </div>
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)"><div style="font-size:14px;font-weight:500">Gmail API</div><div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">watch + history</div></div>
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)"><div style="font-size:14px;font-weight:500">IMAP</div><div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">IDLE, any provider</div></div>
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)"><div style="font-size:14px;font-weight:500">Calendar</div><div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">push channel</div></div>
+          <div style="padding:var(--space-4)"><div style="font-size:14px;font-weight:500">Client</div><div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">quick add · REST</div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:104px repeat(3,1fr);border-bottom:1px solid var(--color-divider)">
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Ingest</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+          </div>
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+            <div style="font:600 15px var(--font-heading);letter-spacing:.04em;color:var(--color-accent-800);margin-bottom:5px">CONNECTOR</div>
+            <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Holds tokens, renews watches, fetches only new message ids. Never parses.</p>
+          </div>
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+            <div style="font:600 15px var(--font-heading);letter-spacing:.04em;color:var(--color-accent-800);margin-bottom:5px">CLASSIFIER</div>
+            <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Is this message about a job application at all? Cheap filter, drops ~95% of the inbox.</p>
+          </div>
+          <div style="padding:var(--space-4)">
+            <div style="font:600 15px var(--font-heading);letter-spacing:.04em;color:var(--color-accent-800);margin-bottom:5px">EXTRACTOR</div>
+            <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Company, role, stage, dates, comp. Rules first, model only on unknown templates.</p>
+          </div>
+        </div>
+
+        <div style="background:var(--color-accent-100);border-bottom:1px solid var(--color-divider)">
+          <div style="display:grid;grid-template-columns:104px repeat(3,1fr)">
+            <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);display:flex;flex-direction:column;gap:6px">
+              <span style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-800)">Core</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+            </div>
+            <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+              <div style="font:600 15px var(--font-heading);letter-spacing:.04em;color:var(--color-accent-800);margin-bottom:5px">RESOLVER</div>
+              <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--color-accent-900)">Entity resolution: which application is this signal about? Canonical company, fuzzy role match, cross-channel dedup.</p>
+            </div>
+            <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+              <div style="font:600 15px var(--font-heading);letter-spacing:.04em;color:var(--color-accent-800);margin-bottom:5px">PIPELINE</div>
+              <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--color-accent-900)">Appends to the event log and folds it into a current stage. The only writer of application state.</p>
+            </div>
+            <div style="padding:var(--space-4)">
+              <div style="font:600 15px var(--font-heading);letter-spacing:.04em;color:var(--color-accent-800);margin-bottom:5px">NUDGE</div>
+              <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--color-accent-900)">Cron over the log: staleness, overdue follow-ups, interviews to prepare, ghost calls.</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:var(--space-4);padding:var(--space-3) var(--space-4);border-top:1px solid var(--color-divider);flex-wrap:wrap">
+            <span style="font:600 15px var(--font-heading);letter-spacing:.06em;color:var(--color-accent-800)">POSTGRES 16</span>
+            <span style="font-size:12.5px;color:var(--color-accent-900)">append-only <em>application_events</em> · projections · pgvector for dedup · pgmq as the queue · pg_cron as the scheduler</span>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:104px repeat(3,1fr);border-bottom:1px solid var(--color-divider)">
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Edge</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
+          </div>
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+            <div style="font:600 15px var(--font-heading);letter-spacing:.04em;color:var(--color-accent-800);margin-bottom:5px">GATEWAY</div>
+            <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">One BFF: auth, REST + SSE for live updates, reads projections only.</p>
+          </div>
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+            <div style="font:600 15px var(--font-heading);letter-spacing:.04em;color:var(--color-accent-800);margin-bottom:5px">ANALYTICS</div>
+            <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Materialised funnel, time-in-stage, channel and comp views. Refreshed on event, not on request.</p>
+          </div>
+          <div style="padding:var(--space-4)">
+            <div style="font:600 15px var(--font-heading);letter-spacing:.04em;color:var(--color-accent-800);margin-bottom:5px">NOTIFIER</div>
+            <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Web push and a weekly digest. Rate-limited so the app never nags twice for one thing.</p>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:104px repeat(2,1fr)">
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+            <span style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Surfaces</span>
+          </div>
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);display:flex;align-items:baseline;gap:var(--space-3)">
+            <span style="font-size:14px;font-weight:500">Mobile app</span>
+            <span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">PWA · primary surface</span>
+          </div>
+          <div style="padding:var(--space-4);display:flex;align-items:baseline;gap:var(--space-3)">
+            <span style="font-size:14px;font-weight:500">Web dashboard</span>
+            <span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">analysis · bulk edit</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 -->
+<section style="margin-top:var(--space-8);padding-top:var(--space-8);border-top:1px solid var(--color-divider)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">03</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">One message, end to end</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">A recruiter at Fastweb replies to an application you sent through LinkedIn eleven days ago. Nothing in that email says "LinkedIn", and the company's ATS is Greenhouse. This is the path it takes.</p>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--color-divider)">
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:var(--space-3)"><svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1"><path d="M5.5 0v11M0 5.5h11"/></svg><span style="font:600 13px var(--font-heading);color:var(--color-accent)">t+0s</span></div>
+          <div style="font-family:var(--font-heading);font-size:17px;line-height:1.15;margin-bottom:var(--space-2)">Gmail push arrives</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">The webhook carries a history id, not content. Connector pulls the delta, stores <em>message_id + sha256</em>, publishes <em>raw.message</em>. A replayed webhook is a no-op.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:var(--space-3)"><svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1"><path d="M5.5 0v11M0 5.5h11"/></svg><span style="font:600 13px var(--font-heading);color:var(--color-accent)">t+0.3s</span></div>
+          <div style="font-family:var(--font-heading);font-size:17px;line-height:1.15;margin-bottom:var(--space-2)">Classify, then strip</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Sender domain is a known ATS vendor, so heuristics are skipped. HTML reduced to text; quoted history, signatures and tracking pixels dropped.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:var(--space-3)"><svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1"><path d="M5.5 0v11M0 5.5h11"/></svg><span style="font:600 13px var(--font-heading);color:var(--color-accent)">t+0.4s</span></div>
+          <div style="font-family:var(--font-heading);font-size:17px;line-height:1.15;margin-bottom:var(--space-2)">Extract by template</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">The Greenhouse rule yields company, role and <em>intent: schedule_screening</em> deterministically. No model call, no cost, ~4 ms.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:var(--space-3)"><svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1"><path d="M5.5 0v11M0 5.5h11"/></svg><span style="font:600 13px var(--font-heading);color:var(--color-accent)">t+0.5s</span></div>
+          <div style="font-family:var(--font-heading);font-size:17px;line-height:1.15;margin-bottom:var(--space-2)">Resolve</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">New thread, so: canonical domain + role embedding at cosine 0.91 against an application created 11 days ago from a LinkedIn confirmation. Above 0.82 → same application, second source attached.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:var(--space-3)"><svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1"><path d="M5.5 0v11M0 5.5h11"/></svg><span style="font:600 13px var(--font-heading);color:var(--color-accent)">t+0.6s</span></div>
+          <div style="font-family:var(--font-heading);font-size:17px;line-height:1.15;margin-bottom:var(--space-2)">Append, fold</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">One row: <em>stage_advanced → hr_screen</em>, confidence 0.94, evidence = message id. Nothing is overwritten, so a wrong guess is corrected by appending.</p>
+        </div>
+        <div style="padding:var(--space-4);background:var(--color-accent-100)">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:var(--space-3)"><svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1.4"><path d="M5.5 0v11M0 5.5h11"/></svg><span style="font:600 13px var(--font-heading);color:var(--color-accent-800)">t+0.9s</span></div>
+          <div style="font-family:var(--font-heading);font-size:17px;line-height:1.15;margin-bottom:var(--space-2);color:var(--color-accent-900)">Surfaces update</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--color-accent-900)">SSE pushes to any open client, the nudge service cancels the "silent 11 days" reminder and schedules "prepare screening". Your phone buzzes once.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section style="margin-top:var(--space-8);padding-top:var(--space-8);border-top:1px solid var(--color-divider)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">04</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">The extraction ladder</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">Extraction decides whether this thing works, and it is the only part that could quietly cost money. So it is a ladder: each rung is cheaper and more certain than the one below, and a message only falls through when the rung above abstains.</p>
+
+      <div style="border:1px solid var(--color-divider)">
+        <div style="display:grid;grid-template-columns:52px minmax(0,1fr) 168px;align-items:center;border-bottom:1px solid var(--color-divider)">
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);font:600 20px var(--font-heading);color:var(--color-accent);text-align:center">1</div>
+          <div style="padding:var(--space-4)">
+            <div style="font-family:var(--font-heading);font-size:20px;margin-bottom:4px">ATS template registry</div>
+            <p style="margin:0;font-size:13px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Greenhouse, Lever, Workday, Ashby, SmartRecruiters, Workable, iCIMS, Taleo, Recruitee, BambooHR — plus LinkedIn and Indeed's own confirmations. Sender domain + subject pattern → declarative YAML rule. One rule covers thousands of companies.</p>
+          </div>
+          <div style="padding:var(--space-4);border-left:1px solid var(--color-divider);text-align:right">
+            <div style="font:600 30px var(--font-heading);line-height:1;color:var(--color-accent-800)">78%</div>
+            <div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">of messages · 4 ms · €0</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:52px minmax(0,1fr) 168px;align-items:center;border-bottom:1px solid var(--color-divider)">
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);font:600 20px var(--font-heading);color:var(--color-accent);text-align:center">2</div>
+          <div style="padding:var(--space-4)">
+            <div style="font-family:var(--font-heading);font-size:20px;margin-bottom:4px">Calendar &amp; thread heuristics</div>
+            <p style="margin:0;font-size:13px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">An <em>.ics</em> attachment or a meeting link from a company domain resolves the stage by itself. A reply on a known thread inherits the application with no parsing at all.</p>
+          </div>
+          <div style="padding:var(--space-4);border-left:1px solid var(--color-divider);text-align:right">
+            <div style="font:600 30px var(--font-heading);line-height:1;color:var(--color-accent-800)">13%</div>
+            <div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">of messages · 2 ms · €0</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:52px minmax(0,1fr) 168px;align-items:center;border-bottom:1px solid var(--color-divider)">
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);font:600 20px var(--font-heading);color:var(--color-accent);text-align:center">3</div>
+          <div style="padding:var(--space-4)">
+            <div style="font-family:var(--font-heading);font-size:20px;margin-bottom:4px">Local model, structured output</div>
+            <p style="margin:0;font-size:13px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Unknown template, human-written email, or Italian/English mixed prose. A 3–7B instruct model behind an OpenAI-compatible endpoint, called with a JSON schema and a 1500-token cap. Slow (2–5 s) but queued, so nobody waits.</p>
+          </div>
+          <div style="padding:var(--space-4);border-left:1px solid var(--color-divider);text-align:right">
+            <div style="font:600 30px var(--font-heading);line-height:1;color:var(--color-accent-800)">8%</div>
+            <div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">of messages · 2–5 s · €0</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:52px minmax(0,1fr) 168px;align-items:center;background:repeating-linear-gradient(135deg,transparent,transparent 7px,color-mix(in srgb, var(--color-text) 4%, transparent) 7px,color-mix(in srgb, var(--color-text) 4%, transparent) 8px)">
+          <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);font:600 20px var(--font-heading);color:color-mix(in srgb, var(--color-text) 45%, transparent);text-align:center">4</div>
+          <div style="padding:var(--space-4)">
+            <div style="font-family:var(--font-heading);font-size:20px;margin-bottom:4px">Ask the human, once</div>
+            <p style="margin:0;font-size:13px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Confidence below 0.6, or two candidate applications within 0.05 of each other. Lands in an inbox-shaped review queue: one tap to confirm, and the answer is written back as a new template rule or a resolver alias.</p>
+          </div>
+          <div style="padding:var(--space-4);border-left:1px solid var(--color-divider);text-align:right">
+            <div style="font:600 30px var(--font-heading);line-height:1;color:color-mix(in srgb, var(--color-text) 60%, transparent)">1%</div>
+            <div style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">2 taps · teaches rung 1</div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:13.5px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 60%, transparent);max-width:80ch;margin:var(--space-4) 0 0">At 25 live applications the system sees on the order of 40 relevant messages a week, of which three reach the model. Even on a paid API that is cents per month — the local model exists so the number is exactly zero and no email body ever leaves the box.</p>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<!-- engine decision — the one accent field -->
+<section style="margin-top:var(--space-8);background:var(--color-accent-900);color:var(--color-bg)">
+  <div style="padding:var(--space-8) var(--space-6)">
+    <div style="display:flex;align-items:baseline;gap:var(--space-4);flex-wrap:wrap;margin-bottom:var(--space-3)">
+      <span style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-300)">Decision · rung 3</span>
+      <h3 style="font-family:var(--font-heading);font-size:34px;margin:0;text-transform:uppercase;letter-spacing:-.01em;color:var(--color-bg)">Which engine runs the model</h3>
+    </div>
+    <p style="font-size:15px;line-height:1.6;color:var(--color-accent-200);max-width:80ch;margin:0 0 var(--space-6)">The extractor never talks to a model directly — it talks to an OpenAI-compatible <em>/v1/chat/completions</em> endpoint with a JSON schema attached. That makes the engine a config line rather than an architectural commitment, which matters because this workload has two very different shapes: a trickle of three messages a day, and one enormous backfill.</p>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid color-mix(in srgb, var(--color-bg) 30%, transparent)">
+      <div style="padding:var(--space-6) var(--space-4);border-right:1px solid color-mix(in srgb, var(--color-bg) 30%, transparent)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-3)">
+          <span style="font:600 19px var(--font-heading);letter-spacing:.03em;color:var(--color-bg)">LLAMA.CPP</span>
+          <span style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;padding:2px 7px;background:var(--color-bg);color:var(--color-accent-900)">default</span>
+        </div>
+        <p style="margin:0 0 var(--space-3);font-size:13px;line-height:1.55;color:var(--color-accent-200)">Steady state. A Q4 GGUF of a 7B fits in ~5 GB, ARM kernels are first-class, and the model unloads when idle — which is 99% of the time. Three requests a day never need batching.</p>
+        <div style="font:600 11.5px var(--font-heading);letter-spacing:.06em;text-transform:uppercase;color:var(--color-accent-300)">~5 GB · idles at zero · one container</div>
+      </div>
+      <div style="padding:var(--space-6) var(--space-4);border-right:1px solid color-mix(in srgb, var(--color-bg) 30%, transparent)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-3)">
+          <span style="font:600 19px var(--font-heading);letter-spacing:.03em;color:var(--color-bg)">vLLM</span>
+          <span style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;padding:2px 7px;border:1px solid var(--color-accent-300);color:var(--color-accent-200)">batch profile</span>
+        </div>
+        <p style="margin:0 0 var(--space-3);font-size:13px;line-height:1.55;color:var(--color-accent-200)">Yes — and it earns its place twice: the 12-month backfill in phase 1, where continuous batching turns hours into minutes, and phase 4, where many users' messages arrive at once. Guided decoding gives a harder JSON guarantee than <em>format:json</em> does.</p>
+        <div style="font:600 11.5px var(--font-heading);letter-spacing:.06em;text-transform:uppercase;color:var(--color-accent-300)">on demand · not always-on</div>
+      </div>
+      <div style="padding:var(--space-6) var(--space-4)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-3)">
+          <span style="font:600 19px var(--font-heading);letter-spacing:.03em;color:color-mix(in srgb, var(--color-bg) 75%, transparent)">HOSTED API</span>
+          <span style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;padding:2px 7px;border:1px solid color-mix(in srgb, var(--color-bg) 35%, transparent);color:var(--color-accent-300)">escape hatch</span>
+        </div>
+        <p style="margin:0 0 var(--space-3);font-size:13px;line-height:1.55;color:var(--color-accent-300)">Same interface, one env var. Opt-in per user, because it moves email text off the box — the one thing sheet 09 promises it will not do by default.</p>
+        <div style="font:600 11.5px var(--font-heading);letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-bg) 45%, transparent)">off by default</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-6);margin-top:var(--space-6)">
+      <div>
+        <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2);color:var(--color-bg)">The catch on the free ARM box</div>
+        <p style="margin:0;font-size:13.5px;line-height:1.6;color:var(--color-accent-200)">vLLM's CPU backend does run on aarch64 with NEON — pre-built Arm wheels exist now, and oneDNN + Arm Compute Library kernels come on automatically — but it serves FP32/FP16/BF16, so a 7B is ~15 GB resident rather than 5, and it holds a preallocated KV cache instead of unloading. On a 24 GB Ampere instance that is affordable; as an always-on service for three requests a day it is the wrong trade.</p>
+      </div>
+      <div>
+        <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2);color:var(--color-bg)">So: both, behind one switch</div>
+        <p style="margin:0;font-size:13.5px;line-height:1.6;color:var(--color-accent-200)"><em>docker compose --profile batch up</em> brings vLLM online, the extractor's queue drains through it, and it stops. Steady state stays on llama.cpp. The only requirement this puts on the design is that rung 3 be stateless and idempotent per message — which it already is, because everything downstream is replayable from <em>seen_messages</em>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div>
+
+<!-- 05 -->
+<section style="margin-top:var(--space-8)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">05</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">Domain model</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">One aggregate — the application — with an append-only event log as its only source of truth. Everything the interface shows, including every statistic, is a fold over that log. Sources are many-to-one on purpose: the same job found on LinkedIn and on the company site is one application with two provenances, which is what makes channel statistics honest.</p>
+
+      <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:var(--space-6);align-items:start">
+        <div class="blueprint" style="padding:var(--space-6);font-family:var(--font-body);font-size:13px;line-height:1.7;overflow-x:auto">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div style="font:600 13px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent-700)">application</div>
+          <div style="padding-left:var(--space-4);color:color-mix(in srgb, var(--color-text) 80%, transparent)">id · user_id · company_id · role_title · seniority<br>location · work_mode · current_stage · status<br>applied_at · last_signal_at · comp_expectation<br>confidence · needs_review</div>
+          <div style="font:600 13px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent-700);margin-top:var(--space-3)">application_event <span style="color:color-mix(in srgb, var(--color-text) 45%, transparent);letter-spacing:0;text-transform:none;font-weight:400">— append only</span></div>
+          <div style="padding-left:var(--space-4);color:color-mix(in srgb, var(--color-text) 80%, transparent)">id · application_id · type · occurred_at<br>from_stage · to_stage · payload jsonb<br>source_id · confidence · evidence_ref</div>
+          <div style="font:600 13px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent-700);margin-top:var(--space-3)">source</div>
+          <div style="padding-left:var(--space-4);color:color-mix(in srgb, var(--color-text) 80%, transparent)">id · application_id · channel <span style="color:color-mix(in srgb, var(--color-text) 45%, transparent)">linkedin | indeed | career_page | referral | recruiter</span><br>posting_url · ats_vendor · first_seen_at</div>
+          <div style="font:600 13px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent-700);margin-top:var(--space-3)">company</div>
+          <div style="padding-left:var(--space-4);color:color-mix(in srgb, var(--color-text) 80%, transparent)">id · canonical_name · domain · aliases[] · industry · size</div>
+          <div style="font:600 13px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent-700);margin-top:var(--space-3)">contact · interview · comp_offer · attachment</div>
+          <div style="padding-left:var(--space-4);color:color-mix(in srgb, var(--color-text) 55%, transparent)">satellites, each pointing at one application</div>
+          <div style="font:600 13px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent-700);margin-top:var(--space-3)">mailbox_account <span style="color:color-mix(in srgb, var(--color-text) 45%, transparent);letter-spacing:0;text-transform:none;font-weight:400">— encrypted</span></div>
+          <div style="padding-left:var(--space-4);color:color-mix(in srgb, var(--color-text) 80%, transparent)">id · user_id · provider · token_ciphertext<br>watch_expires_at · last_history_id · scopes[]</div>
+        </div>
+        <div style="display:flex;flex-direction:column;border:1px solid var(--color-divider)">
+          <div style="padding:var(--space-4);border-bottom:1px solid var(--color-divider)">
+            <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-2)">Why event-sourced</div>
+            <p style="margin:0;font-size:13.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 75%, transparent)">Every statistic you asked for is a time question — days to first response, median time in stage, seasonal averages. A current-state table cannot answer any of them retroactively. The log can, and it is also how a better extractor next month gets to re-derive last month's history.</p>
+          </div>
+          <div style="padding:var(--space-4);border-bottom:1px solid var(--color-divider)">
+            <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-2)">Event types</div>
+            <p style="margin:0;font-size:13px;line-height:1.8;color:color-mix(in srgb, var(--color-text) 75%, transparent)">applied · acknowledged · stage_advanced · interview_scheduled · interview_held · rejected · withdrawn · offer_received · offer_negotiated · accepted · went_silent · human_corrected · note_added</p>
+          </div>
+          <div style="padding:var(--space-4)">
+            <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin-bottom:var(--space-2)">Deliberate omission</div>
+            <p style="margin:0;font-size:13.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 65%, transparent)">No email bodies in the database. An event references a mailbox message id; the app deep-links to the real thread rather than re-hosting your correspondence.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 -->
+<section style="margin-top:var(--space-8);padding-top:var(--space-8);border-top:1px solid var(--color-divider)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">06</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">Stage machine</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">Granular stages, grouped into four phases so the interface can stay calm and the funnel stays comparable across companies that name things differently. Stages are per-user configurable; the phase a stage belongs to is what statistics aggregate on.</p>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--color-divider)">
+        <div style="border-right:1px solid var(--color-divider)">
+          <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);display:flex;align-items:center;gap:var(--space-2)"><span style="font:600 12px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700)">01 Sent</span></div>
+          <div style="padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2);font-size:14px">
+            <div style="display:flex;justify-content:space-between;gap:8px"><span>Draft</span><span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">saved posting</span></div>
+            <div>Applied</div>
+            <div style="display:flex;justify-content:space-between;gap:8px"><span>Acknowledged</span><span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">auto</span></div>
+          </div>
+        </div>
+        <div style="border-right:1px solid var(--color-divider)">
+          <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider)"><span style="font:600 12px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700)">02 Screening</span></div>
+          <div style="padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2);font-size:14px">
+            <div>Recruiter reach-out</div>
+            <div>HR call</div>
+            <div style="display:flex;justify-content:space-between;gap:8px"><span>Take-home</span><span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">has deadline</span></div>
+          </div>
+        </div>
+        <div style="border-right:1px solid var(--color-divider)">
+          <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider)"><span style="font:600 12px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700)">03 Interviewing</span></div>
+          <div style="padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2);font-size:14px">
+            <div>Technical</div>
+            <div>System design</div>
+            <div>Onsite loop</div>
+            <div>Final / exec</div>
+          </div>
+        </div>
+        <div style="background:var(--color-accent-100)">
+          <div style="padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider)"><span style="font:600 12px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-800)">04 Decided</span></div>
+          <div style="padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2);font-size:14px;color:var(--color-accent-900)">
+            <div style="font-weight:500">Offer</div>
+            <div style="font-weight:500">Negotiating</div>
+            <div style="color:color-mix(in srgb, var(--color-accent-900) 65%, transparent)">Rejected</div>
+            <div style="color:color-mix(in srgb, var(--color-accent-900) 65%, transparent)">Withdrawn</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--color-divider);border-top:0">
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="font-family:var(--font-heading);font-size:18px;margin-bottom:5px">Silence is a state, not a stage</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Most applications end by being ignored. After a stage-specific timeout the application is flagged <em>dormant</em> — visible in stats as a ghost rate, hidden from the daily view, never silently deleted.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="font-family:var(--font-heading);font-size:18px;margin-bottom:5px">Stages skip and go back</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Transitions are not a strict chain. A referral can start at technical; a company can send you back a round. The fold takes the highest-confidence latest event, and any monotonicity assumption is a bug.</p>
+        </div>
+        <div style="padding:var(--space-4)">
+          <div style="font-family:var(--font-heading);font-size:18px;margin-bottom:5px">Your correction always wins</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 65%, transparent)">A <em>human_corrected</em> event carries confidence 1.0 and pins the stage until a later signal of equal confidence. The agent is never allowed to argue with you twice.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 -->
+<section style="margin-top:var(--space-8);padding-top:var(--space-8);border-top:1px solid var(--color-divider)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">07</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">Metrics, defined once</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">Ratios are easy to compute and easy to compute wrongly — mostly by counting applications that have not had time to convert yet. Each metric names its cohort and its exclusion rule, and the interface shows the denominator next to the number so it can be trusted.</p>
+
+      <table class="table">
+        <thead><tr><th style="width:24%">Metric</th><th style="width:36%">Definition</th><th>Cohort &amp; exclusions</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:500">Application → interview</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Applications that reached phase <em>interviewing</em> ÷ applications sent</td><td style="color:color-mix(in srgb, var(--color-text) 65%, transparent);font-size:13px">Excludes anything applied &lt; 21 days ago and still in <em>sent</em> — otherwise the ratio always looks like it is falling</td></tr>
+          <tr><td style="font-weight:500">Interview → offer</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Offers ÷ applications that held ≥ 1 interview</td><td style="color:color-mix(in srgb, var(--color-text) 65%, transparent);font-size:13px">Excludes live processes; small-n warning shown under 8</td></tr>
+          <tr><td style="font-weight:500">Time to first response</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Median days from <em>applied</em> to the first non-automated inbound event</td><td style="color:color-mix(in srgb, var(--color-text) 65%, transparent);font-size:13px">Auto-acknowledgements are not a response; dormant applications count as right-censored, not as zero</td></tr>
+          <tr><td style="font-weight:500">Time in stage</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Median dwell per stage, from consecutive <em>stage_advanced</em> pairs</td><td style="color:color-mix(in srgb, var(--color-text) 65%, transparent);font-size:13px">Feeds the staleness thresholds the nudge service uses — the app learns your real cadence</td></tr>
+          <tr><td style="font-weight:500">Channel effectiveness</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Interview rate and offer rate per <em>source.channel</em>, attributed to first touch</td><td style="color:color-mix(in srgb, var(--color-text) 65%, transparent);font-size:13px">Multi-source applications attribute to the earliest source; referrals reported separately or they flatter LinkedIn</td></tr>
+          <tr><td style="font-weight:500">Ghost rate</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Applications that went dormant without an explicit rejection ÷ closed</td><td style="color:color-mix(in srgb, var(--color-text) 65%, transparent);font-size:13px">Per channel and per company size — this is where boards differ most</td></tr>
+          <tr><td style="font-weight:500">Seasonal shape</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Interview rate and response latency bucketed by application month</td><td style="color:color-mix(in srgb, var(--color-text) 65%, transparent);font-size:13px">Needs ~2 quarters before it is shown at all; August and late December flagged, not smoothed away</td></tr>
+          <tr><td style="font-weight:500">Comp spread</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Posted range, your ask, and offers received — per role and seniority</td><td style="color:color-mix(in srgb, var(--color-text) 65%, transparent);font-size:13px">Parsed from postings and offer letters; currency-normalised, gross annual</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 08 -->
+<section style="margin-top:var(--space-8);padding-top:var(--space-8);border-top:1px solid var(--color-divider)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">08</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">The agent that suggests</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">A scheduled fold over the log, not a chat. Each rule produces at most one suggestion per application, expires on its own, and is written so that doing nothing is always acceptable.</p>
+
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);border:1px solid var(--color-divider)">
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="display:flex;justify-content:space-between;gap:var(--space-2);align-items:baseline;margin-bottom:var(--space-2)"><span class="tag tag-accent">follow-up due</span><span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">stage dwell &gt; p75 of your own history</span></div>
+          <p style="margin:0;font-size:13.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 75%, transparent)">"Nexi asked for your availability 6 days ago and you replied. Your median wait at this stage is 3 days." One tap drafts a three-line follow-up in the thread's language, which you edit and send from your own mail client.</p>
+        </div>
+        <div style="padding:var(--space-4);border-bottom:1px solid var(--color-divider)">
+          <div style="display:flex;justify-content:space-between;gap:var(--space-2);align-items:baseline;margin-bottom:var(--space-2)"><span class="tag tag-accent">prepare</span><span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">interview in &lt; 48h</span></div>
+          <p style="margin:0;font-size:13.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 75%, transparent)">Surfaces the posting, the thread, your notes on this company, and what the previous round asked. No advice generation — just everything you already wrote, in one place, at the right hour.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="display:flex;justify-content:space-between;gap:var(--space-2);align-items:baseline;margin-bottom:var(--space-2)"><span class="tag tag-neutral">deadline</span><span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">take-home due date parsed</span></div>
+          <p style="margin:0;font-size:13.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 75%, transparent)">The only hard alert in the system, because it is the only one where silence has a cost you cannot undo. Fires at 72h and 12h.</p>
+        </div>
+        <div style="padding:var(--space-4)">
+          <div style="display:flex;justify-content:space-between;gap:var(--space-2);align-items:baseline;margin-bottom:var(--space-2)"><span class="tag tag-neutral">let it go</span><span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">silence &gt; 2× stage p90</span></div>
+          <p style="margin:0;font-size:13.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 75%, transparent)">Offers to archive as dormant, in one tap, batched weekly. This is the rule that keeps the pipeline honest — and the daily view short — without you having to admit defeat one card at a time.</p>
+        </div>
+      </div>
+      <p style="font-size:13.5px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 60%, transparent);max-width:80ch;margin:var(--space-4) 0 0">Budget: at most three suggestions surfaced at once, at most one push notification a day, none between 21:00 and 08:00. The tracker's job is to lower the ambient anxiety of a job search, and a tracker that notifies you nine times raises it.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 09 -->
+<section style="margin-top:var(--space-8);padding-top:var(--space-8);border-top:1px solid var(--color-divider)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">09</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">Credentials, secrets, GDPR</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">This system reads your mailbox. That is the whole design risk, and it is the reason the architecture is self-hosted first: the trust boundary is a box you own. If it is ever opened to other people, the guarantees below become promises you have to keep — so they are built in from v1 rather than retrofitted.</p>
+
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);border:1px solid var(--color-divider)">
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">Minimum viable scopes</div>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 72%, transparent)"><em>gmail.readonly</em> and <em>calendar.readonly</em>, nothing more — no send, no modify, no contacts. Loop drafts follow-ups but never has the right to send one. IMAP accounts use app-specific passwords, never your main password.</p>
+        </div>
+        <div style="padding:var(--space-4);border-bottom:1px solid var(--color-divider)">
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">Envelope encryption</div>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 72%, transparent)">Per-user data key (libsodium secretbox) wrapping tokens and any stored snippet; DEKs wrapped by a KEK held outside the database — env var on a single-tenant box, KMS or an age-encrypted file if hosted. A stolen dump yields nothing readable.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">Retention by default</div>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 72%, transparent)">Raw message text lives in memory for the length of one extraction, and on disk only if you opt into a 7-day debug buffer. What persists is the extracted fields, a message id and a hash. Attachments are referenced, not copied.</p>
+        </div>
+        <div style="padding:var(--space-4);border-bottom:1px solid var(--color-divider)">
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">Data subject rights, as endpoints</div>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 72%, transparent)"><em>GET /export</em> returns the full event log as JSON plus a CSV of applications. <em>DELETE /account</em> is a real cascade including the queue, the projections and the vector index, with a receipt. Articles 15 and 17 satisfied by construction, not by a support inbox.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">Third parties: none, by choice</div>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 72%, transparent)">Local inference means no processor agreement, no transfer outside the EU, no clause about model training. If a hosted model is ever enabled it becomes an explicit per-user toggle with a named processor, off by default.</p>
+        </div>
+        <div style="padding:var(--space-4);border-bottom:1px solid var(--color-divider)">
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">Special-category caution</div>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 72%, transparent)">Recruitment mail can carry health, disability or diversity data. The extractor has an explicit deny-list of fields it will never persist, and the model prompt forbids returning them. This also keeps the multi-user version out of Article 9 territory.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);grid-column:1/-1;border-right:0">
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">If it becomes multi-tenant</div>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 72%, transparent);max-width:90ch">Row-level security on <em>user_id</em> from day one, so the shared-instance version is a deployment flag rather than a rewrite. Google OAuth verification and a CASA assessment are the real cost of that step — plan months, not a weekend.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section style="margin-top:var(--space-8);padding-top:var(--space-8);border-top:1px solid var(--color-divider)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">10</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">Running it for nothing</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">Seven services on one always-free ARM instance, behind Caddy, orchestrated by Docker Compose. Postgres does queue, cron and vector search, so there is nothing else to operate. The whole thing idles at a few hundred megabytes.</p>
+
+      <table class="table">
+        <thead><tr><th style="width:22%">Component</th><th style="width:56%">Choice</th><th style="text-align:right">Monthly</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:500">Compute</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Oracle Cloud always-free ARM (4 vCPU / 24 GB), or a spare machine at home behind a tunnel</td><td style="text-align:right;font-family:var(--font-heading);font-weight:600">€0</td></tr>
+          <tr><td style="font-weight:500">Database</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Postgres 16 in a container: pgmq, pg_cron, pgvector. Nightly <em>pg_dump</em> to object storage</td><td style="text-align:right;font-family:var(--font-heading);font-weight:600">€0</td></tr>
+          <tr><td style="font-weight:500">Inference</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">llama.cpp server, Q4 7B, ~40 calls a week; vLLM as an on-demand batch profile for backfills</td><td style="text-align:right;font-family:var(--font-heading);font-weight:600">€0</td></tr>
+          <tr><td style="font-weight:500">Push</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Web Push (VAPID) straight from the notifier — no vendor, works on installed PWAs</td><td style="text-align:right;font-family:var(--font-heading);font-weight:600">€0</td></tr>
+          <tr><td style="font-weight:500">Ingress / TLS</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">Caddy with automatic Let's Encrypt, or a Cloudflare tunnel if the box has no public IP</td><td style="text-align:right;font-family:var(--font-heading);font-weight:600">€0</td></tr>
+          <tr><td style="font-weight:500">Client</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">One PWA served as static files — installs on the phone, no store review, no build fees</td><td style="text-align:right;font-family:var(--font-heading);font-weight:600">€0</td></tr>
+          <tr><td style="font-weight:500">Backups</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">R2 or B2 free tier; encrypted dumps, 30-day rotation</td><td style="text-align:right;font-family:var(--font-heading);font-weight:600">€0</td></tr>
+          <tr><td style="font-weight:500">Domain</td><td style="color:color-mix(in srgb, var(--color-text) 75%, transparent)">The only real line item, and optional — a dynamic-DNS name works</td><td style="text-align:right;font-family:var(--font-heading);font-weight:600;color:color-mix(in srgb, var(--color-text) 65%, transparent)">≈ €1</td></tr>
+        </tbody>
+      </table>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--color-divider);margin-top:var(--space-6)">
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="font-family:var(--font-heading);font-size:18px;margin-bottom:5px">Why not serverless</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 65%, transparent)">IMAP IDLE and a renewed Gmail watch both want a long-lived process, and local inference wants resident RAM. One small box is cheaper and simpler than working around a function timeout.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="font-family:var(--font-heading);font-size:18px;margin-bottom:5px">Failure posture</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Everything downstream of the connector is replayable from <em>seen_messages</em>, and the connector catches up from a stored history id. The box can be down for a day and lose nothing but timeliness.</p>
+        </div>
+        <div style="padding:var(--space-4)">
+          <div style="font-family:var(--font-heading);font-size:18px;margin-bottom:5px">Cost of growth</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:color-mix(in srgb, var(--color-text) 65%, transparent)">The first bottleneck at multi-user scale is inference, not the database. That is when rung 3 moves to a batched or hosted model — and when the free-tier promise ends, so it is also when you charge.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 -->
+<section style="margin-top:var(--space-8);padding-top:var(--space-8);border-top:1px solid var(--color-divider)">
+  <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--space-4)">
+    <div style="font-family:var(--font-heading);font-size:28px;line-height:1;color:var(--color-accent)">11</div>
+    <div>
+      <h2 style="font-family:var(--font-heading);font-size:31px;margin:0 0 var(--space-3);text-transform:uppercase;letter-spacing:-.01em">Build order</h2>
+      <p style="font-size:14px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 75%, transparent);max-width:74ch;margin:0 0 var(--space-6)">Each phase is usable alone, and each earns the right to build the next. The riskiest assumption — that email extraction is accurate enough to trust — is tested in phase 1, on your own real inbox, before any interface work.</p>
+
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--color-divider)">
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">P0 · weekend</div>
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">Schema + manual</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Event log, stage machine, quick-add, list and detail screens. Already better than a spreadsheet.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider);background:var(--color-accent-100)">
+          <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-800);margin-bottom:var(--space-3)">P1 · the risk</div>
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2);color:var(--color-accent-900)">Read the mailbox</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--color-accent-900)">Connector, classifier, ten ATS templates, resolver. Backfill 12 months of your own inbox and measure precision against what you remember.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">P2</div>
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">Calendar + review</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Interview detection, the model rung, and the two-tap confirmation loop that teaches the registry.</p>
+        </div>
+        <div style="padding:var(--space-4);border-right:1px solid var(--color-divider)">
+          <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">P3</div>
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">Statistics + nudges</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">Projections, the funnel, channel and timing views, the four nudge rules, web push.</p>
+        </div>
+        <div style="padding:var(--space-4);background:repeating-linear-gradient(135deg,transparent,transparent 7px,color-mix(in srgb, var(--color-text) 4%, transparent) 7px,color-mix(in srgb, var(--color-text) 4%, transparent) 8px)">
+          <div style="font:600 11px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin-bottom:var(--space-3)">P4 · optional</div>
+          <div style="font-family:var(--font-heading);font-size:19px;margin-bottom:var(--space-2)">Open it up</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 68%, transparent)">RLS on, OAuth verification, onboarding, hosted inference, billing. A different product with a different burden.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer style="margin-top:var(--space-8);padding-top:var(--space-6);border-top:1px solid var(--color-divider);display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-6);flex-wrap:wrap">
+  <p style="margin:0;font-size:13.5px;line-height:1.6;color:color-mix(in srgb, var(--color-text) 60%, transparent);max-width:62ch">Open questions for you: which mail providers you actually use, whether the take-home deadline alert may break quiet hours, and whether dormant applications should ever leave the funnel denominator.</p>
+</footer>
+
+</div>
+</doc-page>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showCosts&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Sections&quot;},&quot;showPhases&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Sections&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      showCosts: this.props.showCosts ?? true,
+      showPhases: this.props.showPhases ?? true,
+    };
+  }
+}
+</script>
+</body>
+</html>

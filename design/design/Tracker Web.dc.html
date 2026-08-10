@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/industry-5d9669ba-52c5-444b-9a17-67aa1664e37d/styles.css">
+<script src="_ds/industry-5d9669ba-52c5-444b-9a17-67aa1664e37d/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}
+a{color:var(--color-accent-700);text-decoration:none}
+a:hover{color:var(--color-accent)}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column;position:relative">
+
+  <!-- top bar -->
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:var(--space-3) var(--space-6);border-bottom:1px solid var(--color-divider)">
+    <div style="display:flex;align-items:center;gap:var(--space-3)">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span style="font:600 18px var(--font-heading);letter-spacing:.03em;text-transform:uppercase">Loop</span>
+    </div>
+    <div style="display:flex;gap:var(--space-4);margin-left:var(--space-4)">
+      <span style="font:600 12px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent);border-bottom:2px solid var(--color-accent);padding-bottom:2px">Pipeline</span>
+      <span style="font:600 12px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Statistics</span>
+      <span style="font:600 12px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Review · 2</span>
+      <span style="font:600 12px var(--font-heading);letter-spacing:.09em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Settings</span>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:var(--space-3)">
+      <span style="width:7px;height:7px;background:var(--color-accent)"></span>
+      <span style="font-size:12.5px;color:color-mix(in srgb, var(--color-text) 60%, transparent)">Gmail + Calendar connected · last read 4 min ago · 3 messages placed today</span>
+      <a href="Architecture.dc.html" style="font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;margin-left:var(--space-3)">System design →</a>
+    </div>
+  </div>
+
+  <!-- kpi strip -->
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--color-divider)">
+    <div style="padding:var(--space-4) var(--space-6);border-right:1px solid var(--color-divider)">
+      <div style="font:600 34px var(--font-heading);line-height:1">14</div>
+      <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-top:2px">live applications</div>
+    </div>
+    <div style="padding:var(--space-4) var(--space-6);border-right:1px solid var(--color-divider)">
+      <div style="font:600 34px var(--font-heading);line-height:1;color:var(--color-accent-700)">4</div>
+      <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-top:2px">interviewing</div>
+    </div>
+    <div style="padding:var(--space-4) var(--space-6);border-right:1px solid var(--color-divider);background:var(--color-accent-100)">
+      <div style="font:600 34px var(--font-heading);line-height:1;color:var(--color-accent-900)">1</div>
+      <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:var(--color-accent-800);margin-top:2px">open offer</div>
+    </div>
+    <div style="padding:var(--space-4) var(--space-6);border-right:1px solid var(--color-divider)">
+      <div style="font:600 34px var(--font-heading);line-height:1">{{ kpiRatio }}</div>
+      <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-top:2px">application → interview</div>
+    </div>
+    <div style="padding:var(--space-4) var(--space-6);border-right:1px solid var(--color-divider)">
+      <div style="font:600 34px var(--font-heading);line-height:1">{{ kpiResponse }}</div>
+      <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-top:2px">median first reply</div>
+    </div>
+    <div style="padding:var(--space-4) var(--space-6)">
+      <div style="font:600 34px var(--font-heading);line-height:1">{{ kpiGhost }}</div>
+      <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-top:2px">ghost rate</div>
+    </div>
+  </div>
+
+  <div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) 400px">
+
+    <!-- table -->
+    <div style="border-right:1px solid var(--color-divider)">
+      <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-6);border-bottom:1px solid var(--color-divider);flex-wrap:wrap">
+        <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+          <button onClick="{{ f.set }}" style="min-height:32px;padding:0 var(--space-3);border:1px solid var(--color-divider);background:{{ f.bg }};color:{{ f.fg }};font:600 11.5px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;cursor:pointer">{{ f.label }}</button>
+        </sc-for>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:var(--space-2)">
+          <span style="font-size:11.5px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Sort</span>
+          <button onClick="{{ sortSignal }}" style="min-height:32px;padding:0 var(--space-3);border:1px solid var(--color-divider);background:{{ sortSignalBg }};color:{{ sortSignalFg }};font:600 11.5px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;cursor:pointer">Last signal</button>
+          <button onClick="{{ sortStage }}" style="min-height:32px;padding:0 var(--space-3);border:1px solid var(--color-divider);background:{{ sortStageBg }};color:{{ sortStageFg }};font:600 11.5px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;cursor:pointer">Stage depth</button>
+          <button onClick="{{ sortCompany }}" style="min-height:32px;padding:0 var(--space-3);border:1px solid var(--color-divider);background:{{ sortCompanyBg }};color:{{ sortCompanyFg }};font:600 11.5px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;cursor:pointer">Company</button>
+        </div>
+      </div>
+
+      <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-6);background:var(--color-accent-100);border-bottom:1px solid var(--color-divider)">
+        <span style="font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;color:var(--color-accent-900)">{{ selectedCount }} selected</span>
+        <button onClick="{{ archive }}" class="btn btn-primary" style="min-height:32px">Archive as dormant</button>
+        <button class="btn btn-secondary" style="min-height:32px">Set stage…</button>
+        <button class="btn btn-secondary" style="min-height:32px">Export CSV</button>
+        <button onClick="{{ clearSel }}" style="margin-left:auto;background:transparent;border:0;cursor:pointer;font:600 11.5px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;color:var(--color-accent-800);min-height:32px">Clear</button>
+      </div>
+      </sc-if>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:34px;padding-left:var(--space-6)"></th>
+            <th>Company</th>
+            <th>Role</th>
+            <th style="width:130px">Stage</th>
+            <th style="width:96px">Channel</th>
+            <th style="width:88px;text-align:right">Applied</th>
+            <th style="width:104px;text-align:right">Last signal</th>
+            <th style="width:120px;padding-right:var(--space-6)">Flag</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+            <tr style="cursor:pointer;opacity:{{ r.dim }}">
+              <td style="padding-left:var(--space-6)">
+                <button onClick="{{ r.toggle }}" style="width:15px;height:15px;border:1px solid {{ r.boxBorder }};background:{{ r.boxBg }};cursor:pointer;padding:0;display:block"></button>
+              </td>
+              <td onClick="{{ r.open }}" style="font-weight:500">{{ r.company }}</td>
+              <td onClick="{{ r.open }}" style="color:color-mix(in srgb, var(--color-text) 70%, transparent);font-size:13.5px">{{ r.role }}</td>
+              <td onClick="{{ r.open }}"><span style="font:600 11px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;color:var(--color-accent-800)">{{ r.stage }}</span></td>
+              <td onClick="{{ r.open }}" style="font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">{{ r.channel }}</td>
+              <td onClick="{{ r.open }}" style="text-align:right;font-size:13px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">{{ r.applied }}</td>
+              <td onClick="{{ r.open }}" style="text-align:right;font:600 13px var(--font-heading);color:{{ r.daysColor }}">{{ r.days }}</td>
+              <td onClick="{{ r.open }}" style="padding-right:var(--space-6);font-size:11.5px;color:var(--color-accent-700)">{{ r.flag }}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+
+      <div style="padding:var(--space-4) var(--space-6);font-size:12px;color:color-mix(in srgb, var(--color-text) 50%, transparent)">
+        Rows are derived, not typed. Clicking one opens its event log with the evidence behind every stage change.
+      </div>
+    </div>
+
+    <!-- right rail -->
+    <div style="display:flex;flex-direction:column">
+      <div style="display:flex;border-bottom:1px solid var(--color-divider)">
+        <button onClick="{{ setP90 }}" style="flex:1;min-height:38px;border:0;border-right:1px solid var(--color-divider);background:{{ p90bg }};color:{{ p90fg }};font:600 11.5px var(--font-heading);letter-spacing:.08em;text-transform:uppercase;cursor:pointer">90 days</button>
+        <button onClick="{{ setP12 }}" style="flex:1;min-height:38px;border:0;background:{{ p12bg }};color:{{ p12fg }};font:600 11.5px var(--font-heading);letter-spacing:.08em;text-transform:uppercase;cursor:pointer">12 months</button>
+      </div>
+
+      <div style="padding:var(--space-6);border-bottom:1px solid var(--color-divider)">
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-4)">Funnel</div>
+        <sc-for list="{{ funnel }}" as="f" hint-placeholder-count="5">
+          <div style="margin-bottom:var(--space-3)">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+              <span style="font-size:12.5px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">{{ f.label }}</span>
+              <span style="font:600 15px var(--font-heading)">{{ f.n }}</span>
+            </div>
+            <div style="height:9px;background:color-mix(in srgb, var(--color-text) 8%, transparent)"><div style="height:9px;width:{{ f.w }};background:var(--color-accent)"></div></div>
+          </div>
+        </sc-for>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-top:var(--space-4)">
+          <sc-for list="{{ ratios }}" as="r" hint-placeholder-count="2">
+            <div style="border:1px solid var(--color-divider);padding:var(--space-3)">
+              <div style="font:600 24px var(--font-heading);line-height:1;color:var(--color-accent-800)">{{ r.value }}</div>
+              <div style="font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-top:3px">{{ r.label }}</div>
+              <div style="font-size:11px;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin-top:4px">{{ r.note }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="padding:var(--space-6);border-bottom:1px solid var(--color-divider)">
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">By channel</div>
+        <table class="table" style="font-size:13px">
+          <thead><tr><th>Channel</th><th style="text-align:right">Sent</th><th style="text-align:right">→ IV</th><th style="text-align:right">→ Off</th><th style="text-align:right">Ghost</th></tr></thead>
+          <tbody>
+            <sc-for list="{{ channels }}" as="c" hint-placeholder-count="4">
+              <tr>
+                <td style="font-weight:500">{{ c.name }}</td>
+                <td style="text-align:right;color:color-mix(in srgb, var(--color-text) 65%, transparent)">{{ c.sent }}</td>
+                <td style="text-align:right;font:600 14px var(--font-heading);color:var(--color-accent-800)">{{ c.iv }}</td>
+                <td style="text-align:right">{{ c.of }}</td>
+                <td style="text-align:right;color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ c.ghost }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <p style="font-size:11.5px;line-height:1.5;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin:var(--space-3) 0 0">Referrals are reported separately on purpose — folding four of them into LinkedIn would flatter it by six points.</p>
+      </div>
+
+      <div style="padding:var(--space-6)">
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:var(--space-3)">Median time in stage</div>
+        <sc-for list="{{ timing }}" as="t" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:110px minmax(0,1fr) 40px;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
+            <span style="font-size:12px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">{{ t.label }}</span>
+            <span style="height:7px;background:color-mix(in srgb, var(--color-text) 8%, transparent);display:block"><span style="height:7px;width:{{ t.w }};background:var(--color-accent-500);display:block"></span></span>
+            <span style="font:600 13px var(--font-heading);text-align:right">{{ t.days }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- drawer -->
+  <sc-if value="{{ isOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:40;display:flex;justify-content:flex-end;background:color-mix(in srgb, var(--color-neutral-900) 35%, transparent)">
+    <div style="width:520px;background:var(--color-bg);border-left:1px solid var(--color-divider);display:flex;flex-direction:column;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-4) var(--space-6);border-bottom:1px solid var(--color-divider)">
+        <span style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Application record</span>
+        <button onClick="{{ closeDrawer }}" style="background:transparent;border:0;cursor:pointer;color:var(--color-accent-700);font:600 12px var(--font-heading);letter-spacing:.07em;text-transform:uppercase;min-height:36px">Close ×</button>
+      </div>
+
+      <div style="padding:var(--space-6)">
+        <h2 style="font-family:var(--font-heading);font-size:34px;margin:0;text-transform:uppercase;line-height:1">{{ app.company }}</h2>
+        <div style="font-size:15px;color:color-mix(in srgb, var(--color-text) 72%, transparent);margin-top:var(--space-2)">{{ app.role }}</div>
+        <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3)">
+          <span class="tag tag-accent">{{ app.stage }}</span>
+          <span class="tag tag-neutral">{{ app.channel }}</span>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--color-divider)">
+        <div style="padding:var(--space-3) var(--space-6);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Applied</div>
+          <div style="font-size:14px">{{ app.applied }}</div>
+        </div>
+        <div style="padding:var(--space-3) var(--space-6);border-bottom:1px solid var(--color-divider)">
+          <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">ATS</div>
+          <div style="font-size:14px">{{ app.ats }}</div>
+        </div>
+        <div style="padding:var(--space-3) var(--space-6);border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+          <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Location</div>
+          <div style="font-size:14px">{{ app.loc }}</div>
+        </div>
+        <div style="padding:var(--space-3) var(--space-6);border-bottom:1px solid var(--color-divider)">
+          <div style="font:600 10px var(--font-heading);letter-spacing:.11em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">Posted range</div>
+          <div style="font-size:14px">{{ app.comp }}</div>
+        </div>
+      </div>
+
+      <div style="padding:var(--space-6) var(--space-6) var(--space-3)">
+        <div style="font:600 11px var(--font-heading);letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700)">Event log</div>
+      </div>
+      <div style="padding:0 var(--space-6) var(--space-6)">
+        <sc-for list="{{ events }}" as="e" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:58px 18px minmax(0,1fr);gap:var(--space-2);padding-bottom:var(--space-4)">
+            <div style="font:600 12px var(--font-heading);letter-spacing:.04em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);text-align:right;padding-top:2px">{{ e.when }}</div>
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <svg width="11" height="11" viewBox="0 0 11 11" stroke="var(--color-accent)" stroke-width="1" style="flex:none;margin-top:3px"><path d="M5.5 0v11M0 5.5h11"/></svg>
+              <span style="flex:1;width:1px;background:var(--color-divider);margin-top:3px"></span>
+            </div>
+            <div>
+              <div style="font-size:14.5px;font-weight:500;line-height:1.25">{{ e.what }}</div>
+              <div style="font-size:12.5px;line-height:1.45;color:color-mix(in srgb, var(--color-text) 65%, transparent);margin-top:2px">{{ e.detail }}</div>
+              <div style="display:flex;gap:var(--space-2);align-items:center;margin-top:var(--space-2)">
+                <span style="font-size:10.5px;padding:2px 6px;border:1px solid var(--color-divider);color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ e.source }}</span>
+                <span style="font:600 10.5px var(--font-heading);letter-spacing:.06em;color:var(--color-accent-700)">conf {{ e.conf }}</span>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="padding:0 var(--space-6) var(--space-8);display:flex;gap:var(--space-2);flex-wrap:wrap">
+        <button class="btn btn-primary" style="min-height:40px">Draft follow-up</button>
+        <button class="btn btn-secondary" style="min-height:40px">Open thread</button>
+        <button class="btn btn-secondary" style="min-height:40px">Correct stage</button>
+        <button class="btn btn-secondary" style="min-height:40px">Archive</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000}}">
+const A = (id, company, role, stage, phase, channel, days, applied, extra) => Object.assign({
+  id, company, role, stage, phase, channel, days, applied, depth: extra && extra.depth || 0,
+}, extra || {});
+
+const APPS = [
+  A('satispay', 'Satispay', 'Backend Engineer', 'Technical', 'interviewing', 'Career page', 1, '2 Jul', { depth: 7, comp: '€55–70k', ats: 'Ashby', loc: 'Milan · hybrid', flag: 'interview tomorrow' }),
+  A('nexi', 'Nexi', 'Platform Engineer', 'Onsite loop', 'interviewing', 'LinkedIn', 6, '12 Jun', { depth: 8, comp: '€60–75k', ats: 'Workday', loc: 'Milan · onsite', flag: 'follow-up due' }),
+  A('zalando', 'Zalando', 'Senior Backend Engineer', 'System design', 'interviewing', 'Career page', 5, '18 Jun', { depth: 8, comp: '€75–90k', ats: 'Greenhouse', loc: 'Berlin · remote EU' }),
+  A('personio', 'Personio', 'Backend Engineer', 'HR call', 'interviewing', 'LinkedIn', 2, '9 Jul', { depth: 6, comp: '€65–80k', ats: 'Greenhouse', loc: 'Munich · remote' }),
+  A('docebo', 'Docebo', 'Software Engineer', 'HR call', 'screening', 'Indeed', 2, '21 Jul', { depth: 5, comp: '€45–58k', ats: 'Lever', loc: 'Biassono · hybrid' }),
+  A('prima', 'Prima Assicurazioni', 'Backend Engineer', 'Take-home', 'screening', 'LinkedIn', 1, '23 Jul', { depth: 6, comp: '€50–65k', ats: 'Workable', loc: 'Milan · remote', flag: 'due Sunday 23:59' }),
+  A('scalapay', 'Scalapay', 'Engineer, Payments', 'Recruiter', 'screening', 'Referral', 4, '24 Jul', { depth: 4, comp: 'not posted', ats: 'Greenhouse', loc: 'Milan · hybrid' }),
+  A('bending', 'Bending Spoons', 'Software Engineer', 'Offer', 'decided', 'Career page', 2, '2 Jun', { depth: 10, comp: '€68k + equity', ats: 'in-house', loc: 'Milan · onsite', flag: 'decide by 8 Aug' }),
+  A('getyourguide', 'GetYourGuide', 'Backend Engineer', 'Applied', 'sent', 'LinkedIn', 6, '24 Jul', { depth: 1, comp: '€70–85k', ats: 'Greenhouse', loc: 'Berlin · hybrid' }),
+  A('translated', 'Translated', 'Platform Engineer', 'Acknowledged', 'sent', 'Career page', 8, '22 Jul', { depth: 2, comp: 'not posted', ats: 'Recruitee', loc: 'Rome · remote' }),
+  A('everli', 'Everli', 'Backend Engineer', 'Acknowledged', 'sent', 'Indeed', 9, '21 Jul', { depth: 2, comp: '€45–55k', ats: 'Workable', loc: 'Milan · remote' }),
+  A('iliad', 'Iliad Italia', 'Software Engineer', 'Applied', 'sent', 'Career page', 11, '19 Jul', { depth: 1, comp: 'not posted', ats: 'Taleo', loc: 'Milan · onsite', flag: 'in review queue' }),
+  A('casavo', 'Casavo', 'Senior Engineer', 'Applied', 'sent', 'LinkedIn', 14, '16 Jul', { depth: 1, comp: '€60–72k', ats: 'Lever', loc: 'Milan · hybrid', flag: 'past your p90' }),
+  A('sportradar', 'Sportradar', 'Backend Engineer', 'Acknowledged', 'sent', 'Indeed', 17, '13 Jul', { depth: 2, comp: '€50–62k', ats: 'SmartRecruiters', loc: 'Trento · hybrid', flag: 'past your p90' }),
+  A('musement', 'Musement', 'Backend Engineer', 'Rejected', 'decided', 'LinkedIn', 12, '28 Jun', { depth: 0, comp: '€48–58k', ats: 'Workable', loc: 'Milan · hybrid', closed: true }),
+  A('vodafone', 'Vodafone Italia', 'Cloud Engineer', 'Dormant', 'decided', 'Career page', 41, '15 Jun', { depth: 0, comp: 'not posted', ats: 'Workday', loc: 'Milan · hybrid', closed: true }),
+];
+
+const STATS = {
+  '12m': {
+    funnel: [['Applied', 68, 100], ['Acknowledged', 61, 90], ['Screening', 22, 32], ['Interviewing', 11, 16], ['Offer', 3, 4]],
+    ratios: [['App → interview', '16.2%', '11 of 68 · 5 too recent'], ['Interview → offer', '27%', '3 of 11 · small n']],
+    firstResponse: '9 d', ghost: '46%', ratio: '16.2%',
+    channels: [['Career page', 16, '25%', '6%', '25%'], ['LinkedIn', 34, '12%', '3%', '47%'], ['Indeed', 14, '7%', '0%', '64%'], ['Referral', 4, '75%', '25%', '0%']],
+    timing: [['Applied → ack', '0.4 d', 8], ['Ack → screening', '9 d', 100], ['Screening → tech', '6 d', 67], ['Tech → final', '8 d', 89], ['Final → offer', '5 d', 56]],
+  },
+  '90d': {
+    funnel: [['Applied', 31, 100], ['Acknowledged', 28, 90], ['Screening', 12, 39], ['Interviewing', 6, 19], ['Offer', 2, 6]],
+    ratios: [['App → interview', '19.4%', '6 of 31 · 5 too recent'], ['Interview → offer', '33%', '2 of 6 · very small n']],
+    firstResponse: '7 d', ghost: '38%', ratio: '19.4%',
+    channels: [['Career page', 8, '38%', '13%', '13%'], ['LinkedIn', 15, '13%', '0%', '40%'], ['Indeed', 6, '0%', '0%', '67%'], ['Referral', 2, '100%', '50%', '0%']],
+    timing: [['Applied → ack', '0.3 d', 6], ['Ack → screening', '7 d', 100], ['Screening → tech', '5 d', 71], ['Tech → final', '6 d', 86], ['Final → offer', '4 d', 57]],
+  },
+};
+
+const EVENTS = {
+  satispay: [
+    ['2 Jul', 'Applied', 'Submitted through satispay.com/careers', 'quick add', '1.0'],
+    ['2 Jul', 'Acknowledged', 'Ashby auto-reply', 'gmail · template', '0.99'],
+    ['9 Jul', 'Recruiter reach-out', 'Giulia P. asked for a 20-minute intro call', 'gmail · model', '0.88'],
+    ['14 Jul', 'HR call held', 'Calendar event ended, no reschedule followed', 'calendar', '0.95'],
+    ['22 Jul', 'Technical round 1 held', 'Live coding with the payments team', 'calendar', '0.95'],
+    ['29 Jul', 'Round 2 scheduled', 'Invite for 31 Jul 10:00 — "System & code review"', 'calendar · ics', '0.97'],
+  ],
+  bending: [
+    ['2 Jun', 'Applied', 'Career page form', 'quick add', '1.0'],
+    ['4 Jun', 'Screening call', 'Recruiter intro, 30 minutes', 'calendar', '0.95'],
+    ['13 Jun', 'Take-home submitted', 'Deadline detected and met with 2 days to spare', 'gmail · template', '0.92'],
+    ['26 Jun', 'Onsite loop', 'Four sessions in one day', 'calendar', '0.95'],
+    ['28 Jul', 'Offer received', '€68k base + equity, decision requested by 8 Aug', 'gmail · model', '0.90'],
+  ],
+  nexi: [
+    ['12 Jun', 'Applied', 'LinkedIn Easy Apply', 'gmail · linkedin', '0.98'],
+    ['13 Jun', 'Acknowledged', 'Workday auto-reply', 'gmail · template', '0.99'],
+    ['1 Jul', 'HR call held', '30 minutes with talent acquisition', 'calendar', '0.95'],
+    ['15 Jul', 'Technical round', 'Two engineers, 90 minutes', 'calendar', '0.95'],
+    ['24 Jul', 'Onsite loop held', 'Three sessions, Milan office', 'calendar', '0.95'],
+  ],
+};
+
+class Component extends DCLogic {
+  state = { filter: 'all', sort: 'signal', selected: [], open: null, period: '12m', archived: [] };
+
+  renderVals() {
+    const { filter, sort, selected, period, archived, open } = this.state;
+    const cur = open ? APPS.find((a) => a.id === open) : null;
+    const curEvents = cur ? (EVENTS[cur.id] || [
+      [cur.applied, 'Applied', 'Submitted via ' + cur.channel, cur.channel === 'LinkedIn' ? 'gmail · linkedin' : 'quick add', '0.98'],
+      [cur.applied, 'Acknowledged', 'Automated reply from ' + cur.ats, 'gmail · template', '0.99'],
+    ]) : [];
+    const st = STATS[period];
+    const activeBg = 'var(--color-accent)', activeFg = 'var(--color-bg)';
+    const idleBg = 'transparent', idleFg = 'color-mix(in srgb, var(--color-text) 70%, transparent)';
+
+    let list = APPS.filter((a) => archived.indexOf(a.id) < 0)
+      .filter((a) => filter === 'all' || a.phase === filter);
+    if (sort === 'company') list = list.slice().sort((x, y) => x.company.localeCompare(y.company));
+    else if (sort === 'stage') list = list.slice().sort((x, y) => y.depth - x.depth);
+    else list = list.slice().sort((x, y) => x.days - y.days);
+
+    const filters = [['all', 'All'], ['interviewing', 'Interviewing'], ['screening', 'Screening'], ['sent', 'Sent'], ['decided', 'Decided']];
+
+    return {
+      kpiRatio: st.ratio, kpiResponse: st.firstResponse, kpiGhost: st.ghost,
+      isOpen: !!cur, app: cur || {}, closeDrawer: () => this.setState({ open: null }),
+      events: curEvents.map(([when, what, detail, source, conf]) => ({ when, what, detail, source, conf })),
+      filters: filters.map(([key, label]) => ({
+        label: key === 'all' ? 'All ' + APPS.filter((a) => archived.indexOf(a.id) < 0).length : label,
+        set: () => this.setState({ filter: key }),
+        bg: filter === key ? activeBg : idleBg, fg: filter === key ? activeFg : idleFg,
+      })),
+      sortSignal: () => this.setState({ sort: 'signal' }),
+      sortStage: () => this.setState({ sort: 'stage' }),
+      sortCompany: () => this.setState({ sort: 'company' }),
+      sortSignalBg: sort === 'signal' ? activeBg : idleBg, sortSignalFg: sort === 'signal' ? activeFg : idleFg,
+      sortStageBg: sort === 'stage' ? activeBg : idleBg, sortStageFg: sort === 'stage' ? activeFg : idleFg,
+      sortCompanyBg: sort === 'company' ? activeBg : idleBg, sortCompanyFg: sort === 'company' ? activeFg : idleFg,
+      hasSelection: selected.length > 0, selectedCount: selected.length,
+      clearSel: () => this.setState({ selected: [] }),
+      archive: () => this.setState({ archived: archived.concat(selected), selected: [] }),
+      rows: list.map((a) => {
+        const sel = selected.indexOf(a.id) >= 0;
+        return {
+          company: a.company, role: a.role, stage: a.stage, channel: a.channel, applied: a.applied,
+          days: a.days === 1 ? '1 day' : a.days + ' days',
+          daysColor: a.days > 13 ? 'var(--color-accent-700)' : 'color-mix(in srgb, var(--color-text) 70%, transparent)',
+          flag: a.flag || '', dim: a.closed ? '0.55' : '1',
+          boxBg: sel ? 'var(--color-accent)' : 'transparent',
+          boxBorder: sel ? 'var(--color-accent)' : 'color-mix(in srgb, var(--color-text) 30%, transparent)',
+          toggle: () => this.setState({ selected: sel ? selected.filter((s) => s !== a.id) : selected.concat(a.id) }),
+          open: () => this.setState({ open: a.id }),
+        };
+      }),
+      setP12: () => this.setState({ period: '12m' }), setP90: () => this.setState({ period: '90d' }),
+      p12bg: period === '12m' ? activeBg : idleBg, p12fg: period === '12m' ? activeFg : idleFg,
+      p90bg: period === '90d' ? activeBg : idleBg, p90fg: period === '90d' ? activeFg : idleFg,
+      funnel: st.funnel.map(([label, n, pct]) => ({ label, n, w: pct + '%' })),
+      ratios: st.ratios.map(([label, value, note]) => ({ label, value, note })),
+      channels: st.channels.map(([name, sent, iv, of, ghost]) => ({ name, sent, iv, of, ghost })),
+      timing: st.timing.map(([label, days, w]) => ({ label, days, w: w + '%' })),
+    };
+  }
+}
+</script>
+</body>
+</html>
