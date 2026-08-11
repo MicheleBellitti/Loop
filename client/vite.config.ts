@@ -19,6 +19,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': { target: 'http://localhost:3000', changeOrigin: true },
+      // `/health/deep` is the one gateway route the client calls without an
+      // `/api` prefix. Unproxied, Vite answers it with index.html at 200, and
+      // the client — which only parses a JSON content-type — hands the HTML
+      // back as a string that passes a truthiness check and then has no
+      // `components` on it. Dev has to forward this or it diverges from :3000.
+      '/health': { target: 'http://localhost:3000', changeOrigin: true },
     },
   },
 });

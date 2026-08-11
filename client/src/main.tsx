@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './industry.css';
 import './app.css';
 import { App } from './App.js';
+import { ErrorBoundary } from './states/ErrorBoundary.js';
 
 /**
  * Cache per query key, invalidated on the matching SSE event — so a stage
@@ -23,9 +24,11 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );
 
