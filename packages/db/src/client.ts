@@ -32,7 +32,14 @@ export function createPool(opts: DbOptions = {}): pg.Pool {
     application_name: opts.applicationName ?? 'loop',
     // A query that has been running for two minutes is a bug, not a slow query.
     statement_timeout: 120_000,
-    idle_in_transaction_session_timeout: 30_000,
+    // This has to exceed MODEL_TIMEOUT_MS. The extractor calls rung 3 from
+    // inside its transaction, so the connection sits idle-in-transaction for
+    // however long inference takes; at 30s a local model that thinks before it
+    // answers gets the connection terminated mid-flight, and the resulting
+    // unhandled 'error' event takes the whole extractor process down. The real
+    // fix is to move the model call outside the transaction — until then these
+    // two numbers are coupled and this one must be the larger.
+    idle_in_transaction_session_timeout: 180_000,
   });
 }
 

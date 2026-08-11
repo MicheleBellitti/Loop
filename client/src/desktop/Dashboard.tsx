@@ -320,7 +320,7 @@ export function Dashboard() {
             <Skeleton height={200} />
           )}
 
-          {deep.data ? (
+          {deep.data?.components ? (
             <section>
               <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Extraction</div>
               <ComponentStatus components={deep.data.components} />
