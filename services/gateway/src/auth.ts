@@ -1,4 +1,4 @@
-import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import type pg from 'pg';
 
@@ -60,18 +60,36 @@ export interface IssuedSession {
 }
 
 /**
- * Only hashes are stored. A database dump does not hand over live sessions,
- * which is the same reasoning that keeps mailbox tokens in an envelope.
+ * The CSRF token is *derived*, not stored.
+ *
+ * It used to be a random value whose hash went into the session row — which
+ * works exactly once, at login, because a hash cannot be turned back into the
+ * token. On the next page load `/api/me` had nothing to hand back but the hash
+ * itself, the client presented that, the server hashed it a second time, and
+ * every mutation failed with 403. The symptom was a button that did nothing.
+ *
+ * An HMAC over the session id fixes it without storing a live secret: it is
+ * recomputable on any request, identical for the whole life of the session,
+ * and useless to anyone who does not also hold the session cookie.
+ */
+export function csrfFor(sessionId: string): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error('SESSION_SECRET is not set');
+  return createHmac('sha256', secret).update(`csrf:${sessionId}`).digest('base64url');
+}
+
+/**
+ * Only the session token's hash is stored. A database dump does not hand over
+ * live sessions, which is the same reasoning that keeps mailbox tokens sealed.
  */
 export async function createSession(sql: pg.Pool | pg.PoolClient, userId: string): Promise<IssuedSession> {
   const token = randomBytes(32).toString('base64url');
-  const csrf = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 86_400_000);
-  await sql.query(
-    `insert into sessions (user_id, token_hash, csrf_hash, expires_at) values ($1,$2,$3,$4)`,
-    [userId, sha256(token), sha256(csrf), expiresAt],
+  const res = await sql.query<{ id: string }>(
+    `insert into sessions (user_id, token_hash, expires_at) values ($1,$2,$3) returning id`,
+    [userId, sha256(token), expiresAt],
   );
-  return { token, csrf, expiresAt };
+  return { token, csrf: csrfFor(res.rows[0]!.id), expiresAt };
 }
 
 export async function loadSession(
@@ -79,15 +97,15 @@ export async function loadSession(
   token: string | undefined,
 ): Promise<Session | null> {
   if (!token) return null;
-  const res = await sql.query<{ id: string; user_id: string; csrf_hash: Buffer }>(
+  const res = await sql.query<{ id: string; user_id: string }>(
     `update sessions set last_seen_at = now()
       where token_hash = $1 and expires_at > now()
-      returning id, user_id, csrf_hash`,
+      returning id, user_id`,
     [sha256(token)],
   );
   const row = res.rows[0];
   if (!row) return null;
-  return { id: row.id, userId: row.user_id, csrf: row.csrf_hash.toString('base64') };
+  return { id: row.id, userId: row.user_id, csrf: csrfFor(row.id) };
 }
 
 export async function destroySession(sql: pg.Pool | pg.PoolClient, token: string): Promise<void> {
@@ -97,8 +115,8 @@ export async function destroySession(sql: pg.Pool | pg.PoolClient, token: string
 /** Constant-time comparison of the submitted CSRF token against the session. */
 export function csrfMatches(session: Session, presented: string | undefined): boolean {
   if (!presented) return false;
-  const a = sha256(presented);
-  const b = Buffer.from(session.csrf, 'base64');
+  const a = Buffer.from(presented);
+  const b = Buffer.from(session.csrf);
   return a.length === b.length && timingSafeEqual(a, b);
 }
 

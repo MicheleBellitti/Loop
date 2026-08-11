@@ -10,6 +10,7 @@ import {
   type Rung,
   type Signal,
 } from '@loop/domain';
+import { roleFromBody } from '@loop/rules';
 
 /**
  * Turning a rung's answer into the one shape the resolver accepts.
@@ -80,7 +81,13 @@ export interface BuildSignalInput {
 
 export function buildSignal(input: BuildSignalInput): Signal & { application_hint: string | null } {
   const { msg } = input;
-  const normalised = input.role ? normaliseRole(input.role) : null;
+  // Whatever rung produced this signal, the job title may still be sitting in
+  // the body — a calendar invite says "Interview with Prima" in its subject and
+  // names the role in the description. Recovering it here means every rung
+  // benefits, and the resolver gets something to match on instead of the
+  // placeholder that made every roleless signal look like a new application.
+  const role = input.role ?? roleFromBody(`${msg.headers.subject}\n${msg.text}`);
+  const normalised = role ? normaliseRole(role) : null;
 
   // A calendar invite is the most accurate `occurred_at` in the mailbox: the
   // event happened when the meeting is, not when the mail arrived.
@@ -103,7 +110,7 @@ export function buildSignal(input: BuildSignalInput): Signal & { application_hin
     // for and what they will recognise in a list. The normalised form travels
     // beside it for the resolver to embed — conflating the two put lower-cased
     // strings on screen.
-    role: input.role,
+    role,
     role_normalised: normalised?.role ?? null,
     stage_hint: input.stageHint,
     occurred_at: occurredAt,

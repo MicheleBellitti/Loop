@@ -232,3 +232,23 @@ describe('fold — edges', () => {
     expect(s.status).toBe('live');
   });
 });
+
+describe('fold — applied_at from an acknowledgement', () => {
+  it('uses the acknowledgement when no explicit applied event exists', () => {
+    // The shape of every real ATS thread: you submitted through a web form, so
+    // the only trace is "Thanks for applying".
+    const events = [
+      ev('acknowledged', '2026-03-04T10:00:00Z', 0.98, { payload: { ats_vendor: 'lever' } }),
+      ev('stage_advanced', '2026-03-20T10:00:00Z', 0.95, { to_stage: 'hr_call' }),
+    ];
+    expect(fold(events).applied_at?.toISOString()).toBe('2026-03-04T10:00:00.000Z');
+  });
+
+  it('still prefers a real applied event when there is one', () => {
+    const events = [
+      ev('applied', '2026-03-01T10:00:00Z', 1.0),
+      ev('acknowledged', '2026-03-04T10:00:00Z', 0.98),
+    ];
+    expect(fold(events).applied_at?.toISOString()).toBe('2026-03-01T10:00:00.000Z');
+  });
+});

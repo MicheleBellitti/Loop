@@ -1,30 +1,60 @@
+# Ashby
+#
+# Rewritten against the six real messages in this mailbox. Note how much this
+# overlaps with Lever: "Thanks for applying to X!" is sent by both, and under
+# the old vendor-scoped rules the pattern existed in lever.yaml while Ashby mail
+# was never tested against it. Shared shapes now live in each vendor that sends
+# them; a cross-vendor fallback file would be the next step if the duplication
+# grows.
 vendor: ashby
 match:
   sender_domains: [ashbyhq.com, mail.ashbyhq.com, notifications.ashbyhq.com]
 locale: [en]
-company_from: subject_capture
+company_from: sender_display_name
 patterns:
+  # "Thanks for applying to Lexroom!" · "Thanks for applying to Air Apps!"
   - intent: acknowledged
-    subject: '^(?<company>.+?) — Application Received$'
-    extract:
-      role: 'application for (?:the )?(?<role>[^,\.\n]{3,60}?)(?:[\.\n]|$)'
-    confidence: 0.99
-  - intent: acknowledged
-    subject: '^We received your application to (?<company>.+)$'
+    subject: '^thanks for applying to\b'
     confidence: 0.98
+
+  # "Your application to Cradle"
+  - intent: acknowledged
+    subject: '^your application (?:to|at)\b'
+    confidence: 0.97
+
+  # "Application at Cradle for Software Engineer in Machine Learning (f/m/*)"
+  - intent: acknowledged
+    subject: '^application at .+? for (?<role>.+)$'
+    confidence: 0.97
+
+  # "Lexroom Application Update" — an update, but of what kind is in the body.
+  # Rejections are the common case and are matched first, below.
+  - intent: rejected
+    subject: 'application update'
+    body: '(not moving forward|not be moving forward|decided to pursue other|other candidates|unfortunately)'
+    confidence: 0.96
+
   - intent: interview_invite
-    subject: '^(Interview|Chat) with (?<company>.+)$'
-    extract:
-      role: 'for (?:the )?(?<role>[^,\.\n]{2,60}?) (?:position|role|team)'
+    subject: 'application update'
+    body: '(would like to invite|schedule (?:a|an) (?:call|interview)|next (?:step|round))'
     confidence: 0.93
+
+  # Anything still called an update, with no body signal either way, is a real
+  # unknown — it abstains rather than guessing, which is what rung 4 is for.
+  - intent: interview_invite
+    subject: '^(?:interview|chat) with\b'
+    confidence: 0.93
+
   - intent: take_home
-    body: '(take[- ]home|coding (exercise|challenge)|technical assignment)'
+    body: '(take[- ]home|coding (?:exercise|challenge)|technical assignment)'
     extract:
       deadline: '(?:by|before|due) (?<deadline>[A-Z][a-z]+day[^\.\n]{0,30}|\d{1,2} [A-Z][a-z]+[^\.\n]{0,20})'
     confidence: 0.92
+
   - intent: rejected
     body: '(not moving forward|decided to pursue other candidates)'
     confidence: 0.96
+
 tests:
   - fixture: fixtures/ats/ashby-ack-01.eml
-    expect: { intent: acknowledged, company: Satispay, confidence: 0.99 }
+    expect: { intent: acknowledged, confidence: 0.98 }

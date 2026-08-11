@@ -19,7 +19,7 @@
     "lint:no-send-path": "node scripts/assert-no-send-path.mjs",
     "migrate": "node --experimental-strip-types packages/db/src/migrate.ts",
     "seed:user": "node --experimental-strip-types scripts/seed-user.ts",
-    "dev": "node scripts/dev.mjs",
+    "dev": "tsc --build && node scripts/dev.mjs",
     "client:dev": "npm run dev -w @loop/client",
     "client:build": "npm run build -w @loop/client",
     "fixtures": "tsx scripts/gen-fixtures.ts",

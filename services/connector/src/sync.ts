@@ -59,7 +59,13 @@ async function ingestMessage(
     if (seen.rowCount) return 'skipped';
 
     const accessToken = await accessTokenFor(deps, mailbox);
-    const gmail = await deps.google.getMessage(accessToken, messageId);
+    // A calendar part over a few kilobytes arrives as an attachment id with an
+    // empty body, so the .ics has to be fetched separately or every interview
+    // invite parses as null — see GoogleClient.hydrateCalendarParts.
+    const gmail = await deps.google.hydrateCalendarParts(
+      accessToken,
+      await deps.google.getMessage(accessToken, messageId),
+    );
     const raw: RawMessage = toRawMessage(gmail, {
       userId: mailbox.user_id,
       mailboxId: mailbox.id,
@@ -89,7 +95,22 @@ async function ingestMessage(
 /** Live sync from a stored history id. */
 export async function syncHistory(deps: SyncDeps, mailbox: MailboxRow): Promise<number> {
   const cursor = mailbox.cursor?.historyId;
-  if (!cursor) return backfill(deps, mailbox, 1);
+  if (!cursor) {
+    // A freshly connected mailbox has no resume point yet. Establish one and
+    // stop — do NOT read history here.
+    //
+    // This used to run a one-month backfill as a default, which raced the user:
+    // the five-minute poll fires seconds after the OAuth callback, long before
+    // anyone reaches "how far back?", and by saving a cursor it made the
+    // explicit choice a no-op. The window the user picks is the only thing that
+    // decides how far back Loop reads, and a scan they did not ask for is not
+    // a sensible default for the one operation that touches a year of mail.
+    const accessToken = await accessTokenFor(deps, mailbox);
+    const profile = await deps.google.profile(accessToken);
+    await saveCursor(deps.pool, mailbox.id, { historyId: profile.historyId });
+    deps.log.info({ mailbox_id: mailbox.id, outcome: 'cursor_established' });
+    return 0;
+  }
 
   let published = 0;
   try {

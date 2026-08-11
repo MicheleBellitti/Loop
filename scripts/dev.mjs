@@ -1,10 +1,22 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 /**
  * `npm run dev` — every service in one terminal, with its own database role so
  * row-level security applies exactly as it does in production.
+ *
+ * Under compose every service is handed its environment by the orchestrator.
+ * Here nothing does, so the parent loads `.env` once and the children inherit
+ * it — otherwise every service boots and immediately dies on a missing
+ * DATABASE_URL, which is a confusing way to learn that a file was not read.
  */
+if (existsSync('.env')) {
+  process.loadEnvFile('.env');
+} else {
+  console.error('no .env found — copy .env.example and fill it in');
+  process.exit(1);
+}
 const SERVICES = [
   ['gateway',    'services/gateway/src/index.ts',    'loop_gateway',    '3000'],
   ['connector',  'services/connector/src/index.ts',  'loop_connector',  '9105'],

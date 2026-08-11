@@ -144,13 +144,20 @@ export async function projectApplication(
 
   let wentDormantAt: Date | null = null;
   let lastUserActionAt: Date | null = null;
+  let presumedClosed = false;
   for (const ev of events) {
-    if (ev.type === 'went_silent') wentDormantAt = ev.occurred_at;
+    if (ev.type === 'went_silent') {
+      wentDormantAt = ev.occurred_at;
+      presumedClosed = ev.payload?.presumed_closed === true;
+    }
     if (HUMAN_AUTHORED.has(ev.type) || ev.rung === 4) {
       if (!lastUserActionAt || ev.occurred_at > lastUserActionAt) lastUserActionAt = ev.occurred_at;
     }
   }
-  if (state.status !== 'dormant') wentDormantAt = null;
+  if (state.status !== 'dormant') {
+    wentDormantAt = null;
+    presumedClosed = false;
+  }
 
   const openDeadline = await one<{ n: string }>(
     sql,
@@ -180,6 +187,7 @@ export async function projectApplication(
        went_dormant_at = $7,
        last_user_action_at = $8,
        awaiting_them = $9,
+       presumed_closed = $18,
        role_title = coalesce($10, role_title),
        seniority = coalesce($11, seniority),
        location = coalesce($12, location),
@@ -207,6 +215,7 @@ export async function projectApplication(
       state.comp_currency,
       state.confidence,
       Number(needsReview?.n ?? '0') > 0,
+      presumedClosed,
     ],
   );
 }

@@ -98,6 +98,7 @@ export function displayStage(
   status: AppStatus,
   stage: string,
   stages: StageTable = DEFAULT_STAGES,
+  opts: { presumedClosed?: boolean } = {},
 ): string {
   switch (status) {
     case 'rejected':
@@ -107,7 +108,10 @@ export function displayStage(
     case 'accepted':
       return 'Accepted';
     case 'dormant':
-      return 'Dormant';
+      // Dormant means "no reply yet". Past the long threshold it means "you
+      // were passed over and nobody said so", and saying the weaker thing
+      // leaves a pipeline full of processes that ended months ago.
+      return opts.presumedClosed ? 'Closed by silence' : 'Dormant';
     default:
       return stages.labelOf(stage);
   }

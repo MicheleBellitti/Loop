@@ -55,8 +55,22 @@ function pickBody(parts: GmailMessagePart[]): { text?: string; html?: string } {
  */
 export function parseIcs(ics: string): CalendarInvite | null {
   const unfolded = ics.replace(/\r?\n[ \t]/g, '');
+
+  /**
+   * Read inside VEVENT, not inside the file.
+   *
+   * An Outlook or Exchange invitation puts a VTIMEZONE block *before* the
+   * event, and that block's STANDARD and DAYLIGHT subcomponents each carry
+   * their own `DTSTART` — conventionally `16010101T030000`, the zero of the
+   * Windows FILETIME epoch. A regex over the whole file finds that one first,
+   * so every corporate interview in this mailbox was recorded as happening in
+   * the year 1601, which then poisoned every gap and every timing statistic
+   * computed from it.
+   */
+  const vevent = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/i.exec(unfolded)?.[1] ?? unfolded;
+
   const get = (key: string): string | null => {
-    const m = new RegExp(`^${key}(?:;[^:]*)?:(.*)$`, 'im').exec(unfolded);
+    const m = new RegExp(`^${key}(?:;[^:]*)?:(.*)$`, 'im').exec(vevent);
     return m ? m[1]!.trim() : null;
   };
   const uid = get('UID');

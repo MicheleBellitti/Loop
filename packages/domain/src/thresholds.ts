@@ -122,6 +122,37 @@ export const QUEUE = {
   PARK_MAX_ATTEMPTS: 6,
 } as const;
 
+/**
+ * Silence, in two tiers.
+ *
+ * The first tier is the spec's: past `stale_after_days` — or twice your own p90
+ * for that stage, once there is enough history to know it — an application is
+ * `dormant`. That is a *reversible* judgement, and it is right: a recruiter who
+ * comes back after three weeks is common.
+ *
+ * The second tier does not exist in the spec, and it should. A dormant
+ * application still reads as something that might yet happen, so a pipeline
+ * accumulates processes that everyone involved has forgotten about, and the
+ * daily view keeps offering to chase them. Past this threshold the honest
+ * reading is that you were passed over without being told — which is what a
+ * ghost rate is measuring in the first place.
+ *
+ * The number is not a guess. Across a real twelve-month mailbox, the longest
+ * silence that was ever followed by a reply was **20 days**; every other gap
+ * was under two weeks. Ninety days is four and a half times the longest
+ * observed revival, which leaves generous room for the case the data has not
+ * seen while still clearing the pipeline within a quarter.
+ *
+ * It stays a setting because that evidence is one person's mailbox, and an
+ * industry that moves slower would need a longer number.
+ */
+export const SILENCE = {
+  /** Past this, with no inbound signal, treat the application as closed. */
+  PRESUMED_CLOSED_DAYS: 90,
+  /** Never presume closure while the ball is in the user's court. */
+  SKIP_STAGES: ['take_home', 'offer', 'negotiating'] as readonly string[],
+} as const;
+
 /** Observability (Spec §16): the one question that matters. */
 export const FRESHNESS = {
   WARN_AFTER_HOURS: 2,

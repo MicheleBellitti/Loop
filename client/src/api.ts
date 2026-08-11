@@ -29,7 +29,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = init.method ?? 'GET';
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
   if (method !== 'GET' && method !== 'HEAD') {
-    headers['content-type'] = 'application/json';
+    // Only when there is something to declare. Announcing a JSON body and then
+    // sending none is a 400 from Fastify before the handler ever runs — and
+    // several mutations here legitimately have no body ("start the OAuth
+    // dance", "archive this"), so this is the common case, not the edge one.
+    if (init.body !== undefined) headers['content-type'] = 'application/json';
     if (csrf) headers['x-csrf-token'] = csrf;
   }
 

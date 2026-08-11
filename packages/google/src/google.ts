@@ -38,6 +38,29 @@ export class GoogleRateLimit extends Error {
   }
 }
 
+/**
+ * Google's own words, trimmed to one line and capped.
+ *
+ * Never the whole body: an error response can echo request content, and this
+ * string goes to a log that must stay safe to keep (§16 — "never subject
+ * lines, never sender addresses, never body fragments").
+ */
+async function readGoogleError(res: Response): Promise<string> {
+  try {
+    const text = (await res.text()).slice(0, 2_000);
+    try {
+      const body = JSON.parse(text) as { error?: { message?: string; status?: string } };
+      const msg = body.error?.message ?? '';
+      const status = body.error?.status ?? '';
+      return [status, msg].filter(Boolean).join(' — ').replace(/\s+/g, ' ').slice(0, 300);
+    } catch {
+      return text.replace(/\s+/g, ' ').slice(0, 300);
+    }
+  } catch {
+    return '';
+  }
+}
+
 /** Gmail forgets history ids older than a week; a 404 means "re-list". */
 export class HistoryTooOld extends Error {}
 
@@ -148,10 +171,18 @@ export class GoogleClient {
       }),
     );
     if (res.status === 404) throw new HistoryTooOld(path);
-    if (res.status === 401 || res.status === 403) {
-      throw new GoogleAuthError(`Google returned ${res.status} for ${path}`, true);
+    if (!res.ok) {
+      // Google explains itself in the body — "Gmail API has not been used in
+      // project N before or it is disabled", "Request had insufficient
+      // authentication scopes". Throwing away that sentence turns a five-second
+      // fix into a guess, which is the opposite of what §16 asks of an error.
+      const reason = await readGoogleError(res);
+      const where = `${res.status} for ${path}${reason ? `: ${reason}` : ''}`;
+      if (res.status === 401 || res.status === 403) {
+        throw new GoogleAuthError(`Google returned ${where}`, true);
+      }
+      throw new Error(`Google returned ${where}`);
     }
-    if (!res.ok) throw new Error(`Google returned ${res.status} for ${path}`);
     return (await res.json()) as T;
   }
 
@@ -206,6 +237,54 @@ export class GoogleClient {
 
   getMessage(accessToken: string, id: string): Promise<GmailMessage> {
     return this.call(accessToken, `/gmail/v1/users/me/messages/${id}?format=full`);
+  }
+
+  /**
+   * Fetch an attachment body.
+   *
+   * `format=full` inlines small parts as base64 in `body.data`, but anything
+   * past a few kilobytes comes back as a bare `attachmentId` with an empty
+   * body. A real Google Calendar invitation is one of those — which meant every
+   * `.ics` in this mailbox parsed as null, and the single cheapest, most
+   * certain stage detector in the whole design never fired once.
+   */
+  getAttachment(accessToken: string, messageId: string, attachmentId: string): Promise<{ data: string; size: number }> {
+    return this.call(
+      accessToken,
+      `/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`,
+    );
+  }
+
+  /**
+   * Return the message with any calendar part's body filled in.
+   *
+   * Done here rather than in the normaliser so that `toRawMessage` stays a pure
+   * function of a message — the fetch is I/O and belongs on this side.
+   */
+  async hydrateCalendarParts(accessToken: string, msg: GmailMessage): Promise<GmailMessage> {
+    const parts: GmailMessagePart[] = [];
+    const walk = (p: GmailMessagePart | undefined): void => {
+      if (!p) return;
+      parts.push(p);
+      for (const child of p.parts ?? []) walk(child);
+    };
+    walk(msg.payload);
+
+    const needed = parts.filter(
+      (p) =>
+        (p.mimeType === 'text/calendar' || /\.ics$/i.test(p.filename ?? '')) &&
+        !p.body?.data &&
+        p.body?.attachmentId,
+    );
+    for (const part of needed) {
+      try {
+        const att = await this.getAttachment(accessToken, msg.id, part.body!.attachmentId!);
+        part.body!.data = att.data;
+      } catch {
+        // An attachment can be gone; the message is still worth extracting.
+      }
+    }
+    return msg;
   }
 
   listCalendarEvents(

@@ -110,6 +110,23 @@ export function normaliseCompany(raw: string): string {
   return s.replace(/[\s.&+-]+$/g, '').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * The key two spellings of one employer have to agree on.
+ *
+ * `normaliseCompany` folds case, accents and legal suffixes, which is enough
+ * until the same company arrives by two routes: an ATS puts "ION Group" in the
+ * From display name, while the company's own mail resolves through its domain
+ * to "iongroup". Those differ by one space and became two companies, two
+ * pipelines and two sets of statistics.
+ *
+ * The key drops everything that is not a letter or a digit, so spacing,
+ * hyphenation and punctuation stop mattering. It is only ever a lookup key —
+ * the human-readable `canonical_name` keeps its spaces.
+ */
+export function companyKey(raw: string): string {
+  return normaliseCompany(raw).replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
 export interface NormalisedRole {
   /** The comparison key — what gets embedded and compared by cosine. */
   role: string;

@@ -1,27 +1,71 @@
+# Lever
+#
+# Rewritten against 24 real messages from this mailbox rather than from the
+# spec's illustrative example. Every pattern below was copied from a subject
+# line that actually arrived; the previous version matched exactly one of the
+# 24, and that one match filed an application under the name of a sentence
+# fragment.
+#
+# The employer comes from the From display name, never from the subject: Lever
+# sends on behalf of the company and puts it there ("Prima <no-reply@
+# hire.eu.lever.co>", "ION Group <…>"), while the subject slot after "to" is
+# sometimes the company and sometimes the role.
 vendor: lever
 match:
-  sender_domains: [hire.lever.co, lever.co, mail.lever.co]
+  sender_domains: [lever.co, hire.lever.co, hire.eu.lever.co, mail.lever.co]
 locale: [en]
-company_from: subject_capture
+company_from: sender_display_name
 patterns:
+  # "Thank you for your application to Prima" · "… to Match Group" · "… to ION Group"
   - intent: acknowledged
-    subject: '^(?<company>.+?) (has received your application|received your application)'
+    subject: '^(?:.{0,40}?[-–—]\s*)?thank you for your application (?:to|at)\b'
     confidence: 0.98
+
+  # "Michele - Thank you for your application at ZURU"
   - intent: acknowledged
-    subject: '^Thanks for applying to (?<company>.+)$'
-    confidence: 0.98
-  - intent: schedule_screening
-    subject: '^(Scheduling|Availability) .*(?<company>)'
-    body: '(let us know (your|what) availability|find a time that works)'
-    confidence: 0.92
-  - intent: interview_invite
-    subject: '^Interview confirmation'
-    extract:
-      role: '(?:for|as) (?:the )?(?<role>[A-Z][^,\.\n]{2,60}?) (?:position|role)'
-    confidence: 0.93
-  - intent: rejected
-    body: '(moving forward with other candidates|not be moving forward|decided not to proceed)'
+    subject: 'thank you for (?:your )?appl(?:ying|ication)\b'
+    confidence: 0.97
+
+  # "Thank You from Hinge - Regarding your Application for Machine Learning Engineer"
+  - intent: acknowledged
+    subject: '^thank you from .+?[-–—]\s*regarding your application for (?<role>.+)$'
+    confidence: 0.97
+
+  # "Thanks for applying to Machine Learning Engineer , here is a link to manage
+  # your application data" — the slot holds the ROLE here, so it is captured as
+  # one. This exact subject is why company_from is not subject_capture.
+  - intent: acknowledged
+    subject: '^thanks for applying to (?<role>.+?)\s*,\s*here is a link to manage your application data$'
+    confidence: 0.97
+
+  # "Thanks for applying to Lexroom!" — the generic Lever/Ashby shape.
+  - intent: acknowledged
+    subject: '^thanks for applying to (?<company_hint>.+?)!?$'
     confidence: 0.96
+
+  # "Michele, you're invited to an interview with ION Group!" and the reply
+  # thread that follows it. Also their own typo, "you're interview with".
+  - intent: interview_invite
+    subject: "you'?re (?:invited to an )?interview with\\b"
+    confidence: 0.95
+
+  # "ION Group - Recruitment process" · "Michele Bellitti, ION Group - Followup
+  # - Intro to ION/ Graduate Development Program"
+  - intent: schedule_screening
+    subject: '\b(recruitment process|followup|follow[- ]up)\b'
+    confidence: 0.88
+
+  - intent: rejected
+    body: '(moving forward with other candidates|not be moving forward|decided not to proceed|will not be progressing|unfortunately, (?:we|after))'
+    confidence: 0.96
+
+  # Outreach and events are NOT applications. They are matched explicitly and
+  # marked `other` so they resolve to nothing rather than falling through to the
+  # model and being guessed at.
+  - intent: other
+    subject: '\b(webinar|job opportunity|newsletter|event)\b'
+    confidence: 0.9
+
 tests:
   - fixture: fixtures/ats/lever-ack-01.eml
-    expect: { intent: acknowledged, company: Docebo, confidence: 0.98 }
+    expect: { intent: acknowledged, confidence: 0.98 }

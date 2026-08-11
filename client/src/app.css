@@ -508,6 +508,24 @@ td.emphasis { font: 600 14px var(--font-heading); color: var(--color-accent-800)
   .desk-layout { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* The single-column views behind the top bar: statistics, review, settings.
+   Same gutters as the pipeline layout so the top bar and the KPI strip keep
+   their alignment when you switch between them. */
+.desk-single {
+  padding: 0 var(--space-8) var(--space-8);
+  max-width: 1440px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .stats-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .checkbox {
   width: 15px;
   height: 15px;

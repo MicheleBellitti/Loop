@@ -11,24 +11,73 @@ import { hashPassword } from '../services/gateway/src/auth.js';
  * rather than mailed because there is no send path in this repository.
  */
 
-const email = process.argv[2];
+const args = process.argv.slice(2);
+const reset = args.includes('--reset');
+const positional = args.filter((a) => !a.startsWith('--'));
+const email = positional[0];
 if (!email || !email.includes('@')) {
-  console.error('usage: npm run seed:user -- you@example.com');
+  console.error('usage: npm run seed:user -- you@example.com [timezone]');
+  console.error('       npm run seed:user -- you@example.com --reset');
   process.exit(1);
 }
 
-const tz = process.argv[3] ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Europe/Rome';
+const tz = positional[1] ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Europe/Rome';
 
 const pool = createPool({ applicationName: 'loop-seed' });
 
 const existing = await pool.query<{ id: string }>('select id from users limit 1');
-if (existing.rowCount) {
+if (existing.rowCount && !reset) {
   console.error(
     'This box already has a user. Loop is single-tenant by design; opening it to a second\n' +
-      'person is phase 4, which is a different product with a different burden.',
+      'person is phase 4, which is a different product with a different burden.\n\n' +
+      'To issue a fresh recovery password for the existing user, pass --reset.',
   );
   await pool.end();
   process.exit(1);
+}
+
+/**
+ * A recovery password is single-use by design, and a passkey can be lost with
+ * the phone that held it. Without this the only way back into your own box was
+ * to delete the user and every application with it — which is a data-loss
+ * event dressed up as a password reset.
+ *
+ * Registered passkeys are deliberately left alone: this reissues the fallback,
+ * it does not revoke the credentials that are still working.
+ */
+if (existing.rowCount && reset) {
+  const row = await pool.query<{ id: string; email: string }>(
+    'select id, email from users limit 1',
+  );
+  const target = row.rows[0]!;
+  if (target.email.toLowerCase() !== email.toLowerCase()) {
+    console.error(
+      `This box belongs to ${target.email}, not ${email}. Refusing to reset a password for\n` +
+        'an address that is not the one on record.',
+    );
+    await pool.end();
+    process.exit(1);
+  }
+  const fresh = randomBytes(18).toString('base64url');
+  await pool.query(
+    `update auth_secrets
+        set recovery_hash = $2, recovery_used_at = null
+      where user_id = $1`,
+    [target.id, await hashPassword(fresh)],
+  );
+  const passkeys = await pool.query<{ n: string }>(
+    'select count(*)::text as n from credentials where user_id = $1',
+    [target.id],
+  );
+  await pool.end();
+  console.log(`
+  recovery password reissued for ${target.email}
+
+      ${fresh}
+
+  Shown once. Registered passkeys left untouched (${passkeys.rows[0]!.n} on file).
+`);
+  process.exit(0);
 }
 
 // Long enough that it does not need to be memorable, short enough to type once.

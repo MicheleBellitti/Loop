@@ -1,0 +1,14 @@
+-- 009 · the CSRF token stops being stored
+--
+-- It was a random value whose sha256 went into the session row. That works for
+-- exactly one request — the login response, which still holds the plaintext —
+-- and then never again, because `/api/me` on a fresh page load can only return
+-- what is in the row, and what is in the row is a hash. The client presented
+-- the hash, the server hashed it again, and every mutation 403'd.
+--
+-- The token is now an HMAC over the session id keyed with SESSION_SECRET:
+-- recomputable on any request, stable for the session's life, and worthless
+-- without the session cookie. Nothing left to store.
+--
+-- Existing sessions survive: token_hash is untouched, so nobody is logged out.
+alter table sessions drop column if exists csrf_hash;

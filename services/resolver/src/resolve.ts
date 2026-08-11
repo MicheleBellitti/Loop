@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import {
   matchesDomainSuffix,
+  companyKey,
   normaliseCompany,
   normaliseRole,
   RESOLVER,
@@ -74,7 +75,10 @@ export async function canonicaliseCompany(
     if (byDomain.rows[0]) return byDomain.rows[0].id;
   }
 
-  const alias = signal.company ? normaliseCompany(signal.company) : null;
+  // The alias is keyed on letters and digits only, so "ION Group" arriving from
+  // an ATS display name and "iongroup" derived from the company's own domain
+  // land on the same row instead of forking the pipeline in two.
+  const alias = signal.company ? companyKey(signal.company) : null;
   if (alias) {
     const byAlias = await sql.query<{ company_id: string }>(
       `select company_id from company_aliases where user_id = $1 and alias = $2`,
@@ -83,7 +87,9 @@ export async function canonicaliseCompany(
     if (byAlias.rows[0]) return byAlias.rows[0].company_id;
 
     const byName = await sql.query<{ id: string }>(
-      `select id from companies where lower(canonical_name) = $1 limit 1`,
+      `select id from companies
+        where regexp_replace(lower(canonical_name), '[^a-z0-9]+', '', 'g') = $1
+        limit 1`,
       [alias],
     );
     if (byName.rows[0]) {
@@ -96,7 +102,9 @@ export async function canonicaliseCompany(
     }
   }
 
-  const name = signal.company?.trim() || companyDomain || 'Unknown';
+  // A company created from a bare domain still gets a readable name, and the
+  // alias below is keyed the same way, so the next spelling finds it.
+  const name = signal.company?.trim() || domainLabel(companyDomain) || 'Unknown';
   const created = await sql.query<{ id: string }>(
     `insert into companies (canonical_name, domain) values ($1, $2)
      on conflict (lower(canonical_name), coalesce(domain, '')) do update
@@ -105,11 +113,11 @@ export async function canonicaliseCompany(
     [name, companyDomain],
   );
   const companyId = created.rows[0]!.id;
-  if (alias) {
+  for (const key of new Set([alias, companyKey(name)].filter(Boolean) as string[])) {
     await sql.query(
       `insert into company_aliases (user_id, company_id, alias) values ($1,$2,$3)
        on conflict do nothing`,
-      [userId, companyId, alias],
+      [userId, companyId, key],
     );
   }
   return companyId;
@@ -219,13 +227,40 @@ export async function resolve(
 
   const best = scored[0]!;
 
+  /**
+   * A signal that names no role at all.
+   *
+   * Most real mail does not repeat the job title: a calendar invite says
+   * "Interview with Prima", a rejection says "we will not be moving forward".
+   * Embedding the placeholder "unknown" gives a cosine near zero against every
+   * candidate, so the old code created a *second* application at the same
+   * company for every such message — one employer became four rows, and the
+   * event log for the real application lost its own rejection.
+   *
+   * When the signal carries no role and the company has exactly one open
+   * application, that application is the only thing the message can be about.
+   * With more than one candidate it stays ambiguous and asks, as it should.
+   */
+  const roleless = !signal.role || normalisedRole.role === 'unknown' || normalisedRole.role === '';
+
   if (candidates.length === 1) {
+    if (roleless) {
+      return { kind: 'attached', applicationId: best.row.id, cosine: 1 };
+    }
     if (best.cos >= RESOLVER.ATTACH_SINGLE) {
       return { kind: 'attached', applicationId: best.row.id, cosine: best.cos };
     }
     return {
       kind: 'created',
       applicationId: await createApplication(deps, signal, companyId, normalisedRole, embedding),
+    };
+  }
+
+  if (roleless) {
+    // Several open applications at this company and nothing to tell them apart.
+    return {
+      kind: 'ambiguous',
+      candidates: scored.slice(0, 3).map((s) => ({ id: s.row.id, cosine: s.cos })),
     };
   }
 
@@ -332,4 +367,16 @@ export async function findDuplicate(
       : { keep: other.id, merge: me.id, cos };
   }
   return null;
+}
+
+/** `iongroup.com` → `iongroup`. The registrable label, not the whole host. */
+function domainLabel(domain: string | null): string | null {
+  if (!domain) return null;
+  const parts = domain.split('.').filter(Boolean);
+  if (parts.length < 2) return domain;
+  // Handle two-part public suffixes like .co.uk / .com.br.
+  const last = parts[parts.length - 1]!;
+  const penultimate = parts[parts.length - 2]!;
+  const isCompound = penultimate.length <= 3 && last.length <= 3 && parts.length >= 3;
+  return isCompound ? parts[parts.length - 3]! : penultimate;
 }

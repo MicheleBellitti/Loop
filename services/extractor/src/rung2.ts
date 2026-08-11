@@ -1,3 +1,4 @@
+import { companyFromDisplayName, matchGenericBody } from '@loop/rules';
 import { domainOfAddress, matchesDomainSuffix, type Intent, type RawMessage } from '@loop/domain';
 
 /**
@@ -85,6 +86,39 @@ export function runRung2(msg: RawMessage, ctx: Rung2Context): Rung2Result | null
       endsAt: null,
       calendarEventId: null,
       applicationId: ctx.threadToApplication.get(msg.thread_id)!,
+      location: null,
+    };
+  }
+
+  // ── deterministic body vocabulary, from any sender ───────────────────────
+  //
+  // The ladder's rung 3 exists because "unknown template, human-written email,
+  // Italian/English mixed prose" cannot be pattern-matched. That is true of the
+  // *general* case — but not of the commonest sentences in recruiting, which
+  // are close to formulaic in both languages: "non proseguiremo", "vorremmo
+  // invitarti", "grazie per la tua candidatura".
+  //
+  // Reading those without a model matters here specifically: the box this runs
+  // on is an 8 GB laptop, where a resident 7B alongside Postgres and eight
+  // services is not a trade worth making. So the phrases a rule can honestly
+  // recognise are recognised, at a confidence a step below a real ATS template,
+  // and everything genuinely ambiguous still goes to a human.
+  //
+  // Only for mail the classifier already scored as job-related — this never
+  // sees the general inbox.
+  const generic = matchGenericBody(`${msg.headers.subject}\n${msg.text}`);
+  if (generic && !isAts) {
+    return {
+      intent: generic.intent,
+      // One step below the same phrase from a known ATS: the sender is not
+      // established, so the claim is weaker even when the words are identical.
+      confidence: Math.min(generic.confidence, 0.88),
+      stageHint: null,
+      company: companyFromDisplayName(msg.headers.from) ?? companyFromOrganiser(senderDomain, ctx.atsDomains),
+      startsAt: null,
+      endsAt: null,
+      calendarEventId: null,
+      applicationId: msg.thread_id ? (ctx.threadToApplication.get(msg.thread_id) ?? null) : null,
       location: null,
     };
   }

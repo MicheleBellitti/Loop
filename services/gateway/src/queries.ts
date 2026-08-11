@@ -74,7 +74,7 @@ export interface ApplicationRow {
 
 const APPLICATION_SELECT = `
   select a.id, c.canonical_name as company, a.role_title, a.current_stage, a.current_phase,
-         a.status, a.applied_at, a.last_signal_at, a.needs_review, a.confidence,
+         a.status, a.applied_at, a.last_signal_at, a.needs_review, a.presumed_closed, a.confidence,
          s.channel,
          sd.stale_after_days,
          d.p90_days,
@@ -99,6 +99,7 @@ interface RawApplicationRow {
   applied_at: Date | null;
   last_signal_at: Date | null;
   needs_review: boolean;
+  presumed_closed: boolean;
   confidence: string;
   channel: string | null;
   stale_after_days: number | null;
@@ -124,7 +125,9 @@ function toRow(r: RawApplicationRow, user: UserContext, now: Date): ApplicationR
     company: r.company,
     role: r.role_title,
     stage: r.current_stage,
-    display_stage: displayStage(r.status, r.current_stage, user.stages),
+    display_stage: displayStage(r.status, r.current_stage, user.stages, {
+      presumedClosed: r.presumed_closed,
+    }),
     phase: r.current_phase,
     status: r.status,
     channel: r.channel,

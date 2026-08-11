@@ -81,8 +81,23 @@ export async function registerMailboxRoutes(app: FastifyInstance, deps: Deps): P
       return reply.code(400).send({ error: { code: 'stale_state', message: 'start the flow again' } });
     }
 
-    const tokens = await google.exchangeCode(q.data.code, config.google.redirectUri, entry.verifier);
-    const profile = await google.profile(tokens.access_token);
+    // Everything past this point is Google's to refuse, and its refusals are
+    // specific and actionable ("Gmail API has not been used in project N",
+    // "insufficient authentication scopes"). Swallowing them into a generic
+    // 500 leaves the user staring at "something failed" at the exact moment
+    // the product is asking for the largest permission it will ever ask for.
+    let tokens: Awaited<ReturnType<typeof google.exchangeCode>>;
+    let profile: Awaited<ReturnType<typeof google.profile>>;
+    try {
+      tokens = await google.exchangeCode(q.data.code, config.google.redirectUri, entry.verifier);
+      profile = await google.profile(tokens.access_token);
+    } catch (err) {
+      const detail = (err as Error).message;
+      log.error({ user_id: entry.userId, outcome: 'connect_failed', error: detail });
+      return reply.code(502).send({
+        error: { code: 'google_refused', message: detail },
+      });
+    }
 
     await withUser(entry.userId, async (sql) => {
       const gmailId = await storeMailbox(sql, {
