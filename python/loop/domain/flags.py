@@ -8,8 +8,6 @@ apply at once, so the precedence is defined here: soonest irreversible cost
 first. decisions.md C2.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal

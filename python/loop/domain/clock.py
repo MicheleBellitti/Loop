@@ -13,8 +13,6 @@ here — which is one small, concrete example of the port being a simplification
 rather than a translation.
 """
 
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 

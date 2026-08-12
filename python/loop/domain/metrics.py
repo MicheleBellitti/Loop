@@ -6,8 +6,6 @@ Shipping a ratio without its note is called out in the handoff as a bug, so the
 note is part of the value, not part of the template.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from .thresholds import (

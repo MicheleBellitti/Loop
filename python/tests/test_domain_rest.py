@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import UTC, datetime
 
 from loop.domain.flags import Flag, compute_flag, days_quiet, quiet_label

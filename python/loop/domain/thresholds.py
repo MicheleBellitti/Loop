@@ -9,8 +9,6 @@ from measurements on a real mailbox rather than chosen — losing that provenanc
 would make them look arbitrary.
 """
 
-from __future__ import annotations
-
 from typing import Final
 
 # ── Resolver · entity resolution (Spec §09) ─────────────────────────────────

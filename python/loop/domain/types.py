@@ -8,8 +8,6 @@ recorded in `docs/decisions.md` — that document, not the original Engineering
 Spec, is the specification this package implements.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal

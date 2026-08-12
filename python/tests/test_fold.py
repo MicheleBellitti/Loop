@@ -6,8 +6,6 @@ exists because the original Engineering Spec said something that does not work
 — the reason is on the test, not only in the commit message.
 """
 
-from __future__ import annotations
-
 from dataclasses import replace
 from datetime import UTC, datetime, timezone
 from typing import Any

@@ -5,8 +5,6 @@ statistics aggregate on. Depth is for display and for "how far did it get" —
 never a gate on a transition.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 
 from .types import AppStatus, Phase, StageDef

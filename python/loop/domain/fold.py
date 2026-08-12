@@ -26,8 +26,6 @@ state could not pass. The tie-break here is content-derived (`evidence_ref` +
 type), which is stable across replays. decisions.md A1.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime

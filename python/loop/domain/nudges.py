@@ -8,8 +8,6 @@ The service around this decides *when* to run and *whether* to push; this
 decides *what is true*. Keeping it pure is what makes the budget testable.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta

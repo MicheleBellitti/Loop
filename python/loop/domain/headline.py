@@ -17,8 +17,6 @@ The third case is the one worth defending: a pipeline that is full and quiet is
 a good day, and saying so is not cheer — it is the accurate reading.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta

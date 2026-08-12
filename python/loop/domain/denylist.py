@@ -10,8 +10,6 @@ A hit is dropped and counted (`denylist_violations_total`). Never a silent
 pass-through: a violation that is invisible is a violation that recurs.
 """
 
-from __future__ import annotations
-
 import re
 from dataclasses import dataclass
 from typing import Any

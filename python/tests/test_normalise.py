@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from loop.domain.denylist import (
     FENCE_CLOSE,
     FENCE_OPEN,

@@ -11,8 +11,6 @@ behaviour and the differential harness needs something to diff against — not
 because they are the destination.
 """
 
-from __future__ import annotations
-
 import re
 import unicodedata
 from dataclasses import dataclass
