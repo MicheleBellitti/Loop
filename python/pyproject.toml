@@ -1,0 +1,67 @@
+[project]
+name = "loop"
+version = "0.1.0"
+description = "A job application tracker that reads your mailbox instead of asking you to update it"
+requires-python = ">=3.12"
+
+# The core has no runtime dependencies on purpose.
+#
+# `loop.domain` is the fold, the stage machine, every threshold and the nudge
+# rules, and it must stay importable with nothing installed: no database, no
+# clock, no network. That is what lets its tests run in under a second and what
+# makes the port verifiable — a pure module can be diffed against the
+# TypeScript one message at a time.
+dependencies = []
+
+[project.optional-dependencies]
+db = ["asyncpg>=0.30"]
+api = ["fastapi>=0.115", "pydantic>=2.9", "uvicorn[standard]>=0.32"]
+ladder = ["pyyaml>=6.0", "httpx>=0.27"]
+ml = ["sentence-transformers>=3.3", "rapidfuzz>=3.10"]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.8",
+  "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["loop"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Two kinds of test, split by marker rather than by directory so a module's
+# pure and integration tests can sit next to the code they cover.
+markers = [
+  "integration: needs a real Postgres",
+]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+line-length = 96
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# RUF001/002/003 flag en dashes and typographic quotes as "ambiguous unicode".
+# They are deliberate: the comments in this codebase are prose, they explain why
+# a threshold is what it is, and mangling them into hyphens to satisfy a linter
+# would trade readability for nothing. The rule exists to catch homoglyph
+# attacks in identifiers, which is not what is happening here.
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+# A shared list of events built once per class is the point of the determinism
+# test; rebuilding it per method would test a different thing each time.
+"tests/*" = ["RUF012"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
