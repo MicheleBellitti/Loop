@@ -19,6 +19,14 @@ export interface DbOptions {
   connectionString?: string;
   max?: number;
   applicationName?: string;
+  /**
+   * Raise `idle_in_transaction_session_timeout` for this pool alone. Only a
+   * service that holds a transaction open across a network call has any
+   * business doing so, and it owns the consequence rather than spreading it.
+   */
+  idleInTransactionTimeoutMs?: number;
+  /** Called when a pooled client fails while idle. See `createPool`. */
+  onError?: (err: Error) => void;
 }
 
 let sharedPool: pg.Pool | null = null;
@@ -26,21 +34,29 @@ let sharedPool: pg.Pool | null = null;
 export function createPool(opts: DbOptions = {}): pg.Pool {
   const connectionString = opts.connectionString ?? process.env.DATABASE_URL;
   if (!connectionString) throw new Error('DATABASE_URL is not set');
-  return new Pool({
+  const p = new Pool({
     connectionString,
     max: opts.max ?? 10,
     application_name: opts.applicationName ?? 'loop',
     // A query that has been running for two minutes is a bug, not a slow query.
     statement_timeout: 120_000,
-    // This has to exceed MODEL_TIMEOUT_MS. The extractor calls rung 3 from
-    // inside its transaction, so the connection sits idle-in-transaction for
-    // however long inference takes; at 30s a local model that thinks before it
-    // answers gets the connection terminated mid-flight, and the resulting
-    // unhandled 'error' event takes the whole extractor process down. The real
-    // fix is to move the model call outside the transaction — until then these
-    // two numbers are coupled and this one must be the larger.
-    idle_in_transaction_session_timeout: 180_000,
+    // An open transaction doing nothing still holds its locks and still pins
+    // the vacuum horizon, so the default stays tight. The one service that
+    // legitimately needs longer — the extractor, which awaits the model from
+    // inside its transaction — raises its own pool and nobody else's.
+    idle_in_transaction_session_timeout: opts.idleInTransactionTimeoutMs ?? 30_000,
   });
+
+  // Postgres can terminate a backend under a client that is sitting idle in the
+  // pool: a restart, a failover, an administrative pg_terminate_backend, an
+  // idle-in-transaction timeout. node-pg reports that on the pool, and an
+  // 'error' event with no listener is an uncaught exception — which is to say
+  // the whole service dies because one pooled connection did. The connection is
+  // already gone and the pool will replace it, so the only thing left to do is
+  // say so out loud; swallowing it silently is how this becomes unfindable.
+  p.on('error', opts.onError ?? ((err) => console.error('idle database client failed', err)));
+
+  return p;
 }
 
 export function pool(opts: DbOptions = {}): pg.Pool {
