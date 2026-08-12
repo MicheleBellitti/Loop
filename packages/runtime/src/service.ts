@@ -25,6 +25,17 @@ export interface ServiceOptions {
   healthPort?: number;
   /** Extra checks folded into /health/deep. */
   deepCheck?: (ctx: ServiceContext) => Promise<Record<string, unknown>>;
+  /**
+   * Raise `idle_in_transaction_session_timeout` for this service's pool.
+   *
+   * A function of config rather than a number, because the only thing that
+   * legitimately holds a transaction open with nothing to do is a network call
+   * whose own timeout the user configures. Deriving one from the other is what
+   * keeps the two from crossing when somebody edits `MODEL_TIMEOUT_MS` — an
+   * ordering asserted in a comment is an ordering that eventually stops
+   * holding.
+   */
+  idleInTransactionTimeoutMs?: (config: Config) => number;
 }
 
 export async function startService(
@@ -33,7 +44,13 @@ export async function startService(
 ): Promise<void> {
   const config = loadConfig();
   const log = createLogger(opts.name);
-  const pool = createPool({ applicationName: `loop-${opts.name}` });
+  const pool = createPool({
+    applicationName: `loop-${opts.name}`,
+    idleInTransactionTimeoutMs: opts.idleInTransactionTimeoutMs?.(config),
+    // Structured, and on this service's logger, so the line names which
+    // container lost the connection.
+    onError: (err) => log.error({ msg: 'idle database client failed', error: String(err) }),
+  });
   const ctx: ServiceContext = { name: opts.name, config, pool, log };
 
   let health: Server | null = null;
