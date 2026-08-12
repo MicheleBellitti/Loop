@@ -26,7 +26,18 @@ import { buildSignal, channelForVendor, stageForIntent } from './signal.js';
  * that such a hang must not touch the connector's OAuth tokens.
  */
 
-await startService({ name: 'extractor', healthPort: 9102 }, async (ctx) => {
+await startService({
+  name: 'extractor',
+  healthPort: 9102,
+  // Rung 3 is awaited from inside the consumer's transaction, so the connection
+  // sits idle-in-transaction for however long inference takes. At the default
+  // 30s a local model that thinks before it answers got its backend terminated
+  // mid-call, and the resulting pool error took this process down with it. The
+  // margin covers the queries either side of the model call; the real fix is to
+  // move that call out of the transaction, and until then this is derived from
+  // the model's own timeout so the two cannot be configured into crossing.
+  idleInTransactionTimeoutMs: (config) => config.model.timeoutMs + 30_000,
+}, async (ctx) => {
   const registry = await rules();
   const domains = atsDomains(registry);
   const modelEnabled = !!ctx.config.model.baseUrl;

@@ -39,7 +39,12 @@ import { fetchPostingHtml, parsePosting } from './ssrf.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const config = loadConfig();
 const log = createLogger('gateway');
-const pool = createPool({ applicationName: 'loop-gateway' });
+const pool = createPool({
+  applicationName: 'loop-gateway',
+  // The gateway is the single ingress, so it is the one process whose death
+  // takes the product offline rather than just stalling a queue.
+  onError: (err) => log.error({ msg: 'idle database client failed', error: String(err) }),
+});
 
 const app = Fastify({ logger: false, trustProxy: true, bodyLimit: 1_000_000 });
 
