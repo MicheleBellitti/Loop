@@ -245,6 +245,96 @@ class TestTheLadder:
         assert outcome.confidence == pytest.approx(0.4)
 
 
+class TestArrangingTheFirstCall:
+    """The intent the vocabulary had no phrase for at all.
+
+    Ten of the twenty-four signals a recall audit found missing were this: an
+    Italian recruiter negotiates the whole first call in prose, over several
+    short messages, none of which contain the word "colloquio".
+    """
+
+    def test_reads_a_confirmed_call(self) -> None:
+        signal = signal_of(
+            candidate(
+                sender="Alice Doro <alice.doro@dinova.one>",
+                subject="Re: Opportunità Dinova - AI ENGINEER (Interacta)",
+                text="Ti confermo allora la nostra breve chiamata per questo pomeriggio "
+                "alle ore 17:00.",
+            )
+        )
+        assert signal.intent == "schedule_screening"
+        assert signal.company == "Dinova"
+        # The company sits before the dash in the subject and the role after it.
+        assert signal.role == "AI ENGINEER"
+
+    def test_reads_a_proposed_time(self) -> None:
+        signal = signal_of(
+            candidate(
+                sender="Federica <federica@enginium.eu>",
+                subject="Opportunità lavorativa",
+                text="Gentile Michele, va bene. Potrebbe andare bene domani 28/05 alle ore 10?",
+            )
+        )
+        assert signal.intent == "schedule_screening"
+
+    def test_needs_both_a_day_and_a_time_before_it_believes_one(self) -> None:
+        # A date on its own is any email ever written.
+        outcome = read(
+            candidate(
+                sender="Newsletter <news@example.test>",
+                subject="Aggiornamento",
+                text="Ci vediamo domani per il webinar.",
+            )
+        )
+        assert isinstance(outcome, NeedsReview)
+
+    def test_an_italian_acknowledgement_the_vocabulary_did_not_have(self) -> None:
+        signal = signal_of(
+            candidate(
+                sender="Gruppo Maggioli <no-reply.selezione@gruppomaggioli.it>",
+                subject="Conferma di registrazione annuncio Gruppo Maggioli",
+                text="Grazie per l'interesse dimostrato per la posizione AI Engineer - "
+                "Interacta.\n\nTi confermiamo di aver ricevuto la tua candidatura.",
+            )
+        )
+        assert signal.intent == "acknowledged"
+        assert signal.company == "Gruppo Maggioli"
+        assert signal.role == "AI Engineer"
+
+
+class TestTheInMailRelay:
+    """LinkedIn's relay is the one sender whose display name is not the employer.
+
+    An ATS sends on behalf of the employer and puts the employer in the display
+    name, which is why that is the default place to read it. The InMail relay
+    does the opposite: the display name is the recruiter who typed the message.
+    """
+
+    HEADER = "Federica Pettinato <hit-reply@linkedin.com>"
+
+    def test_never_files_the_recruiter_as_the_employer(self) -> None:
+        assert company_from_sender(self.HEADER, REGISTRY.ats_domains) is None
+
+    def test_but_still_reads_what_the_message_says(self) -> None:
+        signal = signal_of(
+            candidate(
+                sender=self.HEADER,
+                subject="Risposta al messaggio: Opportunità lavorativa",
+                text="Sì certo. Allora ti contatterò domani alle ore 10:15.",
+            )
+        )
+        assert signal.intent == "schedule_screening"
+        # No employer is the right answer: the company is named in the InMail
+        # that opened the thread, which is the resolver's to carry forward.
+        assert signal.company is None
+
+    def test_a_vendor_that_does_send_as_the_employer_is_unaffected(self) -> None:
+        assert (
+            company_from_sender("Prima <no-reply@hire.eu.lever.co>", REGISTRY.ats_domains)
+            == "Prima"
+        )
+
+
 class TestSelfSentMail:
     OWN = frozenset({"michele@gmail.com"})
 
@@ -332,6 +422,10 @@ class TestReaders:
     def test_a_display_name_that_is_not_the_address_is_still_believed(self) -> None:
         assert not is_the_senders_own_name("Prima <no-reply@hire.eu.lever.co>")
         assert company_from_sender("Prima <no-reply@hire.eu.lever.co>") == "Prima"
+
+    def test_strips_a_bracketed_vendor_the_same_as_an_unbracketed_one(self) -> None:
+        header = '"ISelection - Iagica srl [via ALLIBO]" <mail_delivery_service@allibo.com>'
+        assert company_from_display_name(header) == "ISelection - Iagica srl"
 
     def test_a_bare_domain_yields_a_company_where_the_typescript_gave_up(self) -> None:
         assert company_from_domain("talent.nexi.it", REGISTRY.ats_domains) == "Nexi"

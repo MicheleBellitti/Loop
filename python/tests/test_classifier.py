@@ -70,6 +70,31 @@ class TestTheRecallBias:
         assert result.outcome == "pass"
         assert any("waived" in r for r in result.reasons)
 
+    def test_the_waiver_covers_every_ats_not_only_the_two_named_ones(self) -> None:
+        # An Italian ATS acknowledgement scored +2 for naming a candidatura and
+        # -4 for arriving in bulk, landed at -2, and was dropped — the one
+        # failure the classifier is not allowed to have.
+        result = classify(
+            msg(
+                sender='"ISelection [via ALLIBO]" <mail_delivery_service@allibo.com>',
+                subject="Candidatura ricevuta",
+                precedence="bulk",
+            ),
+            ctx(),
+        )
+        assert result.outcome == "pass"
+
+    def test_but_a_bulk_sender_that_is_not_an_ats_still_pays(self) -> None:
+        result = classify(
+            msg(
+                sender="Shop <news@shop.example>",
+                subject="La tua candidatura al nostro concorso",
+                precedence="bulk",
+            ),
+            ctx(),
+        )
+        assert result.score == -2
+
     def test_the_waiver_does_not_cover_the_rest_of_what_the_platform_sends(self) -> None:
         # 186 messages in a real mailbox, every one of them a review item asking
         # a human to classify "your profile appeared in 8 searches".

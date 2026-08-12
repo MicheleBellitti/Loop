@@ -231,6 +231,10 @@ class BaselineContext:
     # The addresses this mailbox sends as, so the user's own half of a thread
     # is not read as the employer's.
     own_addresses: frozenset[str] = frozenset()
+    # The ATS vendors the reference knew when it judged these messages. Empty in
+    # a baseline exported before this field existed, which is indistinguishable
+    # from "knew nothing" and is treated as "cannot tell".
+    ats_vendors: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +273,7 @@ def _baseline_context(row: JsonObject) -> BaselineContext:
         known_newsletters=frozenset(row.get("known_newsletters") or ()),
         thread_to_application=dict(row.get("thread_to_application") or {}),
         own_addresses=frozenset(a.lower() for a in row.get("own_addresses") or ()),
+        ats_vendors=frozenset(row.get("ats_vendors") or ()),
     )
 
 

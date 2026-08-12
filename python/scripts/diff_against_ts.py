@@ -25,7 +25,7 @@ from loop.harness import (
     explain,
     load_baseline,
 )
-from loop.ladder import ClassifierContext
+from loop.ladder import ClassifierContext, RuleRegistry
 
 
 def main() -> int:
@@ -47,7 +47,15 @@ def main() -> int:
         own_addresses=baseline.context.own_addresses,
     )
 
+    # `rules/ats/*.yaml` is shared data: adding a vendor changes both
+    # implementations, but only the one that has re-read the files. A difference
+    # attributable to a vendor the reference never saw is a stale baseline, not
+    # a porting error, and saying so is the difference between a harness that
+    # can be trusted and one that cries wolf.
+    unseen = _vendors_the_reference_never_saw(baseline.context.ats_vendors)
+
     expected: Counter[str] = Counter()
+    stale: Counter[str] = Counter()
     unexpected: list[str] = []
     agreed = 0
 
@@ -58,9 +66,11 @@ def main() -> int:
             agreed += 1
             continue
 
-        deliberate = explain(case, verdict, baseline.context)
         line = _describe(case, verdict, fields)
-        if deliberate:
+        deliberate = explain(case, verdict, baseline.context)
+        if verdict.vendor in unseen:
+            stale[verdict.vendor or "?"] += 1
+        elif deliberate:
             expected[deliberate.name] += 1
             if args.show_expected:
                 print(f"  ~ {deliberate.name}  {line}")
@@ -72,6 +82,15 @@ def main() -> int:
     for name, count in expected.most_common():
         print(f"      {count:>4}  {name}")
 
+    if stale:
+        print(f"\n  {sum(stale.values())} from rules the baseline predates")
+        for name, count in stale.most_common():
+            print(f"      {count:>4}  rules/ats/{name}.yaml")
+
+    if not baseline.context.ats_vendors:
+        print("\n  note: this baseline records no registry, so new vendors cannot be told")
+        print("        apart from porting errors. `npm run export:baseline` fixes that.")
+
     if unexpected:
         print(f"\n  {len(unexpected)} unexplained")
         for line in unexpected:
@@ -80,6 +99,18 @@ def main() -> int:
 
     print("\n  no unexplained differences")
     return 0
+
+
+def _vendors_the_reference_never_saw(recorded: frozenset[str]) -> frozenset[str]:
+    """Vendors in the registry now that the baseline was not judged with.
+
+    An empty record means the baseline predates the field entirely, and nothing
+    can be attributed — better to report every difference than to forgive one on
+    a guess.
+    """
+    if not recorded:
+        return frozenset()
+    return frozenset(rule.vendor for rule in RuleRegistry.load()) - recorded
 
 
 def _describe(case: BaselineCase, verdict: Verdict, fields: tuple[str, ...]) -> str:

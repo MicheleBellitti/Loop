@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from loop.domain import domain_of_address
 from loop.ladder.company import company_from_domain
 from loop.ladder.domains import LEARNING_PLATFORMS, in_list
+from loop.ladder.phrases import match_phrase
 
 from .corpus import BaselineCase, BaselineContext
 from .runner import Verdict
@@ -85,6 +86,36 @@ def _names_a_company_from_the_domain(
     return after.company == company_from_domain(source, ())
 
 
+def _extends_the_vocabulary(
+    before: BaselineCase, after: Verdict, _ctx: BaselineContext
+) -> bool:
+    """A phrase the TypeScript's vocabulary never had.
+
+    Seven of the eleven phrases were added after the port, from a recall audit
+    over this corpus: the whole `schedule_screening` intent, which an Italian
+    recruiter negotiates over several short messages, none of them saying
+    "colloquio". A message the reference could not place is only a porting error
+    if the phrase that places it here was supposed to exist in both, so the
+    phrase's own provenance decides.
+    """
+    if before.intent is not None or after.intent is None:
+        return False
+    phrase = match_phrase(f"{before.message.headers.subject}\n{before.message.text}")
+    return phrase is not None and phrase.origin == "recall-audit"
+
+
+def _waives_bulk_for_an_ats(
+    before: BaselineCase, after: Verdict, _ctx: BaselineContext
+) -> bool:
+    """An ATS acknowledgement is no longer penalised for arriving in bulk.
+
+    The waiver used to cover LinkedIn and Indeed by name. An applicant-tracking
+    system sends in bulk because that is what it is, and the four points cost a
+    real Italian acknowledgement its place in the queue.
+    """
+    return after.score == before.score + 4 and after.vendor is not None
+
+
 DIVERGENCES: tuple[Divergence, ...] = (
     Divergence(
         "stage-abstention",
@@ -105,6 +136,16 @@ DIVERGENCES: tuple[Divergence, ...] = (
         "company-from-domain",
         "§3.3 the domain fallback accepts a bare domain and now fires",
         _names_a_company_from_the_domain,
+    ),
+    Divergence(
+        "vocabulary-extended",
+        "a phrase added after the port, from the recall audit over this corpus",
+        _extends_the_vocabulary,
+    ),
+    Divergence(
+        "ats-bulk-waiver",
+        "an ATS acknowledgement is no longer penalised for arriving in bulk",
+        _waives_bulk_for_an_ats,
     ),
 )
 

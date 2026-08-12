@@ -30,6 +30,16 @@ patterns:
   - intent: rejected
     body: '(will not be moving forward|decided to move forward with other|not to move forward with your application)'
     confidence: 0.97
+  # "Update for the Machine Learning Engineer opportunity" — a rejection that
+  # never says no. The subject is neutral and the body closes with "we have
+  # filled the role", which is why the vendor matched and every one of its own
+  # templates missed. The company is in the sign-off, not the subject.
+  - intent: rejected
+    subject: '^Update for the (?<role>.+?) opportunity\s*$'
+    body: '(we have filled the|no longer be interviewing further applicants)'
+    extract:
+      company: 'The (?<company>.+?) Talent Team'
+    confidence: 0.96
   - intent: offer
     subject: '^(Offer|Your offer) (from|at) (?<company>.+)$'
     confidence: 0.9

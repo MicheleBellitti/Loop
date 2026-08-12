@@ -1,0 +1,29 @@
+# ALLIBO
+#
+# An Italian HR platform that relays on behalf of the employer, with the
+# employer in the From display name and the vendor bracketed after it:
+# "ISelection - Iagica srl [via ALLIBO]" <mail_delivery_service@allibo.com>.
+#
+# Registering the domain is most of the point. Its acknowledgement carries bulk
+# headers, so before the vendor was known the message scored +2 for naming a
+# candidatura and -4 for being bulk, landed at -2, and was dropped without ever
+# reaching a rule — the one failure mode the classifier is not allowed to have,
+# because a dropped application is invisible and unrecoverable.
+vendor: allibo
+match:
+  sender_domains: [allibo.com]
+locale: [it]
+company_from: sender_display_name
+patterns:
+  # "Candidatura ricevuta" · "Ti confermiamo di aver ricevuto il tuo CV"
+  - intent: acknowledged
+    subject: '^candidatura ricevuta'
+    confidence: 0.97
+
+  - intent: acknowledged
+    body: 'confermiamo di aver ricevuto (il tuo cv|la tua candidatura)'
+    confidence: 0.95
+
+  - intent: rejected
+    body: '(non (abbiamo|è) (individuato|stata selezionata)|non proseguir(e|emo)|altri candidati)'
+    confidence: 0.94

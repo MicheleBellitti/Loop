@@ -64,6 +64,14 @@ _PATTERNS: tuple[re.Pattern[str], ...] = (
         _I,
     ),
     re.compile(r"\bposizione\s+di\s+(?P<role>[^.,\n<>|]{3,60}?)\s*(?:[.,\n]|presso\b|$)", _I),
+    # "per la posizione AI Engineer - Interacta" — the same phrase without the
+    # "di" that formal Italian drops in front of an English job title.
+    re.compile(r"\bposizione\s+(?P<role>[^.,\n<>|]{3,60}?)\s*(?:[.,\n]|[-–—]|presso\b|$)", _I),
+    # "Opportunità Dinova - AI ENGINEER (Interacta)" — the subject shape an
+    # Italian agency uses for outreach. The company sits before the dash and the
+    # role after it; the job vocabulary below is what stops "Opportunità
+    # lavorativa - Torino o Venegono Superiore" from becoming a job title.
+    re.compile(r"\bopportunit[àa]\s+[^\n]{0,40}?[-–—]\s*(?P<role>[^.,\n<>|(]{3,60})", _I),
     re.compile(r"^\s*(?:posizione|ruolo)\s*:\s*(?P<role>[^\n]{3,60})$", _IM),
     re.compile(
         r"\bcolloquio\s+(?:per|come)\s+(?:la\s+posizione\s+di\s+)?"

@@ -12,13 +12,16 @@ import re
 
 from loop.domain import company_key, domain_of_address
 
+from .addresses import address_of
 from .domains import in_list, names_an_employer
 
 _ADDRESS = re.compile(r"<([^<>]+)>\s*$")
 _NOT_LETTERS = re.compile(r"[^a-z]")
 
 _DISPLAY_NAME = re.compile(r"""^\s*"?([^"<]+?)"?\s*<""")
-_VIA_VENDOR = re.compile(r"\s+via\s+\w+\s*$", re.IGNORECASE)
+# "Prima via Lever" and "ISelection - Iagica srl [via ALLIBO]" — the same
+# convention, bracketed by the vendors that expect a human to read it.
+_VIA_VENDOR = re.compile(r"\s*[\[(]?\bvia\s+\w+[\])]?\s*$", re.IGNORECASE)
 _RECRUITING_SUFFIX = re.compile(
     r"\s*(?:\b(?:hiring|recruiting|recruitment|talent(?:\s+acquisition)?|careers?|jobs?"
     r"|people(?:\s+ops)?|hr)\b\s*)*(?:\bteam\b)?\s*$",
@@ -96,6 +99,24 @@ def is_the_senders_own_name(from_header: str) -> bool:
     return bool(local) and company_key(match.group(1)) == local
 
 
+# Addresses that relay one human's message rather than an employer's mail.
+#
+# An applicant-tracking system sends *on behalf of* the employer and puts the
+# employer in the display name, which is why that is the default place to read
+# it. LinkedIn's InMail relay does the opposite: the display name is the
+# recruiter who typed the message and the address is LinkedIn's. Reading it the
+# usual way files an application under "Federica Pettinato".
+#
+# Neither route names an employer here, and no employer is the right answer —
+# the company is named in the InMail that started the thread, which is the
+# resolver's problem to carry forward, not this function's to guess at.
+RELAY_ADDRESSES: tuple[str, ...] = (
+    "hit-reply@linkedin.com",
+    "inmail-hit-reply@linkedin.com",
+    "messages-noreply@linkedin.com",
+)
+
+
 def company_from_sender(from_header: str, ats_domains: tuple[str, ...] = ()) -> str | None:
     """The employer behind a From header, by whichever route is trustworthy.
 
@@ -103,6 +124,8 @@ def company_from_sender(from_header: str, ats_domains: tuple[str, ...] = ()) -> 
     once as a calendar organiser and once as the author of an email — has to
     yield one employer, or the resolver creates two applications for one job.
     """
+    if address_of(from_header) in RELAY_ADDRESSES:
+        return None
     if is_the_senders_own_name(from_header):
         return company_from_domain(from_header, ats_domains)
     return company_from_display_name(from_header) or company_from_domain(

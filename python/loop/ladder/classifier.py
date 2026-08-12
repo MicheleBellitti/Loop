@@ -190,6 +190,7 @@ def classify(msg: RawMessage, ctx: ClassifierContext) -> Classification:
         sender_domain,
         noise=noise,
         keyword_hit=strong or weak,
+        is_ats=is_ats,
         known_newsletters=ctx.known_newsletters,
     )
 
@@ -203,6 +204,7 @@ def _apply_penalties(
     *,
     noise: bool,
     keyword_hit: bool,
+    is_ats: bool,
     known_newsletters: AbstractSet[str],
 ) -> None:
     bulk = (
@@ -213,7 +215,13 @@ def _apply_penalties(
     # The waiver is for their *confirmations*, which is what §07 says. Extending
     # it to every notification the platform emits is what buried the review
     # queue.
-    waived = in_list(sender_domain, BULK_WHITELIST) and not noise
+    #
+    # It covers every vendor in the registry, not only LinkedIn and Indeed. An
+    # applicant-tracking system sends acknowledgements in bulk because that is
+    # what it is, and penalising one for carrying the headers of the thing it is
+    # took a real Italian ATS acknowledgement to -2 and dropped it — the one
+    # failure the classifier is not allowed to have.
+    waived = (is_ats or in_list(sender_domain, BULK_WHITELIST)) and not noise
     if bulk and not waived:
         card.add(-4, "bulk mail")
     elif bulk:

@@ -49,6 +49,7 @@ const domains = atsDomains(registry);
 // The same context the classifier and rung 2 run with in production. Diffing
 // without it compares two different questions: a reply on an owned thread is
 // worth two points and inherits an application.
+//
 // Scoped to the user, because the rows are. Reading this pool without setting
 // `loop.user_id` first is how a previous measurement came to count another
 // tenant's integration-test data as this mailbox's.
@@ -102,6 +103,11 @@ const lines: string[] = [
     // must not be read as the employer's. Nothing in the TypeScript needed this
     // because its thread branch abstained on everything.
     own_addresses: [mailbox.address.toLowerCase()],
+    // The registry this baseline was judged with. `rules/ats/*.yaml` is shared
+    // data, so adding a vendor changes both implementations — but only the one
+    // that has re-read the files. Recording it lets the diff say "stale
+    // baseline" instead of "porting error".
+    ats_vendors: registry.map((r) => r.vendor),
     thread_to_application: Object.fromEntries(threadToApplication),
   }),
 ];

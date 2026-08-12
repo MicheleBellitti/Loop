@@ -261,6 +261,44 @@ Three defects were found while porting and are fixed rather than carried:
   raised with a null excerpt. A review card with nothing on it to judge by is
   not a review card. Carried on every signal now.
 
+**Then the harness was pointed at what a diff cannot see.** A differential shows
+where the two implementations disagree; it says nothing about where both are
+wrong, which is where recall lives. An audit over the 84 review items and the
+709 borderline drops — nine readers, each finding adversarially refuted before
+it counted — confirmed 24 missed signals against 13 extracted.
+
+Almost all of them were in the review queue rather than dropped, which is the
+good news: a review item is visible and a drop is not. Exactly one real signal
+had been lost silently, an Italian ATS acknowledgement scored to −2 by a bulk
+penalty its vendor was not exempt from.
+
+What that produced, all measured on the same 1000 messages:
+
+| | before | after |
+|---|---|---|
+| extracted | 13 | 29 |
+| review queue | 84 | 70 |
+| dropped | 898 | 896 |
+| companies named | 12 | 24 |
+
+- The vocabulary had **no `schedule_screening` phrase at all**, and ten of the
+  misses were exactly that. An Italian recruiter arranges the first call in
+  prose, over several short messages, none of which say "colloquio".
+- The bulk waiver named LinkedIn and Indeed. It now covers every vendor in the
+  registry: an ATS sends in bulk because that is what it is.
+- LinkedIn's InMail relay is the one sender whose display name is a person
+  rather than the employer. Those now yield no company at all, which is the
+  honest answer and the reason P2 needs the thread token above.
+- `rules/ats/allibo.yaml` is new, and one Greenhouse template — a rejection
+  whose subject is "Update for the … opportunity" and which never says no.
+
+**Do not add a catch-all LinkedIn InMail template.** It was tried. Rung 1 runs a
+vendor's own patterns *before* the cross-vendor vocabulary, so a pattern
+matching `^Risposta al messaggio:` shadows the phrases: six messages that read
+correctly as `schedule_screening` collapsed to `other`. Subject capture is
+unreliable there too — "Opportunità lavorativa - Torino" yields *lavorativa* as
+the company.
+
 ### P2 · Connector, resolver, pipeline
 
 Gmail sync, entity resolution, the single writer. Still headless.
@@ -269,6 +307,26 @@ Gmail sync, entity resolution, the single writer. Still headless.
 as the TypeScript database — same companies, same stages, same event counts.
 Differences here are the company-dedup improvements from §3.3, and they should
 be *fewer* rows, not different ones.
+
+**Carry the LinkedIn thread token.** The recall audit found that Gmail splits a
+single LinkedIn conversation across several `thread_id`s — one InMail root at
+`inmail-hit-reply@`, its replies at `hit-reply@`, and a nudge from
+`messages-noreply@`. One AYES conversation is eight messages over four Gmail
+threads. Every transport carries a stable join key in the body:
+
+```
+linkedin\.com/(?:comm/)?messaging/thread/(?<li_thread>2-[A-Za-z0-9=_-]+)
+```
+
+Nineteen messages in the corpus carry it, over six tokens. Keying identity on
+this alongside `thread_id` is what lets a reply inherit the company and role
+from the InMail that opened the conversation — and that inheritance is the only
+correct source, because the replies name no employer at all. The ladder now
+returns those with `company: None` on purpose rather than filing them under the
+recruiter's name; the resolver is what makes them whole.
+
+The same applies to the four `stage_hint: null` invitations from §3.2: a null
+stage on an interview intent means the phase advances and the stage does not.
 
 ### P3 · FastAPI
 
