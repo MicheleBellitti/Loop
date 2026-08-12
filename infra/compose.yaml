@@ -24,6 +24,14 @@ x-service: &service
   environment: &service-env
     NODE_ENV: production
     LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Derived here rather than read from .env, and `environment` outranks
+    # `env_file` so this wins. The DATABASE_URL in .env is the one host-side
+    # tooling uses — migrate, seed:user, npm run dev — and it necessarily names
+    # a published port on localhost. Inside this network there is no published
+    # port and the host is `postgres`, so the two cannot be the same string.
+    # Composing it from POSTGRES_PASSWORD is also what stops the URL and the
+    # password the database was created with from drifting apart.
+    DATABASE_URL: postgres://loop:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/loop
 
 services:
   caddy:
