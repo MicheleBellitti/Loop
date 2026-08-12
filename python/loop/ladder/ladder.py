@@ -20,6 +20,7 @@ from loop.domain import excerpt
 from loop.domain.messages import CandidateMessage, Intent, Signal
 from loop.domain.thresholds import REVIEW_BELOW
 
+from .addresses import address_of
 from .contracts import Extraction, ExtractionRung, LadderContext
 from .rung1 import TemplateRung
 from .rung2 import HeuristicRung
@@ -42,7 +43,19 @@ class NeedsReview:
     confidence: float
 
 
-LadderOutcome = Extracted | NeedsReview
+@dataclass(frozen=True, slots=True)
+class Ignored:
+    """Read, understood, and deliberately not an observation about anyone.
+
+    Distinct from `NeedsReview` because there is nothing for a human to decide.
+    Asking someone to classify an email they wrote themselves is how a review
+    queue fills up with work that has no answer.
+    """
+
+    reason: str
+
+
+LadderOutcome = Extracted | NeedsReview | Ignored
 
 
 class Ladder:
@@ -50,6 +63,14 @@ class Ladder:
         self._rungs = tuple(rungs)
 
     def run(self, msg: CandidateMessage, ctx: LadderContext) -> LadderOutcome:
+        if _is_self_sent(msg, ctx):
+            # A reply you wrote says the thread is yours, which the thread map
+            # already knows, and says nothing about what the employer decided.
+            # The TypeScript never reached this question because its thread
+            # branch abstained on everything; with the vocabulary now running,
+            # "I am happy to accept the invitation" reads as an invitation.
+            return Ignored("sent by the mailbox owner")
+
         reading = self._read(msg, ctx)
         if reading is None or reading.confidence < REVIEW_BELOW:
             return NeedsReview(
@@ -67,6 +88,13 @@ class Ladder:
             if reading is not None:
                 return reading
         return None
+
+
+def _is_self_sent(msg: CandidateMessage, ctx: LadderContext) -> bool:
+    if not ctx.own_addresses:
+        return False
+    sender = address_of(msg.headers.sender)
+    return sender is not None and sender in ctx.own_addresses
 
 
 def deterministic_ladder() -> Ladder:

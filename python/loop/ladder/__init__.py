@@ -8,7 +8,14 @@ that does not abstain wins.
 
 from .classifier import Classification, ClassifierContext, classify
 from .contracts import Extraction, ExtractionRung, LadderContext
-from .ladder import Extracted, Ladder, LadderOutcome, NeedsReview, deterministic_ladder
+from .ladder import (
+    Extracted,
+    Ignored,
+    Ladder,
+    LadderOutcome,
+    NeedsReview,
+    deterministic_ladder,
+)
 from .registry import RuleRegistry, RulesError
 from .rung1 import TemplateRung
 from .rung2 import HeuristicRung, stage_from_title
@@ -21,6 +28,7 @@ __all__ = [
     "Extraction",
     "ExtractionRung",
     "HeuristicRung",
+    "Ignored",
     "Ladder",
     "LadderContext",
     "LadderOutcome",

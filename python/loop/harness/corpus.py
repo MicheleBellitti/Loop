@@ -228,6 +228,9 @@ class BaselineContext:
     known_threads: frozenset[str] = frozenset()
     known_newsletters: frozenset[str] = frozenset()
     thread_to_application: Mapping[str, str] = field(default_factory=dict)
+    # The addresses this mailbox sends as, so the user's own half of a thread
+    # is not read as the employer's.
+    own_addresses: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,6 +268,7 @@ def _baseline_context(row: JsonObject) -> BaselineContext:
         known_threads=frozenset(row.get("known_threads") or ()),
         known_newsletters=frozenset(row.get("known_newsletters") or ()),
         thread_to_application=dict(row.get("thread_to_application") or {}),
+        own_addresses=frozenset(a.lower() for a in row.get("own_addresses") or ()),
     )
 
 

@@ -10,9 +10,12 @@ back rather than inventing an employer.
 
 import re
 
-from loop.domain import domain_of_address
+from loop.domain import company_key, domain_of_address
 
 from .domains import in_list, names_an_employer
+
+_ADDRESS = re.compile(r"<([^<>]+)>\s*$")
+_NOT_LETTERS = re.compile(r"[^a-z]")
 
 _DISPLAY_NAME = re.compile(r"""^\s*"?([^"<]+?)"?\s*<""")
 _VIA_VENDOR = re.compile(r"\s+via\s+\w+\s*$", re.IGNORECASE)
@@ -41,9 +44,9 @@ def company_from_display_name(from_header: str) -> str | None:
     match = _DISPLAY_NAME.match(from_header)
     if match is None:
         return None
-    name = _RECRUITING_SUFFIX.sub("", _VIA_VENDOR.sub("", match.group(1).strip())).strip()
-    name = _RECRUITING_PREFIX.sub("", name).strip()
-    name = _TRAILING_PUNCTUATION.sub("", name).strip()
+    written = _RECRUITING_PREFIX.sub("", _VIA_VENDOR.sub("", match.group(1).strip())).strip()
+    stripped = _TRAILING_PUNCTUATION.sub("", _RECRUITING_SUFFIX.sub("", written)).strip()
+    name = _adjudicate(written, stripped, domain_of_address(from_header))
     if not name:
         return None
     if " " not in name and _ROBOT_FRAGMENT.search(name):
@@ -51,6 +54,60 @@ def company_from_display_name(from_header: str) -> str | None:
     if _ROBOT_NAME.match(name):
         return None
     return name
+
+
+def _adjudicate(written: str, stripped: str, domain: str | None) -> str:
+    """Which of the two readings the sender's own domain agrees with.
+
+    "Careers @ Jet HR" becomes "Jet" once the prefix and then the `hr` suffix
+    come off — but the mail is from `jethr.com`, and the company is called Jet
+    HR. The suffix list cannot tell a recruiting team's name from a company that
+    happens to contain the same word, and the domain can.
+    """
+    label = _domain_label(domain)
+    if not label or stripped == written:
+        return stripped
+    if company_key(written) == label and company_key(stripped) != label:
+        return written
+    return stripped
+
+
+def _domain_label(domain: str | None) -> str:
+    if not domain:
+        return ""
+    labels = domain.split(".")
+    return company_key(labels[-2]) if len(labels) >= 2 else ""
+
+
+def is_the_senders_own_name(from_header: str) -> bool:
+    """Whether the display name is simply the person who holds the address.
+
+    "Clara Villamayor <clara.villamayor@prima.it>" names a recruiter, not an
+    employer, and filing it as one produces an application called Clara
+    Villamayor beside the Prima that her own calendar invites resolve to. The
+    address adjudicates: a display name that is the local part spelled out is a
+    person, and the company is whatever the domain says.
+    """
+    match = _DISPLAY_NAME.match(from_header)
+    address = _ADDRESS.search(from_header)
+    if match is None or address is None:
+        return False
+    local = _NOT_LETTERS.sub("", address.group(1).split("@")[0].lower())
+    return bool(local) and company_key(match.group(1)) == local
+
+
+def company_from_sender(from_header: str, ats_domains: tuple[str, ...] = ()) -> str | None:
+    """The employer behind a From header, by whichever route is trustworthy.
+
+    One entry point on purpose. The same recruiter reaching the pipeline twice —
+    once as a calendar organiser and once as the author of an email — has to
+    yield one employer, or the resolver creates two applications for one job.
+    """
+    if is_the_senders_own_name(from_header):
+        return company_from_domain(from_header, ats_domains)
+    return company_from_display_name(from_header) or company_from_domain(
+        from_header, ats_domains
+    )
 
 
 def company_from_domain(

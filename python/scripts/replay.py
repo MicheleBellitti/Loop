@@ -42,6 +42,7 @@ def main() -> int:
                 known_newsletters=baseline.context.known_newsletters,
             ),
             thread_to_application=dict(baseline.context.thread_to_application),
+            own_addresses=baseline.context.own_addresses,
         )
         source = "baseline"
     else:

@@ -5,6 +5,7 @@ import pytest
 from loop.domain.messages import CalendarInvite, CandidateMessage, MessageHeaders, RawMessage
 from loop.ladder import (
     Extracted,
+    Ignored,
     LadderContext,
     NeedsReview,
     RuleRegistry,
@@ -12,7 +13,12 @@ from loop.ladder import (
     stage_for_intent,
     stage_from_title,
 )
-from loop.ladder.company import company_from_display_name, company_from_domain
+from loop.ladder.company import (
+    company_from_display_name,
+    company_from_domain,
+    company_from_sender,
+    is_the_senders_own_name,
+)
 from loop.ladder.role import role_from_body
 
 REGISTRY = RuleRegistry.load()
@@ -42,7 +48,7 @@ def candidate(
     return CandidateMessage(message=message, score=5, cheap_only=cheap_only)
 
 
-def read(msg: CandidateMessage, **over: object) -> Extracted | NeedsReview:
+def read(msg: CandidateMessage, **over: object) -> Extracted | NeedsReview | Ignored:
     ctx = LadderContext(registry=REGISTRY, **over)  # type: ignore[arg-type]
     return deterministic_ladder().run(msg, ctx)
 
@@ -239,6 +245,47 @@ class TestTheLadder:
         assert outcome.confidence == pytest.approx(0.4)
 
 
+class TestSelfSentMail:
+    OWN = frozenset({"michele@gmail.com"})
+
+    def test_a_message_you_wrote_asserts_nothing_about_the_employer(self) -> None:
+        # "I am happy to accept the invitation to the next step" reads as an
+        # invitation. It is you accepting one.
+        outcome = read(
+            candidate(
+                sender="Michele Bellitti <michele@gmail.com>",
+                subject="Re: Machine Learning Engineer",
+                text="Thank you for the invitation. I would like to invite you to pick a slot.",
+                thread_id="t1",
+            ),
+            own_addresses=self.OWN,
+            thread_to_application={"t1": "app-1"},
+        )
+        assert isinstance(outcome, Ignored)
+
+    def test_and_is_not_a_review_item_either(self) -> None:
+        # There is nothing for a human to decide about their own email.
+        outcome = read(
+            candidate(sender="michele@gmail.com", subject="Re: colloquio", text="Grazie mille"),
+            own_addresses=self.OWN,
+        )
+        assert isinstance(outcome, Ignored)
+        assert not isinstance(outcome, NeedsReview)
+
+    def test_the_same_thread_read_from_their_side_is_still_extracted(self) -> None:
+        signal = signal_of(
+            candidate(
+                sender="Clara Villamayor <clara.villamayor@prima.it>",
+                subject="Machine Learning Engineer",
+                text="We would like to invite you to the next step of the selection.",
+                thread_id="t1",
+            ),
+            own_addresses=self.OWN,
+            thread_to_application={"t1": "app-1"},
+        )
+        assert signal.intent == "interview_invite"
+
+
 class TestReaders:
     @pytest.mark.parametrize(
         ("header", "expected"),
@@ -256,6 +303,35 @@ class TestReaders:
         self, header: str, expected: str | None
     ) -> None:
         assert company_from_display_name(header) == expected
+
+    def test_the_domain_vetoes_a_suffix_strip_that_disagrees_with_it(self) -> None:
+        # "Careers @ Jet HR" reduces to "Jet" once the prefix and then `hr` come
+        # off, but the mail is from jethr.com and the company is called Jet HR.
+        # The suffix list cannot tell a recruiting team from a company whose
+        # name contains the same word; the domain can.
+        assert (
+            company_from_display_name('"Careers @ Jet HR" <careers-noreply@jethr.com>')
+            == "Jet HR"
+        )
+        # And it does not veto a strip the domain has no opinion about.
+        assert (
+            company_from_display_name("Lexroom Hiring Team <no-reply@ashbyhq.com>") == "Lexroom"
+        )
+
+    def test_a_recruiters_own_name_resolves_to_the_company_she_writes_for(self) -> None:
+        # Otherwise the same person yields "Prima" through her calendar invites
+        # and "Clara Villamayor" through her email, and the resolver builds two
+        # applications for one job.
+        header = "Clara Villamayor <clara.villamayor@prima.it>"
+        assert is_the_senders_own_name(header)
+        assert company_from_sender(header) == "Prima"
+
+    def test_a_person_at_a_personal_address_names_no_company_at_all(self) -> None:
+        assert company_from_sender("Michele Bellitti <michelebellitti272@gmail.com>") is None
+
+    def test_a_display_name_that_is_not_the_address_is_still_believed(self) -> None:
+        assert not is_the_senders_own_name("Prima <no-reply@hire.eu.lever.co>")
+        assert company_from_sender("Prima <no-reply@hire.eu.lever.co>") == "Prima"
 
     def test_a_bare_domain_yields_a_company_where_the_typescript_gave_up(self) -> None:
         assert company_from_domain("talent.nexi.it", REGISTRY.ats_domains) == "Nexi"

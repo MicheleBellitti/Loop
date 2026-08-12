@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from loop.domain import domain_of_address
 from loop.domain.messages import CandidateMessage, MessageHeaders
 
-from .company import company_from_display_name, company_from_domain
+from .company import company_from_domain, company_from_sender
 from .contracts import Extraction, LadderContext
 from .phrases import match_phrase
 from .regex import first_group
@@ -67,7 +67,7 @@ def _apply(
         intent=phrase.intent,
         confidence=phrase.confidence,
         rung=1,
-        company=company_from_display_name(msg.headers.sender),
+        company=company_from_sender(msg.headers.sender, ctx.registry.ats_domains),
         role=role_from_body(haystack),
     )
 
@@ -102,15 +102,16 @@ def _company(
     fields: dict[str, str],
     ctx: LadderContext,
 ) -> str | None:
+    ats_domains = ctx.registry.ats_domains
     if rule.company_from == "sender_display_name":
-        return company_from_display_name(msg.headers.sender) or fields.get("company")
+        return company_from_sender(msg.headers.sender, ats_domains) or fields.get("company")
 
     captured = fields.get("company")
     if captured:
         return captured
     if rule.company_from == "sender_domain":
-        return company_from_domain(sender_domain, ctx.registry.ats_domains)
-    return company_from_display_name(msg.headers.sender)
+        return company_from_domain(sender_domain, ats_domains)
+    return company_from_sender(msg.headers.sender, ats_domains)
 
 
 def _headers_match(rule: Rule, msg: CandidateMessage) -> bool:

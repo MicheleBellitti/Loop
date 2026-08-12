@@ -29,6 +29,9 @@ class LadderContext:
     registry: RuleRegistry
     # Threads already attached to an application, mapped to that application.
     thread_to_application: Mapping[str, str] = field(default_factory=dict)
+    # The addresses this mailbox sends as. A thread contains both halves of a
+    # conversation and the user's own half must not be read as the employer's.
+    own_addresses: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)

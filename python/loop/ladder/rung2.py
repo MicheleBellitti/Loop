@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from loop.domain import domain_of_address
 from loop.domain.messages import CandidateMessage
 
-from .company import company_from_display_name, company_from_domain
+from .company import company_from_domain, company_from_sender
 from .contracts import Extraction, LadderContext
 from .domains import LEARNING_PLATFORMS, in_list
 from .phrases import match_phrase
@@ -97,6 +97,5 @@ class HeuristicRung:
             intent=phrase.intent,
             confidence=min(phrase.confidence, _PHRASE_CEILING),
             rung=2,
-            company=company_from_display_name(msg.headers.sender)
-            or company_from_domain(sender_domain, ats_domains),
+            company=company_from_sender(msg.headers.sender, ats_domains),
         )

@@ -12,6 +12,7 @@ from loop.domain.messages import CandidateMessage, RawMessage
 from loop.ladder import (
     ClassifierContext,
     Extracted,
+    Ignored,
     Ladder,
     LadderContext,
     RuleRegistry,
@@ -32,6 +33,10 @@ class Verdict:
     rung: int | None = None
     vendor: str | None = None
     stage_hint: str | None = None
+    # Read and deliberately not an observation about anyone — the user's own
+    # half of a thread. Never compared against the TypeScript, which had no such
+    # outcome: it recorded these as review items a human could not answer.
+    ignored: bool = False
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -47,6 +52,7 @@ class LadderRunner:
         classifier: ClassifierContext | None = None,
         ladder: Ladder | None = None,
         thread_to_application: dict[str, str] | None = None,
+        own_addresses: frozenset[str] = frozenset(),
     ) -> None:
         self._registry = registry or RuleRegistry.load()
         self._ladder = ladder or deterministic_ladder()
@@ -58,7 +64,9 @@ class LadderRunner:
             known_newsletters=base.known_newsletters,
         )
         self._ctx = LadderContext(
-            registry=self._registry, thread_to_application=thread_to_application or {}
+            registry=self._registry,
+            thread_to_application=thread_to_application or {},
+            own_addresses=own_addresses,
         )
 
     def judge(self, msg: RawMessage) -> Verdict:
@@ -86,6 +94,7 @@ class LadderRunner:
                 score=classification.score,
                 outcome=classification.outcome,
                 vendor=vendor,
+                ignored=isinstance(outcome, Ignored),
             )
 
         signal = outcome.signal
@@ -112,7 +121,10 @@ def summarise(verdicts: Sequence[Verdict]) -> dict[str, int]:
         "messages": len(verdicts),
         "dropped": sum(1 for v in verdicts if v.outcome == "drop"),
         "extracted": sum(1 for v in verdicts if v.intent is not None),
-        "review": sum(1 for v in verdicts if v.outcome != "drop" and v.intent is None),
+        "review": sum(
+            1 for v in verdicts if v.outcome != "drop" and v.intent is None and not v.ignored
+        ),
+        "ignored": sum(1 for v in verdicts if v.ignored),
         "with_company": sum(1 for v in verdicts if v.company),
         "with_role": sum(1 for v in verdicts if v.role),
     }

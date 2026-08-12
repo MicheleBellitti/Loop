@@ -98,6 +98,10 @@ const lines: string[] = [
     company_domains: [...companyDomains],
     known_threads: [...threadToApplication.keys()],
     known_newsletters: [...knownNewsletters],
+    // A thread carries both halves of a conversation, and the user's own half
+    // must not be read as the employer's. Nothing in the TypeScript needed this
+    // because its thread branch abstained on everything.
+    own_addresses: [mailbox.address.toLowerCase()],
     thread_to_application: Object.fromEntries(threadToApplication),
   }),
 ];
