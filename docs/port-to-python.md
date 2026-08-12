@@ -147,6 +147,14 @@ Until it is good, **abstain rather than default**. An unrecognised invite should
 produce `interview_scheduled` with a null stage and let the phase be
 `interviewing` — which is the claim actually supported by the evidence.
 
+Done in P1, in both places the default was written: rung 2 no longer answers
+`technical` to a titleless invite, and `stage_for_intent` no longer answers it
+for `interview_invite`. **The same default appears a third time**, in
+`services/resolver/src/events.ts`, as `signal.stage_hint ?? 'technical'` on four
+lines. Porting that faithfully would put the guess straight back. When P2
+reaches the resolver, a null `stage_hint` on an interview intent means the phase
+advances and the stage does not.
+
 ### 3.3 Company deduplication is two heuristics in a trenchcoat
 
 Today: match on sender domain, else on an alias key that strips everything but
@@ -210,6 +218,48 @@ difference is a deliberate improvement with a note.
 
 This is the phase that de-risks everything after it. Do not skip the harness to
 get to the API sooner.
+
+**Status: built, and green on the committed corpus.** `loop/ladder/` is the
+classifier, the registry over `rules/ats/*.yaml` and rungs 1 and 2 behind an
+`ExtractionRung` protocol; `loop/harness/` is the corpus reader, the runner and
+the divergence table. On `fixtures/` the Python reads the same 19 of 29 messages
+the TypeScript reads, and fails on exactly the same two — both stale fixtures
+with no From display name, which is where the rules were rewritten to read the
+employer.
+
+The real corpus needs the mailbox once:
+
+```
+npm run export:baseline                                    # writes fixtures/private/
+uv run --extra ladder python scripts/diff_against_ts.py    # prints only disagreements
+```
+
+The baseline pairs each real message with the verdict this implementation gave
+it, so the diff afterwards needs no database, no network and no mailbox, and
+stays reproducible after the mail has moved on. It carries the classifier's
+context — thread map, company domains, learned newsletters — on its first line,
+because a reply on an owned thread is worth two points and diffing without the
+same context compares two different questions.
+
+**The deliberate differences live in `loop/harness/divergences.py`**, one entry
+per change with the section of this document that justifies it, each predicate
+written to match that change and nothing adjacent. A difference the table cannot
+explain fails the diff. Registered so far: the §3.2 stage abstention, the known
+thread reaching the vocabulary, §3.4 practice sites, and the §3.3 domain
+fallback. Anything else is a porting error.
+
+Three defects were found while porting and are fixed rather than carried:
+
+- `htmlToText` writes `label <href>` and the generic tag strip removes it on the
+  next line, so the posting URL the function exists to preserve never survived
+  an HTML message. Parentheses now.
+- The role capture's terminators are optional, so "Platform Engineer was sent to
+  Nexi" fits inside the six-word ceiling and arrives as a job title. It is now
+  cut at the first word no job title contains, which recovers the real one.
+- `buildSignal` only ever sets `excerpt` below the review threshold, and it is
+  only ever called above it — so the resolver's own ambiguity review items were
+  raised with a null excerpt. A review card with nothing on it to judge by is
+  not a review card. Carried on every signal now.
 
 ### P2 · Connector, resolver, pipeline
 

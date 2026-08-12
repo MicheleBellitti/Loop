@@ -15,6 +15,8 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
+from .types import WorkMode
+
 # Legal forms, stripped so "Nexi S.p.A." and "Nexi" are one company.
 _LEGAL_SUFFIXES = [
     "s.r.l.s.",
@@ -169,7 +171,7 @@ _CONTRACT_TERMS = [
     "m/f",
 ]
 
-_WORK_MODES: list[tuple[re.Pattern[str], str]] = [
+_WORK_MODES: list[tuple[re.Pattern[str], WorkMode]] = [
     (
         re.compile(r"\b(fully\s+)?remote\b|\bda\s+remoto\b|\bsmart\s*working\b|\bwfh\b", re.I),
         "remote",
@@ -332,7 +334,7 @@ class NormalisedRole:
     # Pulled out of the title into its own field, as the spec requires.
     seniority: str | None
     location: str | None
-    work_mode: str | None
+    work_mode: WorkMode | None
 
 
 def _looks_like_place(segment: str) -> bool:
@@ -352,7 +354,7 @@ def _is_contract_term(segment: str) -> bool:
 
 def normalise_role(raw: str) -> NormalisedRole:
     """ "Senior Backend Engineer (m/f/d) - Milan, full time" → "backend engineer"."""
-    work_mode: str | None = None
+    work_mode: WorkMode | None = None
     for pattern, mode in _WORK_MODES:
         if pattern.search(raw):
             work_mode = mode

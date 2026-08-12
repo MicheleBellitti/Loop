@@ -152,6 +152,18 @@ def _implied_stage(ev: DomainEvent) -> str | None:
             return None
 
 
+# A payload is a jsonb column written by four different rungs, so a status that
+# arrives in one is a string until it is recognised. An unknown one decides
+# nothing rather than becoming the state.
+_STATUS_BY_NAME: dict[str, AppStatus] = {
+    "live": "live",
+    "dormant": "dormant",
+    "rejected": "rejected",
+    "withdrawn": "withdrawn",
+    "accepted": "accepted",
+}
+
+
 def _implied_status(ev: DomainEvent) -> AppStatus | None:
     """The status each event type implies."""
     match ev.type:
@@ -165,8 +177,7 @@ def _implied_status(ev: DomainEvent) -> AppStatus | None:
             return "dormant"
         case "human_corrected":
             if ev.payload.get("field") == "status":
-                to = ev.payload.get("to")
-                return to if isinstance(to, str) else None  # type: ignore[return-value]
+                return _STATUS_BY_NAME.get(str(ev.payload.get("to")))
             return None
         case _:
             # Any real signal from the world means the process is alive again.
@@ -243,9 +254,9 @@ def fold_with_provenance(
 
     # ── status ──────────────────────────────────────────────────────────────
     status_cands = [
-        _Candidate(v, ev, tier_of(ev, "status"))
+        _Candidate(implied, ev, tier_of(ev, "status"))
         for ev in voting
-        if (v := _implied_status(ev)) is not None
+        if (implied := _implied_status(ev)) is not None
     ]
     status_win = _pick(status_cands)
     status: AppStatus = status_win.value if status_win else "live"
@@ -272,9 +283,9 @@ def fold_with_provenance(
 
     # ── stage ───────────────────────────────────────────────────────────────
     stage_cands = [
-        _Candidate(v, ev, tier_of(ev, "stage"))
+        _Candidate(reached, ev, tier_of(ev, "stage"))
         for ev in voting
-        if not after_freeze(ev) and (v := _implied_stage(ev)) is not None
+        if not after_freeze(ev) and (reached := _implied_stage(ev)) is not None
     ]
     stage_win = _pick(stage_cands)
     current_stage = stage_win.value if stage_win else "applied"

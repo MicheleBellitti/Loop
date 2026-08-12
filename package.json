@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:corpus": "tsx scripts/run-corpus.ts",
+    "export:baseline": "node --env-file-if-exists=.env --import tsx scripts/export-baseline.ts",
     "lint:no-send-path": "node scripts/assert-no-send-path.mjs",
     "migrate": "node --env-file-if-exists=.env --import tsx packages/db/src/migrate.ts",
     "seed:user": "node --env-file-if-exists=.env --import tsx scripts/seed-user.ts",
