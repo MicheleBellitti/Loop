@@ -19,6 +19,9 @@ pytestmark = pytest.mark.integration
 
 ROME = ZoneInfo("Europe/Rome")
 
+# A Thursday at nine, well outside the quiet window.
+MORNING = datetime(2026, 8, 13, 9, 0, tzinfo=UTC)
+
 
 class Recorder:
     """A sender that remembers, and answers however the test needs it to."""
@@ -65,7 +68,7 @@ class TestWhoMayInterruptYou:
     ) -> None:
         sender = Recorder()
         service = NotifierService(db, sender=sender)
-        morning = datetime(2026, 8, 13, 9, 0, tzinfo=UTC)
+        morning = MORNING
 
         assert (await service.deliver(notification(user_id), now=morning)).outcome == "sent"
         second = await service.deliver(
@@ -84,7 +87,7 @@ class TestWhoMayInterruptYou:
     ) -> None:
         sender = Recorder()
         service = NotifierService(db, sender=sender)
-        morning = datetime(2026, 8, 13, 9, 0, tzinfo=UTC)
+        morning = MORNING
 
         await service.deliver(
             notification(user_id, rule="deadline", bypasses_budget=True), now=morning
@@ -150,7 +153,7 @@ class TestQuietHours:
         # 23:30 UTC on the 13th is 01:30 on the 14th in Rome — a different day,
         # and therefore a different budget. Both are inside the quiet window, so
         # both are deadlines to get past it.
-        first = datetime(2026, 8, 13, 9, 0, tzinfo=UTC)
+        first = MORNING
         after_midnight_in_rome = datetime(2026, 8, 13, 23, 30, tzinfo=UTC)
 
         await service.deliver(
@@ -183,10 +186,19 @@ class TestQuietHours:
 
 
 class TestTheDevices:
+    """All pinned to a weekday morning.
+
+    Without a fixed instant these read the wall clock, and after 21:00 local the
+    quiet-hours gate defers everything — so they passed all day and failed in
+    the evening, which is the worst kind of test.
+    """
+
     async def test_nothing_to_send_to_is_not_a_failure(
         self, db: Database, user_id: str
     ) -> None:
-        result = await NotifierService(db, sender=Recorder()).deliver(notification(user_id))
+        result = await NotifierService(db, sender=Recorder()).deliver(
+            notification(user_id), now=MORNING
+        )
         assert result.outcome == "no_subscription"
 
     async def test_a_subscription_the_browser_threw_away_is_removed(
@@ -195,7 +207,9 @@ class TestTheDevices:
         dead = await _subscribe(db, user_id, "https://push.example/dead")
         sender = Recorder({dead: "gone"})
 
-        result = await NotifierService(db, sender=sender).deliver(notification(user_id))
+        result = await NotifierService(db, sender=sender).deliver(
+            notification(user_id), now=MORNING
+        )
 
         assert result.outcome == "sent"
         assert result.count == 1
@@ -210,7 +224,9 @@ class TestTheDevices:
     ) -> None:
         sender = Recorder({subscription: "failed"})
 
-        result = await NotifierService(db, sender=sender).deliver(notification(user_id))
+        result = await NotifierService(db, sender=sender).deliver(
+            notification(user_id), now=MORNING
+        )
 
         assert result.outcome == "failed"
         async with db.session(user_id) as connection:
@@ -225,7 +241,9 @@ class TestTheServiceWorkerContract:
     ) -> None:
         sender = Recorder()
 
-        await NotifierService(db, sender=sender).deliver(notification(user_id))
+        await NotifierService(db, sender=sender).deliver(
+            notification(user_id), now=MORNING
+        )
 
         [(_sub, payload)] = sender.sent
         assert set(payload.as_json()) == {"title", "body", "url", "tag"}

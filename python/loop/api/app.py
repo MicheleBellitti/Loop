@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -273,6 +273,34 @@ def _install_client(app: FastAPI, settings: Settings) -> None:
     @app.get("/health")
     async def _health() -> dict[str, object]:
         return {"ok": True}
+
+    @app.get("/{filename}")
+    async def _root_file(filename: str) -> Response:
+        """The handful of files that have to sit at the root to work at all.
+
+        `sw.js` is the reason this exists. A service worker's scope is the
+        directory it is served from, so one served from `/assets` could only
+        control `/assets` — it has to be at the root or it controls nothing.
+        `manifest.webmanifest` and the icons are the same story for a different
+        reason: the manifest is what makes the app installable, and a browser
+        looks for it where the page said it was.
+
+        Registered after every route that means something, so it can only ever
+        answer for a path nothing else claimed, and it answers only for a file
+        that is really there — `/pipeline` falls through to the single-page
+        handler below, as it must.
+        """
+        candidate = directory / filename if directory else None
+        if (
+            candidate is None
+            or filename != Path(filename).name
+            or not candidate.is_file()
+        ):
+            # A plain 404 rather than a coded one, deliberately: this has to
+            # fall through to the handler below, which is what decides between
+            # a missing file and a route the single-page app owns.
+            raise HTTPException(status_code=404)
+        return FileResponse(candidate)
 
     @app.exception_handler(404)
     async def _missing(request: Request, _error: Exception) -> Response:
