@@ -18,8 +18,12 @@ why. The assertions came first; the implementation was written to satisfy them.
 
 ## Layout
 
-    loop/domain/     the fold, stages, thresholds, nudges, preprocessing — pure
+    loop/domain/     the fold, stages, thresholds, nudges, wire codecs — pure
     loop/ladder/     classifier, rule registry, rungs 1 and 2, the signal
+    loop/resolver/   embedder, matching, company identity, intent → event — pure
+    loop/db/         asyncpg, the tenant session, the queue, migrations
+    loop/services/   the consumer loop, the pipeline, the resolver
+    loop/api/        FastAPI, built against the client as the specification
     loop/harness/    the corpus, the runner, the divergence table
     scripts/         replay.py, diff_against_ts.py
 
@@ -55,7 +59,8 @@ no network and no mailbox.
 |---|---|---|
 | P0 | schema and domain, headless | **done** |
 | P1 | the ladder and the differential harness | **done** — 974/1000 identical, 26 deliberate, nothing unexplained |
-| P2 | connector, resolver, pipeline | in progress: the resolver's decisions are ported |
+| P2 | connector, resolver, pipeline | resolver, db, queue, runtime and pipeline done; connector outstanding |
+| P3 | FastAPI, response contract byte-identical | tier 0 and tier 1: sign-in, the board, Today |
 | P3 | FastAPI, response contract byte-identical | |
 | P4 | real embeddings, spaCy, the model out of the transaction | |
 | P5 | the interface | |
