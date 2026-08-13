@@ -61,7 +61,6 @@ no network and no mailbox.
 | P1 | the ladder and the differential harness | **done** — 974/1000 identical, 26 deliberate, nothing unexplained |
 | P2 | connector, resolver, pipeline | resolver, db, queue, runtime and pipeline done; connector outstanding |
 | P3 | FastAPI, response contract byte-identical | tier 0 and tier 1: sign-in, the board, Today |
-| P3 | FastAPI, response contract byte-identical | |
 | P4 | real embeddings, spaCy, the model out of the transaction | |
 | P5 | the interface | |
 
