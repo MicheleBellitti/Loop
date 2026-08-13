@@ -10,6 +10,7 @@ take thirty seconds without holding anything open.
 """
 
 from .classifier import ClassifierService, Screened
+from .connector import ConnectorService, Synced
 from .consumer import Consumer, ConsumerOptions, Handler
 from .extractor import ExtractorService, Reading, TransientRungError
 from .notifier import Delivered, NotifierService
@@ -17,10 +18,13 @@ from .nudge import NudgeService, Ticked, suggestion_payload
 from .pipeline import Applied, PipelineService
 from .push import PushPayload, PushResult, PushSender, PushSubscription, VapidConfig
 from .resolver import Resolved, ResolverService
+from .runtime import ConnectorRuntime, until_signalled
 
 __all__ = [
     "Applied",
     "ClassifierService",
+    "ConnectorRuntime",
+    "ConnectorService",
     "Consumer",
     "ConsumerOptions",
     "Delivered",
@@ -37,8 +41,10 @@ __all__ = [
     "Resolved",
     "ResolverService",
     "Screened",
+    "Synced",
     "Ticked",
     "TransientRungError",
     "VapidConfig",
     "suggestion_payload",
+    "until_signalled",
 ]
