@@ -449,6 +449,17 @@ from `packages/google/src/google.ts`. And there are no connector tests in the
 reference at all, which cuts both ways — nothing pins the behaviour, and nothing
 will tell you when you break it.
 
+**The thread map lags the pipeline, and that is a race.** The resolver reads
+thread identity out of `application_events`, which only the pipeline writes. Two
+messages on one thread resolved before the pipeline drains therefore find
+nothing to inherit from and create two applications. A live mailbox delivers a
+thread's messages minutes apart and never notices; a backfill delivers them
+together, which is exactly where "replay split one application in two" came
+from. Inherited rather than introduced, and left alone for now — the fix is
+either for the resolver to remember its own recent decisions or for identity to
+move off the event log, and neither is a change to make while the differential
+is the thing keeping this port honest.
+
 ### P3 · FastAPI
 
 Port the read API. **Keep the response contract byte-identical** — same field

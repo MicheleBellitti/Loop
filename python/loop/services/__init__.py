@@ -11,6 +11,7 @@ take thirty seconds without holding anything open.
 
 from .consumer import Consumer, ConsumerOptions, Handler
 from .pipeline import Applied, PipelineService
+from .resolver import Resolved, ResolverService
 
 __all__ = [
     "Applied",
@@ -18,4 +19,6 @@ __all__ = [
     "ConsumerOptions",
     "Handler",
     "PipelineService",
+    "Resolved",
+    "ResolverService",
 ]
