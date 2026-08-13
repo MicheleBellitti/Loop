@@ -54,8 +54,8 @@ no network and no mailbox.
 | Phase | | |
 |---|---|---|
 | P0 | schema and domain, headless | **done** |
-| P1 | the ladder and the differential harness | **done**, awaiting a run against the real corpus |
-| P2 | connector, resolver, pipeline | next |
+| P1 | the ladder and the differential harness | **done** — 974/1000 identical, 26 deliberate, nothing unexplained |
+| P2 | connector, resolver, pipeline | in progress: the resolver's decisions are ported |
 | P3 | FastAPI, response contract byte-identical | |
 | P4 | real embeddings, spaCy, the model out of the transaction | |
 | P5 | the interface | |

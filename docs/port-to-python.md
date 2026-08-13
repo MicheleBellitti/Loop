@@ -219,13 +219,31 @@ difference is a deliberate improvement with a note.
 This is the phase that de-risks everything after it. Do not skip the harness to
 get to the API sooner.
 
-**Status: built, and green on the committed corpus.** `loop/ladder/` is the
-classifier, the registry over `rules/ats/*.yaml` and rungs 1 and 2 behind an
-`ExtractionRung` protocol; `loop/harness/` is the corpus reader, the runner and
-the divergence table. On `fixtures/` the Python reads the same 19 of 29 messages
-the TypeScript reads, and fails on exactly the same two — both stale fixtures
-with no From display name, which is where the rules were rewritten to read the
-employer.
+**Status: done. The gate is met on real mail.** Over 1000 real messages the two
+implementations agree on 974 and differ on 26, every one of them explained by
+the divergence table. Nothing unexplained.
+
+`loop/ladder/` is the classifier, the registry over `rules/ats/*.yaml` and rungs
+1 and 2 behind an `ExtractionRung` protocol; `loop/harness/` is the corpus
+reader, the runner and the divergence table.
+
+What the deliberate 26 amount to, on the same corpus:
+
+| | reference | port |
+|---|---|---|
+| extracted | 14 | **28** |
+| with a company | 14 | **23** |
+| with a role | 3 | **7** |
+| review queue | 87 | **68** |
+| ignored as self-sent | 0 | 5 |
+| dropped | 899 | 899 |
+
+Twice the extraction from the same input, a review queue a fifth shorter, and
+the classifier unmoved — every message either implementation drops, the other
+drops too. The reference has no `schedule_screening` at all; the port reads ten.
+And the names changed as much as the counts: `ISelection - Iagica srl [via
+ALLIBO]` became `ISelection - Iagica srl`, `LeetCode` stopped being an employer,
+and `Clara Villamayor` became `Prima`.
 
 The real corpus needs the mailbox once:
 
