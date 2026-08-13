@@ -28,7 +28,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - the pure suite runs without it
     asyncpg = None  # type: ignore[assignment]
 
-from loop.db import Database, migrate
+from loop.db import Database, Queue, migrate
 
 TEST_EMAIL_DOMAIN = "pytest.invalid"
 
@@ -69,6 +69,16 @@ async def dsn() -> AsyncIterator[str]:
 async def db(dsn: str) -> AsyncIterator[Database]:
     async with Database(dsn) as database:
         yield database
+        # The queue is one table shared by every test in the run, and several of
+        # them publish messages nothing consumes. `erase_user` takes the ones
+        # carrying a user id; these are the rest. Without this, a test that
+        # claims a batch can pick up a message an earlier test left behind, and
+        # what it fails on is unrelated to what it is testing.
+        async with database.untenanted() as connection:
+            await connection.execute(
+                "delete from mq.messages where queue = any($1::text[])",
+                [*Queue.ALL, *(f"{queue}_dlq" for queue in Queue.ALL)],
+            )
 
 
 @pytest.fixture

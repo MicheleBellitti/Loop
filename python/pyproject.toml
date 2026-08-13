@@ -28,6 +28,9 @@ ml = ["sentence-transformers>=3.3", "rapidfuzz>=3.10"]
 # the only outbound network dependency in the product — a deployment that never
 # pushes never installs it, and every rule around it is testable without it.
 push = ["pywebpush>=2.0"]
+# The connector: an HTTP client for Google, and AES-GCM for the one secret this
+# system stores.
+connector = ["httpx>=0.27", "cryptography>=43", "pyjwt[crypto]>=2.9"]
 
 [dependency-groups]
 dev = [
@@ -98,4 +101,10 @@ ignore_missing_imports = true
 # this side of it.
 [[tool.mypy.overrides]]
 module = "pywebpush.*"
+ignore_missing_imports = true
+
+# `pyjwt` ships stubs in a separate distribution and is imported in exactly one
+# function — verifying the bearer token on the Pub/Sub webhook.
+[[tool.mypy.overrides]]
+module = "jwt.*"
 ignore_missing_imports = true

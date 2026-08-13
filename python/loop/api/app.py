@@ -36,6 +36,7 @@ from .routes import (
     applications,
     export,
     health,
+    mailboxes,
     metrics,
     push,
     review,
@@ -66,6 +67,19 @@ _LOOKS_LIKE_A_FILE_SUFFIX = (2, 5)
 
 
 @dataclass(frozen=True, slots=True)
+class GoogleApp:
+    """The OAuth client. Unset means the connect button is not offered."""
+
+    client_id: str | None = None
+    client_secret: str | None = None
+    pubsub_topic: str | None = None
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.client_id and self.client_secret)
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     dsn: str
     session_secret: str
@@ -77,6 +91,7 @@ class Settings:
     # Unset means the model rung is off, which is the default posture and what
     # `/health/deep` reports as `disabled` rather than as a fault.
     model_base_url: str | None = None
+    google: GoogleApp = field(default_factory=GoogleApp)
 
     @property
     def secure_cookies(self) -> bool:
@@ -96,6 +111,11 @@ class Settings:
                 subject=os.environ.get("VAPID_SUBJECT", "mailto:loop@localhost"),
             ),
             model_base_url=_trimmed("MODEL_BASE_URL"),
+            google=GoogleApp(
+                client_id=_trimmed("GOOGLE_CLIENT_ID"),
+                client_secret=_trimmed("GOOGLE_CLIENT_SECRET"),
+                pubsub_topic=_trimmed("GOOGLE_PUBSUB_TOPIC"),
+            ),
         )
 
 
@@ -150,6 +170,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(stats.router)
     app.include_router(suggestions.router)
     app.include_router(push.router)
+    app.include_router(mailboxes.router)
     app.include_router(export.router)
     app.include_router(account.router)
     app.include_router(stream.router)
