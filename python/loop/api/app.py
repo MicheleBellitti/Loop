@@ -34,10 +34,14 @@ from .errors import INTERNAL_MESSAGE, ApiError, code_for, envelope
 from .routes import (
     account,
     applications,
+    export,
     health,
+    metrics,
+    push,
     review,
     session,
     stats,
+    stream,
     suggestions,
     today,
 )
@@ -120,7 +124,15 @@ def create_app(settings: Settings) -> FastAPI:
             app.state.db = db
             app.state.sessions = auth.Sessions(db, settings.session_secret)
             app.state.settings = settings
-            yield
+            # One `listen` per process, opened here so a stream that arrives a
+            # millisecond after boot has something to attach to.
+            broadcaster = stream.Broadcaster(settings.dsn)
+            await broadcaster.start()
+            app.state.broadcaster = broadcaster
+            try:
+                yield
+            finally:
+                await broadcaster.stop()
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -137,8 +149,12 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(review.router)
     app.include_router(stats.router)
     app.include_router(suggestions.router)
+    app.include_router(push.router)
+    app.include_router(export.router)
     app.include_router(account.router)
+    app.include_router(stream.router)
     app.include_router(health.router)
+    app.include_router(metrics.router)
 
     _install_client(app, settings)
     return app

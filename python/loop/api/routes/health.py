@@ -67,16 +67,6 @@ async def deep(request: Request) -> dict[str, Any]:
     }
 
 
-@router.get("/api/push/key")
-async def push_key(request: Request) -> dict[str, Any]:
-    """Null rather than an error when there are no keys.
-
-    A deployment without VAPID keys is a product without notifications, not a
-    broken one, and onboarding branches on the null instead of on a status code.
-    """
-    return {"public_key": request.app.state.settings.vapid.public_key or None}
-
-
 def _hours_since(moment: datetime | None) -> float | None:
     if moment is None:
         return None

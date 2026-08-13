@@ -125,6 +125,53 @@ async def anonymous(dsn: str) -> AsyncIterator["AsyncClient"]:
         yield http
 
 
+@pytest.fixture
+async def session_cookie(dsn: str, user_id: str) -> str:
+    """A session token, for the tests that talk over a real socket."""
+    from loop.api import auth
+    from loop.db import Database
+
+    async with Database(dsn, role=None) as db:
+        token, _session = await auth.Sessions(db, "test-secret").create(user_id)
+    return token
+
+
+@pytest.fixture
+async def served(dsn: str) -> AsyncIterator[str]:
+    """The app on a real port, for the one thing an ASGI transport cannot do.
+
+    httpx's in-process transport runs the application to completion before it
+    hands back a response, and a server-sent event stream never completes — so
+    a test of `/api/stream` through it deadlocks. Everything else uses the
+    in-process client, which is faster and needs no port.
+    """
+    import asyncio
+    import contextlib
+
+    import uvicorn
+
+    from loop.api import Settings, create_app
+
+    config = uvicorn.Config(
+        create_app(Settings(dsn=dsn, session_secret="test-secret")),
+        host="127.0.0.1",
+        port=0,
+        log_level="warning",
+        lifespan="on",
+    )
+    server = uvicorn.Server(config)
+    task = asyncio.create_task(server.serve())
+    while not server.started:
+        await asyncio.sleep(0.02)
+    port = server.servers[0].sockets[0].getsockname()[1]
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        server.should_exit = True
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
 MAILBOX_ADDRESS = "owner@pytest.invalid"
 
 # A fixed instant, so a test that asserts on a date is reading the fixture and
