@@ -14,7 +14,9 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]
-db = ["asyncpg>=0.30"]
+db = [
+    "asyncpg>=0.30",
+]
 api = ["fastapi>=0.115", "pydantic>=2.9", "uvicorn[standard]>=0.32"]
 ladder = ["pyyaml>=6.0", "httpx>=0.27", "pydantic>=2.9"]
 ml = ["sentence-transformers>=3.3", "rapidfuzz>=3.10"]
@@ -43,6 +45,13 @@ markers = [
   "integration: needs a real Postgres",
 ]
 addopts = "-q --strict-markers"
+# The integration tests build their own database and are skipped without a
+# DATABASE_URL, so the default run stays pure and fast.
+# One event loop for the whole run. The database fixtures are session-scoped
+# and a pool created on one loop cannot be used from another.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 
 [tool.ruff]
 line-length = 96
@@ -66,3 +75,10 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 python_version = "3.12"
 strict = true
 warn_unreachable = true
+
+# asyncpg ships no py.typed marker. Its own annotations are good; the
+# package simply predates the convention, and a per-call ignore in every
+# module that touches the database would be worse than saying it once.
+[[tool.mypy.overrides]]
+module = "asyncpg.*"
+ignore_missing_imports = true
