@@ -5,6 +5,8 @@ enforces the single-writer rule, so importing this elsewhere fails loudly rather
 than quietly corrupting state.
 """
 
+from datetime import UTC, date, datetime
+
 import asyncpg
 
 from loop.domain import StageTable, fold
@@ -103,14 +105,26 @@ async def load_stage_table(connection: asyncpg.Connection, user_id: str) -> Stag
 
 
 async def project_application(
-    connection: asyncpg.Connection, user_id: str, application_id: str
+    connection: asyncpg.Connection,
+    user_id: str,
+    application_id: str,
+    *,
+    now: datetime | None = None,
 ) -> None:
     """Recompute one application's row from its log alone.
 
     Every column written here is derived. Drop the row, run this, and the same
     row comes back — which is what lets the extractor be improved next month and
     re-derive last month's history.
+
+    Almost. `awaiting_them` asks whether a deadline is still in the future, so
+    the row also depends on when you rebuild it: replay an application an hour
+    after its take-home was due and you get a different answer from the same
+    log. The reference called `now()` inside the statement, which makes that
+    dependency invisible and makes a differential run diverge on nothing but
+    elapsed time. Here the instant is a parameter, so a replay can pin it.
     """
+    at = now or datetime.now(UTC)
     events = await load_events(connection, application_id)
     if not events:
         return
@@ -136,9 +150,10 @@ async def project_application(
     open_deadlines = await connection.fetchval(
         """
         select count(*) from deadlines
-         where application_id = $1 and met_at is null and due_at > now()
+         where application_id = $1 and met_at is null and due_at > $2
         """,
         application_id,
+        at,
     )
     unresolved_reviews = await connection.fetchval(
         "select count(*) from review_items where application_id = $1 and resolved_at is null",
@@ -188,12 +203,23 @@ async def project_application(
 
 
 async def apply_side_effects(
-    connection: asyncpg.Connection, user_id: str, application_id: str, event: DomainEvent
+    connection: asyncpg.Connection,
+    user_id: str,
+    application_id: str,
+    event: DomainEvent,
+    *,
+    event_id: str | None = None,
 ) -> None:
-    """Satellite rows some events imply. Written by the pipeline only."""
+    """Satellite rows some events imply. Written by the pipeline only.
+
+    `event_id` is the row the satellite points back at, so a comp offer can be
+    traced to the message that claimed it.
+    """
     match event.type:
         case "interview_scheduled":
             await _record_interview(connection, user_id, application_id, event)
+        case "offer_received" | "offer_negotiated":
+            await _record_offer(connection, user_id, application_id, event, event_id)
         case "interview_held":
             interview_id = event.payload.get("interview_id")
             if interview_id:
@@ -220,8 +246,8 @@ async def _record_interview(
     so a cancellation silently reinstated the interview it was cancelling.
     """
     payload = event.payload
-    starts_at = payload.get("starts_at")
-    if not starts_at:
+    starts_at = _as_datetime(payload.get("starts_at"))
+    if starts_at is None:
         return
     cancelled = payload.get("status") == "cancelled"
     stage = payload.get("stage") or UNSPECIFIED_INTERVIEW
@@ -243,18 +269,52 @@ async def _record_interview(
         application_id,
         stage,
         starts_at,
-        payload.get("ends_at"),
+        _as_datetime(payload.get("ends_at")),
         payload.get("location"),
         payload.get("calendar_event_id"),
         event.occurred_at if cancelled else None,
     )
 
 
+async def _record_offer(
+    connection: asyncpg.Connection,
+    user_id: str,
+    application_id: str,
+    event: DomainEvent,
+    event_id: str | None,
+) -> None:
+    """What was offered, kept beside the event that said so.
+
+    Money is the one field the user will check against their own memory, so an
+    offer with no amount records nothing rather than a row of nulls.
+    """
+    payload = event.payload
+    minimum, currency = payload.get("min_minor"), payload.get("currency")
+    if minimum is None or not currency:
+        return
+    await connection.execute(
+        """
+        insert into comp_offers
+          (user_id, application_id, kind, min_minor, max_minor, currency,
+           equity_note, decide_by, source_event_id)
+        values ($1,$2,'offer',$3,$4,$5,$6,$7,$8)
+        """,
+        user_id,
+        application_id,
+        minimum,
+        payload.get("max_minor"),
+        str(currency).upper(),
+        payload.get("equity_note"),
+        _as_date(payload.get("decide_by")),
+        int(event_id) if event_id is not None else None,
+    )
+
+
 async def _record_deadline(
     connection: asyncpg.Connection, user_id: str, application_id: str, event: DomainEvent
 ) -> None:
-    due_at = event.payload.get("due_at")
-    if not due_at:
+    due_at = _as_datetime(event.payload.get("due_at"))
+    if due_at is None:
         return
     await connection.execute(
         """
@@ -269,3 +329,27 @@ async def _record_deadline(
         event.payload.get("url"),
         event.payload.get("source", "gmail"),
     )
+
+
+def _as_datetime(value: object) -> datetime | None:
+    """A payload timestamp, whichever side of the database it arrived from.
+
+    In memory it is a `datetime`; read back out of `jsonb` it is the ISO string
+    the codec wrote. Both reach here, and binding the string straight to a
+    `timestamptz` parameter is a runtime error on the first real interview.
+    """
+    if value is None or isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _as_date(value: object) -> date | None:
+    moment = _as_datetime(value)
+    if moment is not None:
+        return moment.date()
+    return value if isinstance(value, date) else None

@@ -346,6 +346,44 @@ recruiter's name; the resolver is what makes them whole.
 The same applies to the four `stage_hint: null` invitations from §3.2: a null
 stage on an interview intent means the phase advances and the stage does not.
 
+**The event envelope is nested on the wire and flat in the dataclass.** The
+queue payload is `{user_id, application_id, event: {type, occurred_at, …}}`, and
+four SQL sites build it that way — `sweep_dormancy`, `sweep_dormancy_all`,
+`mark_interviews_held` and the presumed-closed sweep all call
+`jsonb_build_object('event', jsonb_build_object(…))`. A decoder that expects the
+flat shape drops every cron-produced event and dead-letters it after five
+deliveries, which would look exactly like dormancy quietly not working. Decide
+the nesting at the codec, not in the dataclass. `drain_parked` is a second trap:
+it enqueues a four-key stub, not a `CandidateMessage`, so whatever validates
+that queue has to tolerate it.
+
+**Two things about the runtime, both load-bearing.**
+
+The visibility timeout is granted once per *batch* at claim time and consumed
+*serially* per message. A batch of 20 at 3 s each against a 60 s lease means the
+twentieth message's lease expired before its handler started: it is being worked
+twice, its `read_ct` is climbing on attempts no handler saw, and it dead-letters
+early. Claim smaller batches, or extend the lease per message.
+
+And `read_ct` is post-increment, so a first delivery reports 1 and the fifth
+failure is the last one worth having — `>= MAX_ATTEMPTS`, not `>`.
+
+**This port is the first time row-level security actually applies.** None of the
+queue-driven TypeScript services issue `set local role`, and they connect as a
+superuser, so the policies, the FORCE flags and every grant in migration 003 are
+decorative on those paths — `withUser` is the gateway's alone. Doing it properly
+surfaces failures that have never fired: an `update … where id = $1` with no
+`user_id` predicate becomes `UPDATE 0` rather than an error, and grants nobody
+has exercised turn out to be wrong (the gateway's quick add inserts into
+`companies`, `applications` and `comp_offers`, and `loop_gateway` has insert on
+none of them). Each one is a decision about the write path, not a transcription.
+
+Also: `services/connector/src/{google,mailbox}.{js,d.ts}` are stale compiled
+copies predating the attachment-hydration fix and are imported by nothing. Port
+from `packages/google/src/google.ts`. And there are no connector tests in the
+reference at all, which cuts both ways — nothing pins the behaviour, and nothing
+will tell you when you break it.
+
 ### P3 · FastAPI
 
 Port the read API. **Keep the response contract byte-identical** — same field

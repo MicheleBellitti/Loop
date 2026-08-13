@@ -29,6 +29,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from types import TracebackType
 from typing import Self
+from uuid import UUID
 
 import asyncpg
 
@@ -132,14 +133,18 @@ def _quoted(name: str) -> str:
 
 
 def _default(value: object) -> str:
-    """Datetimes, in the shape the rest of the system reads them in.
+    """The two types a payload carries that JSON has no room for.
 
-    `str(datetime)` would put a space where the ISO separator goes, and these
-    payloads are read by a TypeScript implementation as well as this one for as
-    long as both run.
+    Datetimes in ISO form, because `str(datetime)` puts a space where the
+    separator goes and these payloads are read by a TypeScript implementation as
+    well as this one for as long as both run. UUIDs because asyncpg returns one
+    for every uuid column, so any payload built from a row that was read back —
+    an application id, an interview id — carries them.
     """
     if isinstance(value, datetime):
         return value.isoformat()
+    if isinstance(value, UUID):
+        return str(value)
     raise TypeError(f"{type(value).__name__} is not JSON serialisable")
 
 

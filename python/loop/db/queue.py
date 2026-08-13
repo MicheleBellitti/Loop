@@ -56,7 +56,9 @@ class Message:
 
     @property
     def exhausted(self) -> bool:
-        return self.read_count > MAX_ATTEMPTS
+        # `mq.read` increments before returning, so a first delivery reports 1
+        # and the fifth failure is the last one worth having.
+        return self.read_count >= MAX_ATTEMPTS
 
 
 async def publish(

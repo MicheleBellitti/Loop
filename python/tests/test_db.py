@@ -286,6 +286,154 @@ class TestInterviewSideEffects:
         assert row["stage"] == "technical"
 
 
+class TestPayloadsThatHaveBeenThroughTheDatabase:
+    """The round trip is where the types change, so the tests have to make it.
+
+    An earlier version of these tests handed `apply_side_effects` a payload
+    built in memory, where a timestamp is a `datetime`. Read back out of
+    `jsonb` it is the ISO string the codec wrote, and binding that straight to a
+    `timestamptz` parameter fails — on the first real interview, in production,
+    not here.
+    """
+
+    async def test_an_interview_survives_the_journey_through_jsonb(
+        self, db: Database, user_id: str
+    ) -> None:
+        application_id = await _application(db, user_id)
+        async with db.session(user_id) as connection:
+            event_id = await append_event(
+                connection,
+                _event(
+                    user_id,
+                    application_id,
+                    type="interview_scheduled",
+                    payload={
+                        "stage": "system_design",
+                        "starts_at": NOW,
+                        "ends_at": NOW + timedelta(hours=1),
+                        "calendar_event_id": "ev-round-trip",
+                        "status": "confirmed",
+                    },
+                ),
+            )
+            [stored] = await load_events(connection, application_id)
+            assert isinstance(stored.payload["starts_at"], str)
+
+            await apply_side_effects(
+                connection, user_id, application_id, stored, event_id=event_id
+            )
+            row = await connection.fetchrow(
+                "select stage, starts_at, ends_at from interviews where user_id = $1", user_id
+            )
+        assert row["stage"] == "system_design"
+        assert row["starts_at"] == NOW
+
+    async def test_an_offer_is_recorded_beside_the_event_that_claimed_it(
+        self, db: Database, user_id: str
+    ) -> None:
+        application_id = await _application(db, user_id)
+        async with db.session(user_id) as connection:
+            event_id = await append_event(
+                connection,
+                _event(
+                    user_id,
+                    application_id,
+                    type="offer_received",
+                    to_stage="offer",
+                    payload={
+                        "min_minor": 5_500_000,
+                        "currency": "eur",
+                        "decide_by": "2026-08-15",
+                    },
+                ),
+            )
+            [stored] = await load_events(connection, application_id)
+            await apply_side_effects(
+                connection, user_id, application_id, stored, event_id=event_id
+            )
+            row = await connection.fetchrow(
+                "select kind, min_minor, currency, decide_by, source_event_id"
+                " from comp_offers where user_id = $1",
+                user_id,
+            )
+        assert (row["kind"], row["min_minor"], row["currency"]) == ("offer", 5_500_000, "EUR")
+        assert row["source_event_id"] == int(event_id)
+
+    async def test_an_offer_with_no_money_records_nothing(
+        self, db: Database, user_id: str
+    ) -> None:
+        application_id = await _application(db, user_id)
+        async with db.session(user_id) as connection:
+            await apply_side_effects(
+                connection,
+                user_id,
+                application_id,
+                _domain_event({"currency": "EUR"}, kind="offer_received"),
+            )
+            assert (
+                await connection.fetchval(
+                    "select count(*) from comp_offers where user_id = $1", user_id
+                )
+                == 0
+            )
+
+    async def test_a_uuid_in_a_payload_serialises(self, db: Database, user_id: str) -> None:
+        # asyncpg returns `uuid.UUID` for every uuid column, so any payload
+        # built from a row that was read back carries one.
+        import uuid as uuid_module
+
+        application_id = await _application(db, user_id)
+        interview_id = uuid_module.uuid4()
+        async with db.session(user_id) as connection:
+            await append_event(
+                connection,
+                _event(
+                    user_id,
+                    application_id,
+                    type="interview_held",
+                    payload={"interview_id": interview_id},
+                ),
+            )
+            [stored] = await load_events(connection, application_id)
+        assert stored.payload["interview_id"] == str(interview_id)
+
+
+class TestTheProjectionsClock:
+    async def test_a_passed_deadline_is_pinned_rather_than_read_from_the_wall(
+        self, db: Database, user_id: str
+    ) -> None:
+        # `awaiting_them` asks whether a deadline is still ahead, so the row
+        # depends on when it is rebuilt. Passing the instant in is what lets a
+        # differential replay produce the same answer twice.
+        application_id = await _application(db, user_id)
+        async with db.session(user_id) as connection:
+            await append_event(
+                connection, _event(user_id, application_id, type="applied", to_stage="applied")
+            )
+            await connection.execute(
+                """
+                insert into deadlines (user_id, application_id, kind, due_at, source)
+                values ($1,$2,'take_home',$3,'gmail')
+                """,
+                user_id,
+                application_id,
+                NOW + timedelta(days=1),
+            )
+
+            await project_application(connection, user_id, application_id, now=NOW)
+            before = await connection.fetchval(
+                "select awaiting_them from applications where id = $1", application_id
+            )
+            await project_application(
+                connection, user_id, application_id, now=NOW + timedelta(days=2)
+            )
+            after = await connection.fetchval(
+                "select awaiting_them from applications where id = $1", application_id
+            )
+        assert before is False
+        assert after is True
+
+
 class TestTheQueue:
     async def test_a_claim_hides_a_message_without_holding_a_transaction(
         self, db: Database
@@ -331,15 +479,18 @@ class TestTheQueue:
         assert parked["text"] == "[stripped]"
 
     def test_a_message_knows_when_it_has_had_enough_attempts(self) -> None:
-        assert not Message(1, {}, read_count=5).exhausted
-        assert Message(1, {}, read_count=6).exhausted
+        # `mq.read` increments before returning, so a first delivery reports 1
+        # and the fifth failure is the last one worth having. Reading this as
+        # "more than five" bought a sixth delivery nobody asked for.
+        assert not Message(1, {}, read_count=4).exhausted
+        assert Message(1, {}, read_count=5).exhausted
 
 
-def _domain_event(payload: dict[str, object]):
+def _domain_event(payload: dict[str, object], kind: str = "interview_scheduled"):
     from loop.domain.types import DomainEvent
 
     return DomainEvent(
-        type="interview_scheduled",
+        type=kind,
         occurred_at=NOW,
         confidence=0.97,
         evidence_ref="msg-1",
