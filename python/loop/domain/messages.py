@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
-from .types import Channel, Rung, WorkMode
+from .types import Channel, EventType, Rung, WorkMode
 
 Intent = Literal[
     "applied",
@@ -211,7 +211,7 @@ class PendingEvent:
 
     user_id: str
     application_id: str
-    type: str
+    type: EventType
     occurred_at: datetime
     confidence: float
     from_stage: str | None = None

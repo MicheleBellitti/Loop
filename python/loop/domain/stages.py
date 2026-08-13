@@ -16,21 +16,32 @@ from .types import AppStatus, Phase, StageDef
 # excluded from every metric anyway. Depth 0 is left free so a future `saved`
 # event can reintroduce it without renumbering anything. decisions.md A7.
 #
-# Depths 3 and 11 are deliberately unused — the spec leaves them free so a user
+# Depths 0 and 3 are deliberately unused — the spec leaves them free so a user
 # can insert a stage of their own between two defaults.
+#
+# `interview` is not in the spec's set. It is the stage an invitation supports
+# when its title names no round: the process has reached interviewing, and which
+# interview it is remains unknown. Without it the only way to record a titleless
+# invite was to call it `technical`, which is how the pipeline came to show a
+# column of identical Technical stages — a fallback wearing a reading's clothes.
+# Migration 012 adds it and moves the rounds below it up one.
 DEFAULT_STAGE_DEFS: tuple[StageDef, ...] = (
     StageDef("applied", "Applied", "sent", 1, 21),
     StageDef("acknowledged", "Acknowledged", "sent", 2, 21),
     StageDef("recruiter_reachout", "Recruiter reach-out", "screening", 4, 10),
     StageDef("hr_call", "HR call", "screening", 5, 10),
     StageDef("take_home", "Take-home", "screening", 6, 14),
-    StageDef("technical", "Technical", "interviewing", 7, 12),
-    StageDef("system_design", "System design", "interviewing", 8, 12),
-    StageDef("onsite_loop", "Onsite loop", "interviewing", 9, 14),
-    StageDef("final", "Final", "interviewing", 10, 10),
+    StageDef("interview", "Interview", "interviewing", 7, 12),
+    StageDef("technical", "Technical", "interviewing", 8, 12),
+    StageDef("system_design", "System design", "interviewing", 9, 12),
+    StageDef("onsite_loop", "Onsite loop", "interviewing", 10, 14),
+    StageDef("final", "Final", "interviewing", 11, 10),
     StageDef("offer", "Offer", "decided", 12, 7),
     StageDef("negotiating", "Negotiating", "decided", 13, 7),
 )
+
+# The stage a scheduled interview implies when nothing names the round.
+UNSPECIFIED_INTERVIEW = "interview"
 
 # Groups render in this fixed order; empty groups are omitted entirely.
 PHASE_ORDER: tuple[Phase, ...] = ("interviewing", "screening", "sent", "decided")
