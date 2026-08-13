@@ -103,6 +103,21 @@ async def claim(
     ]
 
 
+async def extend_lease(
+    db: Database, queue: str, msg_id: int, *, seconds: int = VISIBILITY_TIMEOUT_SECONDS
+) -> bool:
+    """Say "still working on this one", before starting on it.
+
+    A claim grants its visibility timeout once, for the whole batch. The batch is
+    then worked one message at a time, so without this the last message of a long
+    batch becomes visible again before its turn comes and is handled twice.
+    """
+    async with db.untenanted() as connection:
+        return bool(
+            await connection.fetchval("select mq.extend($1, $2, $3)", queue, msg_id, seconds)
+        )
+
+
 async def acknowledge(db: Database, queue: str, msg_id: int) -> bool:
     async with db.untenanted() as connection:
         return bool(await connection.fetchval("select mq.delete($1, $2)", queue, msg_id))

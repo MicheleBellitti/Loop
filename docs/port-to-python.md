@@ -193,6 +193,71 @@ regression.
   than testing it. Rebuild it from real anonymised mail (`scripts/anonymise.ts`
   exists and works) **before** trusting any measurement in the new codebase.
 
+### 3.5 A compensation figure is not a formal offer
+
+Found reviewing false positives against real mail, not in the differential
+harness — both implementations share this defect, so a diff against the
+TypeScript baseline cannot catch it. `rung3.ts`'s schema carries `comp` and
+`intent` as independent fields (§ above, `services/extractor/src/rung3.ts`),
+but the prompt never says they are independent *facts*: it asks the model to
+extract both without ever stating that a number is not itself a proposal. Any
+RAL mentioned mid-process — a screening question, a range disclosure, a
+negotiation counter — gets read as `intent: offer`, because nothing in the
+prompt distinguishes "a figure is present" from "a position is being offered".
+
+What to build instead:
+
+- **Prompt.** State explicitly that a populated `comp` does not imply
+  `intent: offer`. `offer` requires a formal proposal — "siamo lieti di
+  offrirti la posizione", "we are pleased to offer you the position" — not a
+  compensation figure appearing in any other context. Give the model one
+  contrastive example of each in the prompt: a negotiation message with a
+  number and no offer, and an offer message with a number.
+- **Fold.** Require corroboration before a single rung-3 `offer` signal alone
+  advances status to `offer`/`accepted`: a second signal (a congratulatory or
+  next-steps phrase, or an existing `interview_scheduled`/`negotiation` event
+  earlier in the same application's log) rather than one low-context sentence
+  deciding the terminal state outright. The same asymmetry the fold already
+  applies to a 0.99 acknowledgement not outranking a later stage change
+  applies here in reverse — a single high-confidence `offer` should not
+  outrank an application's whole prior history either.
+- **Measurement.** Add offer/negotiation as a labelled contrast pair to the
+  eval set this fix is checked against (§3.6), so a prompt change here is a
+  measured precision number, not a one-off tweak that regresses silently next
+  time the prompt is touched.
+
+*Done when*: offer-intent precision on the corpus — offers corroborated by a
+subsequent congratulatory or next-steps message, not reversed by a later
+rejection or negotiation-only signal — is measured, and the fix does not
+regress it as thresholds move elsewhere.
+
+### 3.6 A correction is read once, then discarded
+
+`human_corrected` events already exist to pin one field (§3.2's third option
+covers the stage detector). But the mechanism stops at the row it corrects:
+today a company merged wrong (§3.3) or an intent misread (§3.5) becomes
+invisible again the moment a human fixes it, because the correction changes
+that one record and nothing that will see the same pattern tomorrow. The
+review queue is already generating exactly the labelled data both problems
+need to get better, and it is thrown away after being applied once.
+
+What to build:
+
+- **Every `human_corrected` event becomes a labelled example on write, not
+  only a pin.** `{field, before, after, evidence}` appended to a corrections
+  table, distinct from the application it patches.
+- **Company merges corrected by a human seed the canonical registry (§3.3)
+  directly** — ahead of the next fuzzy or embedding pass touching the same
+  sender domain, so the same wrong split does not recur on the next message
+  from the same recruiter.
+- **A periodic re-tune** (triggered on corpus size, not a calendar) of
+  `ATTACH_SINGLE` / `ATTACH_MULTI` / `DEDUP_MERGE` and the offer-confidence
+  discount against the accumulated corrections, run through the harness from
+  P1 so a re-tune is a measured change, not a guess.
+
+*Done when*: a correction made this week measurably reduces the same class of
+error next week on the harness — not just in the one row it was applied to.
+
 ---
 
 ## 4 · Order of work
@@ -396,10 +461,13 @@ available if the contract is preserved.
 ### P4 · The ML that justified the rewrite
 
 Real embeddings, re-tuned thresholds, spaCy NER for company and role, the model
-call moved out of the transaction, the stage detector rebuilt.
+call moved out of the transaction, the stage detector rebuilt, the offer/comp
+prompt fix (§3.5), and the corrections feedback loop (§3.6) that both the
+canonical company registry and the offer-precision measurement depend on.
 
 *Done when*: extraction on the corpus beats the TypeScript baseline, measured
-with the harness from P1.
+with the harness from P1, and offer-intent precision (§3.5) is measured and
+does not regress as the corrections loop (§3.6) re-tunes other thresholds.
 
 ### P5 · The interface
 
