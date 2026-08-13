@@ -475,6 +475,12 @@ class TestTheQueue:
             parked = await connection.fetchval(
                 "select message from mq.messages where queue = $1", f"{Queue.CANDIDATE}_dlq"
             )
+            # Swept up afterwards. A dead letter is the one message that
+            # persists, `/health/deep` sums them across every queue, and a test
+            # leaving one behind makes the box look permanently unwell.
+            await connection.execute(
+                "delete from mq.messages where queue = $1", f"{Queue.CANDIDATE}_dlq"
+            )
         assert parked["provider_message_id"] == "m1"
         assert parked["text"] == "[stripped]"
 

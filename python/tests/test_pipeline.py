@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from loop.db import Database, Queue, depth, publish
+from loop.db import Database, Message, Queue, claim, depth, publish
 from loop.domain.messages import EventSource, PendingEvent
 from loop.domain.wire import encode_pending_event
 from loop.services import Consumer, ConsumerOptions, PipelineService
@@ -206,36 +206,38 @@ class TestTheConsumerLoop:
         assert row["read_ct"] == 1
         assert row["hidden"] is True
 
-    async def test_the_lease_is_refreshed_before_each_message_is_worked(
+    async def test_a_message_stays_hidden_while_it_is_being_worked(
         self, db: Database
     ) -> None:
-        # A claim leases the whole batch at once and the batch is worked one at
-        # a time, so without this the last message of a slow batch comes back
-        # while it is still being handled — and is handled twice.
+        """The lease is granted once per batch and spent one message at a time.
+
+        Two messages at 0.8 s each under a one-second lease: the second one's
+        original lease expires at t=1.0, while its handler runs from 0.8 to 1.6.
+        In that window a second reader — the other container, the same service
+        after a restart — can claim a message that is still in flight, work it
+        twice, and climb its attempt count on deliveries no handler ever saw.
+
+        So the assertion is what a second reader sees at t=1.2, and it is
+        nothing.
+        """
         async with db.untenanted() as connection:
             await connection.execute("delete from mq.messages where queue = $1", Queue.NOTIFY)
-            for n in range(3):
+            for n in range(2):
                 await publish(connection, Queue.NOTIFY, {"n": n})
 
-        seen: list[int] = []
+        async def slow(_message: Message) -> None:
+            await asyncio.sleep(0.8)
 
-        async def slow(message: object) -> None:
-            seen.append(message.msg_id)  # type: ignore[attr-defined]
-            await asyncio.sleep(0.05)
-
-        await _drain(
-            Consumer(
-                db,
-                Queue.NOTIFY,
-                slow,  # type: ignore[arg-type]
-                # A lease so short that without a refresh the second and third
-                # would be visible again before their turn.
-                options=ConsumerOptions(batch=3, visibility=1),
-            )
+        consumer = Consumer(
+            db, Queue.NOTIFY, slow, options=ConsumerOptions(batch=2, visibility=1)
         )
-        assert len(seen) == len(set(seen)) == 3
-        async with db.untenanted() as connection:
-            assert await depth(connection, Queue.NOTIFY) == 0
+        task = asyncio.create_task(consumer.run())
+        await asyncio.sleep(1.2)
+        stolen = await claim(db, Queue.NOTIFY, batch=2, visibility=30)
+
+        await consumer.stop()
+        task.cancel()
+        assert stolen == []
 
     async def test_stopping_waits_for_the_message_in_hand(self, db: Database) -> None:
         async with db.untenanted() as connection:
@@ -295,10 +297,15 @@ class TestTheConsumerLoop:
         assert parked["text"] == "[stripped]"
 
 
-async def _drain(consumer: Consumer) -> None:
-    """Run the loop just long enough to work whatever is waiting."""
+async def _drain(consumer: Consumer, seconds: float = 0.3) -> None:
+    """Run the loop for a while, then stop it the way a deployment would.
+
+    `stop` waits for the message in hand, so the window only has to be long
+    enough to start the last handler — except where the point of the test is
+    that the handlers are slow, and there the number is the test.
+    """
     task = asyncio.create_task(consumer.run())
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(seconds)
     await consumer.stop()
     await task
 
