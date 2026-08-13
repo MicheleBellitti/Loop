@@ -84,7 +84,7 @@ class ClassifierService:
         matching one hop before it runs, silently.
         """
         raw = decode_raw_message(body)
-        context = await self._context_for(raw.user_id)
+        context = await self.context_for(raw.user_id)
         verdict = classify(raw, context)
 
         published = verdict.outcome != "drop"
@@ -111,7 +111,13 @@ class ClassifierService:
         )
         return Screened(verdict.outcome, verdict.score, verdict.reasons, published)
 
-    async def _context_for(self, user_id: str) -> ClassifierContext:
+    async def context_for(self, user_id: str) -> ClassifierContext:
+        """Public because a replay needs exactly this and nothing else.
+
+        A script that rebuilt the three queries itself would be a second copy
+        of the definition of "a company this user already applied to", and the
+        two would drift the first time either moved.
+        """
         now = time.monotonic()
         cached = self._contexts.get(user_id)
         if cached is not None and now - cached[1] < self._ttl:

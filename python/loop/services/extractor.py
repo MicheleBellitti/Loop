@@ -77,6 +77,11 @@ class ExtractorService:
         self._ladder = ladder or deterministic_ladder()
         self._log = log or logging.getLogger("loop.extractor")
 
+    @property
+    def ladder(self) -> Ladder:
+        """For a replay, which needs to read a message without recording it."""
+        return self._ladder
+
     def consumer(self, options: ConsumerOptions | None = None) -> Consumer:
         # Four: small enough that a batch of model calls is not an hour of
         # claimed work, and the lease is refreshed per message either way.
@@ -97,7 +102,7 @@ class ExtractorService:
 
     async def extract(self, msg: CandidateMessage) -> Reading:
         user_id = msg.message.user_id
-        context = await self._context_for(user_id)
+        context = await self.context_for(user_id)
 
         try:
             outcome = self._ladder.run(msg, context)
@@ -189,8 +194,8 @@ class ExtractorService:
             connection, msg.message.mailbox_id, msg.message.provider_message_id, outcome
         )
 
-    async def _context_for(self, user_id: str) -> LadderContext:
-        """Read per message, never cached.
+    async def context_for(self, user_id: str) -> LadderContext:
+        """Read per message, never cached — and public, so a replay reads it too.
 
         The thread map comes out of `application_events`, which only the pipeline
         writes, so it already lags what the resolver has decided. Caching it

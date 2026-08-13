@@ -85,18 +85,18 @@ class TestTheContext:
         self, db: Database, user_id: str
     ) -> None:
         service = ClassifierService(db)
-        assert await service._context_for(user_id) is not None
+        assert await service.context_for(user_id) is not None
 
         await _an_application_at(db, user_id, "prima.it")
 
-        assert "prima.it" not in (await service._context_for(user_id)).company_domains
+        assert "prima.it" not in (await service.context_for(user_id)).company_domains
         expired = ClassifierService(db, ttl=0)
-        assert "prima.it" in (await expired._context_for(user_id)).company_domains
+        assert "prima.it" in (await expired.context_for(user_id)).company_domains
 
     async def test_a_user_with_nothing_yet_is_not_an_error(
         self, db: Database, user_id: str
     ) -> None:
-        context = await ClassifierService(db)._context_for(user_id)
+        context = await ClassifierService(db).context_for(user_id)
         assert context.company_domains == frozenset()
         assert context.known_threads == frozenset()
         # The vendor list still arrives, which is what does the work on a

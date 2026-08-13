@@ -80,7 +80,7 @@ class TestTheThreadMap:
         await _an_event_on_thread(db, user_id, older, "thread-2", days_ago=9)
         await _an_event_on_thread(db, user_id, newer, "thread-2", days_ago=1)
 
-        context = await ExtractorService(db)._context_for(user_id)
+        context = await ExtractorService(db).context_for(user_id)
 
         assert context.thread_to_application["thread-2"] == newer
 
