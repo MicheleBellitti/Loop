@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 
 from loop.api import auth
+from loop.api.mailbox import mailbox_health
 from loop.api.serialise import iso_z
 from loop.db import load_stage_table
 from loop.domain import build_headline, date_eyebrow
@@ -89,6 +90,7 @@ async def today(request: Request) -> dict[str, Any]:
             "select count(*) from review_items where user_id = $1 and resolved_at is null",
             session.user_id,
         )
+        health = await mailbox_health(connection, session.user_id)
 
     tz = tz or "UTC"
     headline = build_headline(
@@ -120,7 +122,7 @@ async def today(request: Request) -> dict[str, Any]:
             for row in suggestions
         ],
         "recent_events": [_recent(row, stages, tz) for row in recent],
-        "mailbox_health": await _mailbox_health(request, session.user_id),
+        "mailbox_health": health,
         "closing_line": (
             "Everything above was read from your mailbox and calendar. "
             "You have not typed anything this week."
@@ -191,35 +193,3 @@ def _what_happened(row: Any, stages: Any) -> str:
             return "Application sent"
         case other:
             return str(other).replace("_", " ")
-
-
-async def _mailbox_health(request: Request, user_id: str) -> dict[str, Any]:
-    """Whether the thing this product is made of is still working.
-
-    `state` is what the shell branches on: F1 full-screens "access revoked", and
-    no providers at all sends the user to onboarding.
-    """
-    async with request.app.state.db.untenanted() as connection:
-        rows = await connection.fetch(
-            """
-            select provider, status, last_ok_at from mailbox_accounts
-             where user_id = $1 order by created_at
-            """,
-            user_id,
-        )
-    providers = [
-        {"provider": r["provider"], "status": r["status"], "last_ok_at": iso_z(r["last_ok_at"])}
-        for r in rows
-    ]
-    last_ok = max((r["last_ok_at"] for r in rows if r["last_ok_at"]), default=None)
-    revoked = any(r["status"] == "revoked" for r in rows)
-    minutes = int((datetime.now(UTC) - last_ok).total_seconds() // 60) if last_ok else None
-    return {
-        "connected": bool(providers),
-        "providers": providers,
-        "last_ok_at": iso_z(last_ok),
-        "minutes_since_read": minutes,
-        "placed_today": 0,
-        "backlog": 0,
-        "state": "F1" if revoked else "ok",
-    }

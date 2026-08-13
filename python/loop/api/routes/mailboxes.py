@@ -33,7 +33,7 @@ from fastapi.responses import RedirectResponse, Response
 from loop.api import auth
 from loop.api.errors import ApiError
 from loop.api.json import read_json
-from loop.api.serialise import iso_z
+from loop.api.mailbox import mailbox_health
 from loop.google.client import GoogleAuthError, GoogleClient
 from loop.google.crypto import Sealed, open_sealed, unwrap_dek
 from loop.google.mailbox import NoRefreshToken, store_mailbox
@@ -48,33 +48,23 @@ _STATE_TTL_SECONDS: Final = 600
 
 _MAX_BACKFILL_MONTHS: Final = 60
 
-_MAILBOXES = """
-select id, provider, address, status, last_ok_at, watch_expires_at,
-       backlog_estimate, last_error, created_at
-  from mailbox_accounts where user_id = $1 order by created_at
-"""
-
-
 @router.get("/mailboxes")
 async def list_mailboxes(request: Request) -> dict[str, Any]:
+    """The health of the connection, not a list of rows.
+
+    The name says list and the answer is a status, which reads oddly until you
+    see what asks: the shell polls this to decide whether to full-screen "access
+    revoked" and whether to send a new user to onboarding. It wants one object
+    with a `state` and a `providers` array, and it is the same object
+    `/api/today` carries — so it is the same function.
+
+    Returning a `{"mailboxes": [...]}` list here instead, which is what a route
+    called `GET /api/mailboxes` looks like it should do, blanks the entire app:
+    `App.tsx` reads `health.providers.length` before it renders anything.
+    """
     session = auth.require(getattr(request.state, "session", None))
     async with request.app.state.db.session(session.user_id) as connection:
-        rows = await connection.fetch(_MAILBOXES, session.user_id)
-    return {
-        "mailboxes": [
-            {
-                "id": str(row["id"]),
-                "provider": row["provider"],
-                "address": row["address"],
-                "status": row["status"],
-                "last_ok_at": iso_z(row["last_ok_at"]),
-                "watch_expires_at": iso_z(row["watch_expires_at"]),
-                "backlog": row["backlog_estimate"],
-                "last_error": row["last_error"],
-            }
-            for row in rows
-        ]
-    }
+        return await mailbox_health(connection, session.user_id)
 
 
 @router.post("/mailboxes/gmail/start")

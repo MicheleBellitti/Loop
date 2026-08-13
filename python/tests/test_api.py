@@ -333,6 +333,89 @@ class TestTheStatistics:
                 assert channel["note"].endswith("needed")
 
 
+class TestTheMailboxHealth:
+    """The shape `App.tsx` reads before it renders anything at all.
+
+    `/api/mailboxes` is a status, not a list — the name suggests otherwise and a
+    list is what the first version of this route returned, which blanked the
+    whole app: the shell reads `health.providers.length` at the top of the
+    component tree, so an absent key is a white screen and nothing in any log.
+    """
+
+    async def test_it_is_the_same_object_today_carries(
+        self, client: AsyncClient, mailbox_id: str
+    ) -> None:
+        health = (await client.get("/api/mailboxes")).json()
+        assert list(health) == [
+            "connected",
+            "providers",
+            "last_ok_at",
+            "minutes_since_read",
+            "placed_today",
+            "backlog",
+            "state",
+        ]
+        assert health == (await client.get("/api/today")).json()["mailbox_health"]
+
+    async def test_providers_is_a_list_even_with_no_mailbox(
+        self, client: AsyncClient
+    ) -> None:
+        health = (await client.get("/api/mailboxes")).json()
+        assert health["providers"] == []
+        assert health["connected"] is False
+        assert health["state"] == "ok"
+
+    async def test_a_revoked_grant_is_the_one_full_screen_failure(
+        self, client: AsyncClient, db: Database, user_id: str, mailbox_id: str
+    ) -> None:
+        async with db.session(user_id) as connection:
+            await connection.execute(
+                "update mailbox_accounts set status = 'needs_reauth' where id = $1",
+                mailbox_id,
+            )
+        health = (await client.get("/api/mailboxes")).json()
+        assert health["state"] == "F1"
+        # A row exists and cannot be read, which is not connected.
+        assert health["connected"] is False
+
+    async def test_a_backlog_is_a_state_of_its_own(
+        self, client: AsyncClient, db: Database, user_id: str, mailbox_id: str
+    ) -> None:
+        async with db.session(user_id) as connection:
+            await connection.execute(
+                "update mailbox_accounts set backlog_estimate = 40, last_ok_at = now() "
+                "where id = $1",
+                mailbox_id,
+            )
+        health = (await client.get("/api/mailboxes")).json()
+        assert (health["state"], health["backlog"]) == ("F2", 40)
+        assert health["connected"] is True
+
+    async def test_freshness_is_the_worst_provider_not_the_best(
+        self, client: AsyncClient, db: Database, user_id: str, mailbox_id: str
+    ) -> None:
+        # A mailbox read a minute ago and a calendar last read a week ago is an
+        # account that is a week stale. Reporting the newest would call it
+        # healthy exactly when half of it had stopped.
+        async with db.session(user_id) as connection:
+            await connection.execute(
+                "update mailbox_accounts set last_ok_at = now() where id = $1", mailbox_id
+            )
+            await connection.execute(
+                """
+                insert into mailbox_accounts
+                  (user_id, provider, address, secret_ciphertext, secret_nonce,
+                   dek_wrapped, dek_nonce, last_ok_at)
+                values ($1,'google_calendar',$2,'\\x00','\\x00','\\x00','\\x00',
+                        now() - interval '7 days')
+                """,
+                user_id,
+                "calendar@pytest.invalid",
+            )
+        health = (await client.get("/api/mailboxes")).json()
+        assert health["minutes_since_read"] >= 7 * 24 * 60
+
+
 class TestIsItStillReadingMyMail:
     async def test_the_deep_check_needs_no_session(self, anonymous: AsyncClient) -> None:
         # A health check you have to sign in for cannot tell you why you cannot
