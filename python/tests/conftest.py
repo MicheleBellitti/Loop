@@ -16,9 +16,12 @@ import os
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
+
+if TYPE_CHECKING:
+    from httpx import AsyncClient
 
 try:
     import asyncpg
@@ -88,6 +91,38 @@ async def user_id(db: Database) -> AsyncIterator[str]:
     finally:
         async with db.untenanted() as connection:
             await connection.execute("select erase_user($1)", new_id)
+
+
+@pytest.fixture
+async def client(dsn: str, user_id: str) -> AsyncIterator["AsyncClient"]:
+    """The API with a session already established, driven in-process."""
+    from httpx import ASGITransport, AsyncClient
+
+    from loop.api import Settings, auth, create_app
+
+    app = create_app(Settings(dsn=dsn, session_secret="test-secret"))
+    async with app.router.lifespan_context(app):
+        token, _session = await app.state.sessions.create(user_id)
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            cookies={auth.COOKIE_NAME: token},
+        ) as http:
+            yield http
+
+
+@pytest.fixture
+async def anonymous(dsn: str) -> AsyncIterator["AsyncClient"]:
+    from httpx import ASGITransport, AsyncClient
+
+    from loop.api import Settings, create_app
+
+    app = create_app(Settings(dsn=dsn, session_secret="test-secret"))
+    async with (
+        app.router.lifespan_context(app),
+        AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http,
+    ):
+        yield http
 
 
 MAILBOX_ADDRESS = "owner@pytest.invalid"

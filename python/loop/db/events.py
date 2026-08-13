@@ -230,8 +230,32 @@ async def apply_side_effects(
                 )
         case "deadline_set":
             await _record_deadline(connection, user_id, application_id, event)
+        case "human_corrected":
+            await _apply_correction(connection, user_id, event)
         case _:
             return
+
+
+async def _apply_correction(
+    connection: asyncpg.Connection, user_id: str, event: DomainEvent
+) -> None:
+    """The one correction that changes a row rather than the fold.
+
+    `merge` names a relationship, not a column, so the fold has nothing to do
+    with it — undoing a merge means freeing the row that was folded away. The
+    reference did this in the gateway, which made `applications` a table with
+    two writers and needed a grant the gateway was never given.
+    """
+    if event.payload.get("field") != "merge":
+        return
+    merged_id = event.payload.get("merged_id")
+    if not merged_id:
+        return
+    await connection.execute(
+        "update applications set merged_into_id = null where id = $1 and user_id = $2",
+        merged_id,
+        user_id,
+    )
 
 
 async def _record_interview(

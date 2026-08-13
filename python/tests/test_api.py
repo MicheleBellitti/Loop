@@ -7,41 +7,16 @@ absent one, a number where it sends a string: each of those breaks a browser and
 none of them breaks a handler.
 """
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from loop.api import Settings, auth, create_app
+from loop.api import auth
 from loop.api.serialise import confidence, iso_z, num, quoted
 from loop.db import Database, Queue
 
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture
-async def client(dsn: str, user_id: str) -> AsyncIterator[AsyncClient]:
-    app = create_app(Settings(dsn=dsn, session_secret="test-secret"))
-    async with app.router.lifespan_context(app):
-        token, _session = await app.state.sessions.create(user_id)
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test",
-            cookies={auth.COOKIE_NAME: token},
-        ) as http:
-            http.app = app  # type: ignore[attr-defined]
-            yield http
-
-
-@pytest.fixture
-async def anonymous(dsn: str) -> AsyncIterator[AsyncClient]:
-    app = create_app(Settings(dsn=dsn, session_secret="test-secret"))
-    async with (
-        app.router.lifespan_context(app),
-        AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http,
-    ):
-        yield http
 
 
 class TestTheGate:

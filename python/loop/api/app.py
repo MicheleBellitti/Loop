@@ -31,7 +31,16 @@ from loop.services.push import VapidConfig
 
 from . import auth
 from .errors import INTERNAL_MESSAGE, ApiError, code_for, envelope
-from .routes import applications, health, review, session, stats, today
+from .routes import (
+    account,
+    applications,
+    health,
+    review,
+    session,
+    stats,
+    suggestions,
+    today,
+)
 
 # Everything the client is allowed to load, and nowhere it may talk to but here.
 _CSP = (
@@ -127,6 +136,8 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(applications.router)
     app.include_router(review.router)
     app.include_router(stats.router)
+    app.include_router(suggestions.router)
+    app.include_router(account.router)
     app.include_router(health.router)
 
     _install_client(app, settings)

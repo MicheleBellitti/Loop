@@ -10,7 +10,9 @@ The detail route adds `facts` and `events` to exactly those seventeen keys, so
 the drawer and the row it opened from cannot disagree about anything.
 """
 
+import logging
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -18,9 +20,20 @@ from fastapi import APIRouter, Query, Request
 
 from loop.api import auth, narrate
 from loop.api.errors import ApiError
+from loop.api.json import read_json
+from loop.api.posting import BlockedUrl, Posting, fetch_posting, parse_posting
 from loop.api.serialise import confidence, iso_z, num, quoted
-from loop.db import load_stage_table
+from loop.db import Queue, load_stage_table, publish
 from loop.domain import compute_flag, days_quiet, display_stage, is_closed, quiet_label
+from loop.domain.messages import EventSource, PendingEvent
+from loop.domain.types import Channel, Rung
+from loop.domain.wire import encode_pending_event
+
+_log = logging.getLogger("loop.api.applications")
+
+# Rung 4 is the human, and a hand-written event says so rather than claiming a
+# machine read it somewhere.
+_HUMAN_RUNG: Rung = 4
 
 router = APIRouter(prefix="/api")
 
@@ -164,6 +177,299 @@ async def get_application(request: Request, application_id: str) -> dict[str, An
         "facts": _facts(row, source, comp, detail),
         "events": [_event(event, stages) for event in events],
     }
+
+
+_CHANNELS: frozenset[Channel] = frozenset(
+    {"linkedin", "indeed", "career_page", "referral", "recruiter", "other"}
+)
+_ARCHIVE_AS = frozenset({"dormant", "withdrawn"})
+_MAX_BULK = 200
+
+
+@dataclass(frozen=True, slots=True)
+class _Manual:
+    """The three fields quick add takes when there is no URL to read."""
+
+    company: str
+    role: str
+    channel: Channel | None
+
+# The fields a human is allowed to overrule, which is not every column. `merge`
+# is written only by the review queue's undo, and `company_id` has no editor.
+_CORRECTABLE = frozenset(
+    {
+        "stage",
+        "status",
+        "role_title",
+        "seniority",
+        "location",
+        "work_mode",
+        "channel",
+        "applied_at",
+        "comp_expectation",
+    }
+)
+
+
+@router.post("/applications", status_code=201)
+async def quick_add(request: Request) -> dict[str, Any]:
+    """The one place the user, not the mailbox, is the source of truth.
+
+    Two shapes: a posting URL, or the three fields by hand. The URL is read
+    best-effort and never blocks the 201 — a posting behind a login is still an
+    application you made, and refusing to record it because a page would not
+    load would be the tail wagging the dog.
+
+    The row is created here and then never moved from here: an `applied` event
+    goes on the queue and the pipeline folds it, so `applied_at`, the channel
+    and the confidence on the row a moment later are the log's answer rather
+    than this handler's guess.
+    """
+    session = auth.require(getattr(request.state, "session", None))
+    body = await read_json(request)
+    posting_url = body.get("posting_url")
+    manual = _manual(body)
+
+    if not manual and not isinstance(posting_url, str):
+        raise ApiError(400, "bad_body", "a posting url, or a company and a role")
+
+    found = await _read_posting(request, posting_url) if posting_url else Posting()
+    company = manual.company if manual else (found.company or "Unknown")
+    role = (manual.role if manual else None) or found.role or "Unknown role"
+    channel: Channel = (manual.channel if manual else None) or "career_page"
+    applied_at = _moment(body.get("applied_at")) or datetime.now(UTC)
+
+    db = request.app.state.db
+    async with db.session(session.user_id) as connection:
+        company_id = await connection.fetchval(
+            """
+            insert into companies (canonical_name) values ($1)
+            on conflict (lower(canonical_name), coalesce(domain, '')) do update
+              set canonical_name = excluded.canonical_name
+            returning id
+            """,
+            company,
+        )
+        application_id = str(
+            await connection.fetchval(
+                """
+                insert into applications
+                  (user_id, company_id, role_title, current_stage, current_phase,
+                   manually_created, confidence, location)
+                values ($1,$2,$3,'applied','sent',true,1.0,$4)
+                returning id
+                """,
+                session.user_id,
+                company_id,
+                role,
+                found.location,
+            )
+        )
+        await publish(
+            connection,
+            Queue.EVENT,
+            encode_pending_event(
+                PendingEvent(
+                    user_id=session.user_id,
+                    application_id=application_id,
+                    type="applied",
+                    occurred_at=applied_at,
+                    confidence=1.0,
+                    to_stage="applied",
+                    rung=_HUMAN_RUNG,
+                    payload={
+                        "channel": channel,
+                        "posting_url": posting_url or None,
+                        "role_title": role,
+                    },
+                    source=EventSource(
+                        channel=channel,
+                        posting_url=posting_url or None,
+                        ats_vendor=found.ats_vendor,
+                        is_first_touch=True,
+                    ),
+                )
+            ),
+        )
+        if found.comp:
+            await connection.execute(
+                """
+                insert into comp_offers
+                  (user_id, application_id, kind, min_minor, max_minor, currency)
+                values ($1,$2,'posted_range',$3,$4,$5)
+                """,
+                session.user_id,
+                application_id,
+                found.comp["min_minor"],
+                found.comp["max_minor"],
+                found.comp["currency"].upper(),
+            )
+
+    return {"id": application_id, "company": company, "role": role, "channel": channel}
+
+
+@router.post("/applications/{application_id}/archive")
+async def archive_one(request: Request, application_id: str) -> dict[str, Any]:
+    session = auth.require(getattr(request.state, "session", None))
+    body = await read_json(request)
+    as_what = body.get("as")
+    if as_what not in _ARCHIVE_AS:
+        raise ApiError(400, "bad_body", "archive as dormant or withdrawn", "as")
+    await _archive(request, session.user_id, [_an_id(application_id)], as_what)
+    return {"ok": True}
+
+
+@router.post("/applications/archive")
+async def archive_many(request: Request) -> dict[str, Any]:
+    session = auth.require(getattr(request.state, "session", None))
+    body = await read_json(request)
+    ids = body.get("ids")
+    # `as` defaults here and is required on the single-id route. Inherited, and
+    # harmless: a bulk archive is the "these are over" gesture and dormant is
+    # what that means.
+    as_what = body.get("as", "dormant")
+    if not isinstance(ids, list) or not 1 <= len(ids) <= _MAX_BULK:
+        raise ApiError(400, "bad_body", f"between 1 and {_MAX_BULK} ids", "ids")
+    if as_what not in _ARCHIVE_AS:
+        raise ApiError(400, "bad_body", "archive as dormant or withdrawn", "as")
+
+    await _archive(request, session.user_id, [_an_id(str(i)) for i in ids], as_what)
+    # The requested count, not the affected one: nothing here checks that a row
+    # exists, and saying "200" for 200 ids you do not own is what the reference
+    # does.
+    return {"ok": True, "count": len(ids)}
+
+
+@router.post("/applications/{application_id}/correct")
+async def correct(request: Request, application_id: str) -> dict[str, Any]:
+    """A correction is a new event at confidence 1.0, never an edit.
+
+    The log is append-only and the row is derived from it, so overruling the
+    machine means adding to the record rather than overwriting it — which is
+    also why a correction survives the next reprocess and a column write would
+    not.
+    """
+    session = auth.require(getattr(request.state, "session", None))
+    application_id = _an_id(application_id)
+    body = await read_json(request)
+    field = body.get("field")
+    if field not in _CORRECTABLE:
+        raise ApiError(400, "bad_body", "that field cannot be corrected", "field")
+    if "to" not in body:
+        raise ApiError(400, "bad_body", "a value to correct it to", "to")
+
+    async with request.app.state.db.session(session.user_id) as connection:
+        current = await connection.fetchrow(
+            "select current_stage, status from applications where id = $1", application_id
+        )
+        if current is None:
+            raise ApiError(404, "not_found", "no such application")
+        # The reference read `status` for every field but `stage`, so correcting
+        # a role title recorded `from: 'live'` and the drawer rendered
+        # `role_title: live → Staff Engineer`. The before-value is now the field
+        # being corrected, or absent when this handler cannot know it.
+        before = _before(field, current)
+
+        await publish(
+            connection,
+            Queue.EVENT,
+            encode_pending_event(
+                PendingEvent(
+                    user_id=session.user_id,
+                    application_id=application_id,
+                    type="human_corrected",
+                    occurred_at=datetime.now(UTC),
+                    confidence=1.0,
+                    rung=_HUMAN_RUNG,
+                    payload={"field": field, "from": before, "to": body["to"]},
+                )
+            ),
+        )
+    return {"ok": True}
+
+
+def _before(field: str, current: Any) -> Any:
+    if field == "stage":
+        return current["current_stage"]
+    if field == "status":
+        return current["status"]
+    return None
+
+
+async def _archive(
+    request: Request, user_id: str, ids: list[str], as_what: str
+) -> None:
+    """One event per application, and no column written here.
+
+    `status` and `current_stage` change when the pipeline folds the event, not
+    before. The reference also stamped `last_user_action_at` inline; the
+    projection recomputes that from the log seconds later, so the write bought
+    nothing and cost the gateway an UPDATE grant on a table it should not be
+    updating.
+    """
+    now = datetime.now(UTC)
+    withdrawn = as_what == "withdrawn"
+    async with request.app.state.db.session(user_id) as connection:
+        for application_id in ids:
+            await publish(
+                connection,
+                Queue.EVENT,
+                encode_pending_event(
+                    PendingEvent(
+                        user_id=user_id,
+                        application_id=application_id,
+                        type="withdrawn" if withdrawn else "went_silent",
+                        occurred_at=now,
+                        confidence=1.0,
+                        rung=_HUMAN_RUNG,
+                        payload={} if withdrawn else {"threshold_used": "archived_by_user"},
+                    )
+                ),
+            )
+
+
+def _manual(body: dict[str, Any]) -> _Manual | None:
+    """The by-hand shape, or None when this is a URL.
+
+    A body carrying both is read as the URL, because that is the one that can
+    be checked — and the reference resolves the union the same way.
+    """
+    if isinstance(body.get("posting_url"), str):
+        return None
+    company, role, channel = body.get("company"), body.get("role"), body.get("channel")
+    if not (isinstance(company, str) and company and isinstance(role, str) and role):
+        return None
+    if channel is not None and channel not in _CHANNELS:
+        raise ApiError(400, "bad_body", "not a channel", "channel")
+    return _Manual(company=company, role=role, channel=channel)
+
+
+async def _read_posting(request: Request, url: str) -> Posting:
+    """Never fatal. A posting that cannot be read is a posting, not an error."""
+    try:
+        final_url, html = await fetch_posting(url)
+    except (BlockedUrl, OSError) as error:
+        _log.info("posting not read (%s): %s", url, error)
+        return Posting()
+    except Exception:
+        _log.exception("posting not read (%s)", url)
+        return Posting()
+    return parse_posting(final_url, html)
+
+
+def _moment(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ApiError(400, "bad_body", "not a timestamp", "applied_at") from error
+
+
+def _an_id(value: str) -> str:
+    if not _UUID.match(value):
+        raise ApiError(400, "bad_id", "that is not an application id", "id")
+    return value
 
 
 def _facts(row: Any, source: Any, comp: Any, detail: Any) -> dict[str, Any]:

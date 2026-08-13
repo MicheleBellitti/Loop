@@ -12,6 +12,7 @@ from fastapi import APIRouter, Request, Response
 
 from loop.api import auth
 from loop.api.errors import ApiError
+from loop.api.json import read_json
 
 router = APIRouter(prefix="/api")
 
@@ -32,7 +33,7 @@ async def auth_state(request: Request) -> dict[str, Any]:
 @router.post("/auth/recover")
 async def recover(request: Request, response: Response) -> dict[str, Any]:
     """The recovery code. Currently the only working way into the product."""
-    body = await _json(request)
+    body = await read_json(request)
     password = body.get("password")
     if not isinstance(password, str) or len(password) < _MIN_PASSWORD:
         raise ApiError(400, "bad_body", "password required", "password")
@@ -91,20 +92,3 @@ async def me(request: Request) -> dict[str, Any]:
         "csrf": request.app.state.sessions.csrf(session),
     }
 
-
-async def _json(request: Request) -> dict[str, Any]:
-    """The client sends a content type only when it sends a body.
-
-    Several mutations legitimately post nothing, and a route that insists on a
-    JSON body rejects those before the handler is reached.
-    """
-    raw = await request.body()
-    if not raw:
-        return {}
-    import json
-
-    try:
-        parsed = json.loads(raw)
-    except ValueError as error:
-        raise ApiError(400, "bad_body", "expected JSON") from error
-    return parsed if isinstance(parsed, dict) else {}
