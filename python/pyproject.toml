@@ -24,6 +24,10 @@ api = [
 ]
 ladder = ["pyyaml>=6.0", "httpx>=0.27", "pydantic>=2.9"]
 ml = ["sentence-transformers>=3.3", "rapidfuzz>=3.10"]
+# Web Push. `pywebpush` layers py-vapid, http-ece and cryptography, and it is
+# the only outbound network dependency in the product — a deployment that never
+# pushes never installs it, and every rule around it is testable without it.
+push = ["pywebpush>=2.0"]
 
 [dependency-groups]
 dev = [
@@ -86,4 +90,12 @@ warn_unreachable = true
 # module that touches the database would be worse than saying it once.
 [[tool.mypy.overrides]]
 module = "asyncpg.*"
+ignore_missing_imports = true
+
+# `pywebpush` ships no annotations at all. It is imported in exactly one
+# function, whose whole job is to turn the library's exceptions into the four
+# results the notifier branches on — so the boundary is narrow and typed on
+# this side of it.
+[[tool.mypy.overrides]]
+module = "pywebpush.*"
 ignore_missing_imports = true

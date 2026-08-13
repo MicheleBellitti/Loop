@@ -23,6 +23,25 @@ def zone(tz: str) -> ZoneInfo:
     return ZoneInfo(tz)
 
 
+def iso_z(moment: datetime | None) -> str | None:
+    """`2026-08-13T09:41:07.482Z` — milliseconds, and a Z rather than +00:00.
+
+    What `Date.prototype.toISOString` produces, which is what every timestamp
+    this system has ever written looks like. It lives in the domain rather than
+    beside the HTTP layer because two things need it and only one of them is a
+    route: the API writes it into responses, and the nudge service writes it
+    into `suggestions.payload`, which is a column both implementations read.
+
+    `datetime.isoformat()` is the trap. It writes `+00:00`, the jsonb codec will
+    reach for it as a fallback without being asked, and a fixture diff against
+    the reference then lights up on every timestamp in the system.
+    """
+    if moment is None:
+        return None
+    utc = moment.astimezone(UTC)
+    return f"{utc:%Y-%m-%dT%H:%M:%S}.{utc.microsecond // 1000:03d}Z"
+
+
 def parse_hhmm(hhmm: str) -> tuple[int, int]:
     parts = hhmm.strip().split(":")
     if len(parts) != 2:

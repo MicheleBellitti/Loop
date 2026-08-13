@@ -88,6 +88,16 @@ class Database:
             self._pool = None
 
     @property
+    def dsn(self) -> str:
+        """For the one caller that cannot use the pool.
+
+        A `listen` holds its connection for as long as it is subscribed, and a
+        pooled connection is handed to the next caller the moment it is
+        released — so the nudge service opens its own.
+        """
+        return self._dsn
+
+    @property
     def pool(self) -> asyncpg.Pool:
         if self._pool is None:
             raise RuntimeError("the pool is not open; use `async with Database(dsn)`")

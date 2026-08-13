@@ -32,6 +32,7 @@ from .messages import (
     EventSource,
     MessageHeaders,
     PendingEvent,
+    PendingNotification,
     RawMessage,
     Signal,
 )
@@ -312,6 +313,39 @@ def decode_pending_event(row: Json) -> PendingEvent:
         payload=event.get("payload") or {},
         source=_decode_source(source) if source else None,
         silent=bool(row.get("silent")),
+    )
+
+
+# ── nudge → notifier ────────────────────────────────────────────────────────
+
+
+def encode_pending_notification(notification: PendingNotification) -> Json:
+    """Flat and snake_case, unlike the suggestion payload it was built from.
+
+    The two shapes travel together and disagree on purpose: this one is a queue
+    message between two services, while `suggestions.payload` is written
+    camelCase because the API spreads it into a response the browser reads.
+    """
+    return {
+        "user_id": notification.user_id,
+        "suggestion_key": notification.suggestion_key,
+        "rule": notification.rule,
+        "title": notification.title,
+        "body": notification.body,
+        "url": notification.url,
+        "bypasses_budget": notification.bypasses_budget,
+    }
+
+
+def decode_pending_notification(row: Json) -> PendingNotification:
+    return PendingNotification(
+        user_id=row["user_id"],
+        suggestion_key=row["suggestion_key"],
+        rule=row["rule"],
+        title=row["title"],
+        body=row["body"],
+        url=row["url"],
+        bypasses_budget=bool(row.get("bypasses_budget")),
     )
 
 

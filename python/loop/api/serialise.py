@@ -21,23 +21,15 @@ design, and it is still the contract: the client's `money()` swallows both, so
 nothing here would catch a well-meaning correction.
 """
 
-from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from loop.domain.clock import iso_z
 
-def iso_z(moment: datetime | None) -> str | None:
-    """`2026-08-13T09:41:07.482Z` — milliseconds, and a Z rather than +00:00.
-
-    What `Date.prototype.toISOString` produces, which is what every timestamp on
-    this API looks like today. The client only calls `new Date(...)` and would
-    accept an offset, but a fixture diff against the reference would flag every
-    single timestamp.
-    """
-    if moment is None:
-        return None
-    utc = moment.astimezone(UTC)
-    return f"{utc:%Y-%m-%dT%H:%M:%S}.{utc.microsecond // 1000:03d}Z"
+# Every timestamp on this API is `2026-08-13T09:41:07.482Z`. The function lives
+# in the domain because the nudge service writes the same format into a jsonb
+# column, and one definition is what keeps the two from drifting.
+__all__ = ["confidence", "iso_z", "num", "quoted"]
 
 
 def num(value: float | Decimal | None) -> int | float | None:
