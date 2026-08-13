@@ -38,6 +38,7 @@ from .routes import (
     health,
     mailboxes,
     metrics,
+    passkeys,
     push,
     review,
     session,
@@ -67,6 +68,19 @@ _LOOKS_LIKE_A_FILE_SUFFIX = (2, 5)
 
 
 @dataclass(frozen=True, slots=True)
+class WebAuthn:
+    """The relying party: who the authenticator thinks it is signing in to.
+
+    `rp_id` must be the registrable domain the client is served from — a
+    credential enrolled against one is refused by another, which is the whole
+    of the phishing resistance.
+    """
+
+    rp_id: str = "localhost"
+    rp_name: str = "Loop"
+
+
+@dataclass(frozen=True, slots=True)
 class GoogleApp:
     """The OAuth client. Unset means the connect button is not offered."""
 
@@ -92,6 +106,7 @@ class Settings:
     # `/health/deep` reports as `disabled` rather than as a fault.
     model_base_url: str | None = None
     google: GoogleApp = field(default_factory=GoogleApp)
+    webauthn: WebAuthn = field(default_factory=WebAuthn)
 
     @property
     def secure_cookies(self) -> bool:
@@ -115,6 +130,10 @@ class Settings:
                 client_id=_trimmed("GOOGLE_CLIENT_ID"),
                 client_secret=_trimmed("GOOGLE_CLIENT_SECRET"),
                 pubsub_topic=_trimmed("GOOGLE_PUBSUB_TOPIC"),
+            ),
+            webauthn=WebAuthn(
+                rp_id=os.environ.get("RP_ID", "localhost"),
+                rp_name=os.environ.get("RP_NAME", "Loop"),
             ),
         )
 
@@ -164,6 +183,7 @@ def create_app(settings: Settings) -> FastAPI:
     _install_security_headers(app)
 
     app.include_router(session.router)
+    app.include_router(passkeys.router)
     app.include_router(today.router)
     app.include_router(applications.router)
     app.include_router(review.router)

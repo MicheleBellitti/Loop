@@ -449,6 +449,39 @@ from `packages/google/src/google.ts`. And there are no connector tests in the
 reference at all, which cuts both ways — nothing pins the behaviour, and nothing
 will tell you when you break it.
 
+**Status: done, all six processes.** `python -m loop <service>` starts one each.
+The stale compiled copies are deleted.
+
+Seven defects in the connector were fixed rather than carried, and each is worth
+knowing because none of them announces itself:
+
+- Every 404 mapped to `HistoryTooOld`, so a message deleted between the listing
+  and the fetch relisted the whole mailbox. Now only the history path.
+- The relist never re-established the cursor, so a stale history id stayed stale
+  and every five-minute poll re-listed the same thirty days for ever.
+- Every 403 set `needs_reauth` — including `accessNotConfigured` and
+  `userRateLimitExceeded`, neither of which signing in again can fix, both of
+  which showed the user the product's only full-screen failure.
+- The access token was refreshed inside the per-message ingest: a 250-message
+  backfill page cost 250 token round-trips.
+- The calendar's `410 Gone` was caught by nothing, so an expired sync token sat
+  in the row and every run threw.
+- `showDeleted` was never set, which made the cancellation handling downstream
+  dead code.
+- An authorisation with no refresh token — which is what Google returns when a
+  grant already exists — sealed `{}` over the working secret.
+
+And `parse_ics` unescapes. RFC 5545 escapes commas in every text value, the
+reference never undid it, and the location of every interview already in the
+database reads `Dinova\, Via Francesco Zanardi\, 51`. Reprocessing would clean
+them.
+
+The body is not chosen in the connector. Both MIME halves go to
+`normalise_message`, which is the reader the harness measured a thousand real
+messages against — deciding between them here would put a second, unmeasured
+reading upstream of everything P1 validated. The harness was re-run after the
+port: 974/1000, unchanged.
+
 **The thread map lags the pipeline, and that is a race.** The resolver reads
 thread identity out of `application_events`, which only the pipeline writes. Two
 messages on one thread resolved before the pipeline drains therefore find
@@ -468,6 +501,35 @@ names, same precomputed `display_stage`, `days_quiet`, `flag`.
 *Done when*: the existing React PWA, unmodified, points at the Python API and
 works. That is a free end-to-end test of the whole surface, and it is only
 available if the contract is preserved.
+
+**Status: every route the client calls exists.** Sign-in and passkeys, the
+board and one application's history, Today, the review queue, statistics, the
+write surface, the event stream, push, the export, the mailbox connection and
+the health line. 414 tests.
+
+Three things settled here that the plan left open.
+
+**Who may write `applications`.** The reference's gateway inserted companies and
+applications, stamped `last_user_action_at` on two routes and cleared
+`merged_into_id` on a third — four statements needing grants `loop_gateway` has
+never had, which have only ever worked because the services connect as a
+superuser. The line is now drawn at creation: the gateway may bring an
+application into existence, because quick add is the one place the user rather
+than the mailbox is the source of truth, and every subsequent move of it goes
+through the log. `last_user_action_at` is dropped outright — the projection
+recomputes it seconds later — and undoing a merge is a `human_corrected` event
+the pipeline applies.
+
+**Absent is not null.** No route uses a response model. The client distinguishes
+a key that is missing from one that is `null`, `1.0` goes over the wire as `1`,
+and three encodings of the same numeric column travel on a single response. That
+is an accident of the reference's driver rather than a design, and it is still
+the contract.
+
+**The stream needs a real socket to test.** httpx's in-process transport runs the
+application to completion before returning a response, and a stream never
+completes, so an SSE test through it deadlocks rather than failing. The suite
+runs uvicorn on a port for that one case.
 
 ### P4 · The ML that justified the rewrite
 

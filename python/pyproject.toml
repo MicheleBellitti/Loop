@@ -19,6 +19,7 @@ db = [
 ]
 api = [
     "fastapi>=0.115",
+    "webauthn>=2.5",
     "pydantic>=2.9",
     "uvicorn[standard]>=0.32",
 ]

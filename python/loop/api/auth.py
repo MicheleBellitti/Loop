@@ -45,6 +45,7 @@ PUBLIC_PATHS: frozenset[str] = frozenset(
         "/api/auth/login/options",
         "/api/auth/login/verify",
         "/api/auth/recover",
+        "/api/auth/session-check",
         "/api/gmail/push",
     }
 )

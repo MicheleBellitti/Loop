@@ -116,26 +116,32 @@ _CSV_COLUMNS = (
 
 
 def _plain(row: Any) -> dict[str, Any]:
-    """A row as JSON, with the two things a driver would get wrong.
+    """A row as JSON, with the things a driver hands back that JSON has no room for.
 
-    Timestamps in the same shape as every other timestamp this API writes, and
-    a `date` left as a date — the column says a day, and turning it into an
-    instant is what moves it.
+    Recursive, because the columns are not all scalars: `application_ids` is a
+    `uuid[]`, and `candidates` and `resolution` are jsonb that can hold anything
+    that was ever put in them. A conversion that only looked at the top level
+    worked on every account with no suggestions, which is every account this was
+    tested against and not the one it ran on.
     """
-    out: dict[str, Any] = {}
-    for key, value in row.items():
-        if key in _INTERNAL:
-            continue
-        if isinstance(value, datetime):
-            out[key] = iso_z(value)
-        elif isinstance(value, date):
-            out[key] = value.isoformat()
-        elif isinstance(value, UUID):
-            out[key] = str(value)
-        elif isinstance(value, Decimal):
-            out[key] = float(value)
-        elif isinstance(value, bytes):
-            out[key] = value.hex()
-        else:
-            out[key] = value
-    return out
+    return {key: _value(value) for key, value in row.items() if key not in _INTERNAL}
+
+
+def _value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        # The same shape as every other timestamp this API writes.
+        return iso_z(value)
+    if isinstance(value, date):
+        # A `date` says a day. Turning it into an instant is what moves it.
+        return value.isoformat()
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, bytes):
+        return value.hex()
+    if isinstance(value, list | tuple):
+        return [_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _value(item) for key, item in value.items()}
+    return value

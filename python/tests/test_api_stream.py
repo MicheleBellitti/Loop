@@ -101,6 +101,28 @@ class TestTheExport:
         assert rows
         assert all("role_embedding" not in row for row in rows)
 
+    async def test_a_column_that_is_not_a_scalar_still_serialises(
+        self, client: AsyncClient, db: Database, user_id: str
+    ) -> None:
+        application_id = await _an_application(db, user_id)
+        async with db.session(user_id) as connection:
+            await connection.execute(
+                """
+                insert into suggestions (user_id, key, rule, application_ids, payload)
+                values ($1,'let_it_go:x','let_it_go',$2,'{}')
+                """,
+                user_id,
+                [application_id],
+            )
+
+        response = await client.get("/api/export")
+
+        # `application_ids` is a `uuid[]`, and a conversion that only looked at
+        # the top level worked on every account with no suggestions — which was
+        # every account this was tested against and not the one it ran on.
+        assert response.status_code == 200
+        assert response.json()["suggestions"][0]["application_ids"] == [application_id]
+
     async def test_an_empty_csv_is_still_a_table(self, client: AsyncClient) -> None:
         response = await client.get("/api/export?format=csv")
         assert response.headers["content-type"].startswith("text/csv")
