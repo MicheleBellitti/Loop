@@ -9,16 +9,23 @@ no connection held, then write — and it is the reason a model call in P4 can
 take thirty seconds without holding anything open.
 """
 
+from .classifier import ClassifierService, Screened
 from .consumer import Consumer, ConsumerOptions, Handler
+from .extractor import ExtractorService, Reading, TransientRungError
 from .pipeline import Applied, PipelineService
 from .resolver import Resolved, ResolverService
 
 __all__ = [
     "Applied",
+    "ClassifierService",
     "Consumer",
     "ConsumerOptions",
+    "ExtractorService",
     "Handler",
     "PipelineService",
+    "Reading",
     "Resolved",
     "ResolverService",
+    "Screened",
+    "TransientRungError",
 ]

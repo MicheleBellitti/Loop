@@ -15,6 +15,8 @@ it — and every row they create belongs to a user they delete afterwards.
 import os
 import uuid
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
@@ -86,3 +88,86 @@ async def user_id(db: Database) -> AsyncIterator[str]:
     finally:
         async with db.untenanted() as connection:
             await connection.execute("select erase_user($1)", new_id)
+
+
+MAILBOX_ADDRESS = "owner@pytest.invalid"
+
+# A fixed instant, so a test that asserts on a date is reading the fixture and
+# not the day it happens to run on.
+SOME_TUESDAY = datetime(2026, 7, 30, 9, 0, tzinfo=UTC)
+
+
+async def record_message(
+    db: Database,
+    user_id: str,
+    mailbox_id: str,
+    *,
+    sender: str = "Prima <careers@prima.it>",
+    subject: str = "La tua candidatura",
+    text: str = "Abbiamo ricevuto la tua candidatura.",
+    thread_id: str | None = None,
+) -> dict[str, Any]:
+    """A message on the wire, plus the replay-log row the connector writes.
+
+    Imported rather than injected as a fixture because two suites want it with
+    different arguments in the same test. It stands in for the connector, which
+    is the one producer neither of them has.
+    """
+    provider_message_id = uuid.uuid4().hex
+    async with db.session(user_id) as connection:
+        await connection.execute(
+            """
+            insert into seen_messages
+              (mailbox_id, provider_message_id, user_id, body_sha256, received_at)
+            values ($1,$2,$3,$4,$5)
+            """,
+            mailbox_id,
+            provider_message_id,
+            user_id,
+            b"\x00" * 32,
+            SOME_TUESDAY,
+        )
+    return {
+        "user_id": user_id,
+        "mailbox_id": mailbox_id,
+        "provider_message_id": provider_message_id,
+        "thread_id": thread_id or provider_message_id,
+        "received_at": SOME_TUESDAY.isoformat(),
+        "headers": {
+            "message_id": f"<{provider_message_id}@mail.gmail.com>",
+            "from": sender,
+            "to": [MAILBOX_ADDRESS],
+            "subject": subject,
+            "date": "Wed, 30 Jul 2026 09:00:00 +0200",
+            "list_id": None,
+            "list_unsubscribe": None,
+            "precedence": None,
+        },
+        "text": text,
+        "body_sha256": "00" * 32,
+        "invite": None,
+    }
+
+
+@pytest.fixture
+async def mailbox_id(db: Database, user_id: str) -> str:
+    """A connected Gmail account, which `seen_messages` needs to reference.
+
+    The sealed-secret columns are `not null` and nothing here decrypts them, so
+    they hold zeroes: what the tests need is the row and its address, and the
+    address is what tells the extractor which half of a thread the user wrote.
+    """
+    async with db.session(user_id) as connection:
+        return str(
+            await connection.fetchval(
+                """
+                insert into mailbox_accounts
+                  (user_id, provider, address, secret_ciphertext, secret_nonce,
+                   dek_wrapped, dek_nonce)
+                values ($1,'gmail',$2,'\\x00','\\x00','\\x00','\\x00')
+                returning id
+                """,
+                user_id,
+                MAILBOX_ADDRESS,
+            )
+        )

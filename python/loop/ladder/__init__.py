@@ -6,7 +6,7 @@ model and rung 4 is the human. The rungs are tried in order and the first one
 that does not abstain wins.
 """
 
-from .classifier import Classification, ClassifierContext, classify
+from .classifier import Classification, ClassifierContext, Outcome, classify
 from .contracts import Extraction, ExtractionRung, LadderContext
 from .ladder import (
     Extracted,
@@ -33,6 +33,7 @@ __all__ = [
     "LadderContext",
     "LadderOutcome",
     "NeedsReview",
+    "Outcome",
     "RuleRegistry",
     "RulesError",
     "TemplateRung",
