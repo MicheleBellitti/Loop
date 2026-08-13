@@ -126,3 +126,27 @@ def format_days(value: float | None) -> str:
         return "—"
     rounded = round(value * 10) / 10
     return f"{rounded:g} day{'' if rounded == 1 else 's'}"
+
+
+# What `Intl.NumberFormat('en-GB', {style: 'currency'})` puts in front of a
+# number. The reference hard-codes en-GB regardless of the user's locale, so an
+# Italian user is shown `€60,000` rather than `60.000 €` — reproduced rather
+# than corrected, because the figure has to match the one already on screen.
+_SYMBOLS = {"EUR": "€", "GBP": "£", "USD": "$", "JPY": "¥"}
+
+# A non-breaking space, which is what ICU puts between a code and an amount.
+_NBSP = " "
+
+
+def format_money(minor: int | float, currency: str) -> str:
+    """`€60,000` — whole units, grouped, no decimals.
+
+    Minor units in, major units out, and the rounding is half away from zero
+    rather than Python's half-to-even, because that is what ICU does and half a
+    cent is not worth diverging over.
+    """
+    major = minor / 100
+    whole = int(major + 0.5) if major >= 0 else -int(-major + 0.5)
+    amount = f"{whole:,}"
+    symbol = _SYMBOLS.get(currency.upper())
+    return f"{symbol}{amount}" if symbol else f"{currency.upper()}{_NBSP}{amount}"

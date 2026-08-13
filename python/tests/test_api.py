@@ -15,7 +15,7 @@ from httpx import ASGITransport, AsyncClient
 
 from loop.api import Settings, auth, create_app
 from loop.api.serialise import confidence, iso_z, num, quoted
-from loop.db import Database
+from loop.db import Database, Queue
 
 pytestmark = pytest.mark.integration
 
@@ -209,6 +209,179 @@ class TestToday:
         counters = (await client.get("/api/today")).json()["counters"]
         assert set(counters) == {"live", "interviewing", "offer", "overdue"}
         assert all(isinstance(v, int) for v in counters.values())
+
+
+class TestOneApplication:
+    async def test_the_detail_is_the_row_plus_facts_and_events(
+        self, client: AsyncClient, db: Database, user_id: str
+    ) -> None:
+        application_id = await _an_application(db, user_id)
+
+        body = (await client.get(f"/api/applications/{application_id}")).json()
+
+        rows = (await client.get("/api/applications?limit=200")).json()["rows"]
+        row = next(r for r in rows if r["id"] == application_id)
+        # The drawer and the row it opened from cannot disagree: the first
+        # seventeen keys are the same seventeen values.
+        assert {k: body[k] for k in row} == row
+        assert list(body)[-2:] == ["facts", "events"]
+
+    async def test_an_id_the_reference_would_refuse_is_refused_here(
+        self, client: AsyncClient
+    ) -> None:
+        # Python's `uuid.UUID` accepts braces and no dashes; the reference's
+        # regex does not, and a route that accepts more ids than the reference
+        # 404s where the reference 400s.
+        response = await client.get("/api/applications/0193f26b1e7c8a9d4e1f2a3b4c5d6e7f")
+        assert response.status_code == 400
+        assert response.json()["error"] == {
+            "code": "bad_id",
+            "message": "that is not an application id",
+            "field": "id",
+        }
+
+    async def test_an_unknown_application_is_a_404_with_no_field_key(
+        self, client: AsyncClient
+    ) -> None:
+        response = await client.get(
+            "/api/applications/00000000-0000-0000-0000-000000000000"
+        )
+        assert response.status_code == 404
+        # `field` is absent rather than null: the reference passes undefined and
+        # JSON.stringify drops it.
+        assert response.json()["error"] == {
+            "code": "not_found",
+            "message": "no such application",
+        }
+
+    async def test_facts_are_present_even_when_there_are_none(
+        self, client: AsyncClient, db: Database, user_id: str
+    ) -> None:
+        application_id = await _an_application(db, user_id)
+        facts = (await client.get(f"/api/applications/{application_id}")).json()["facts"]
+        assert list(facts) == [
+            "applied",
+            "ats",
+            "posting_url",
+            "location",
+            "posted_range",
+            "offers",
+        ]
+        assert facts["posted_range"] is None
+        assert facts["offers"] == []
+
+
+class TestTheReviewQueue:
+    async def test_the_envelope_is_items_and_the_keys_are_the_select_list(
+        self, client: AsyncClient
+    ) -> None:
+        body = (await client.get("/api/review")).json()
+        assert list(body) == ["items"]
+        for item in body["items"]:
+            assert list(item) == [
+                "id",
+                "kind",
+                "evidence_ref",
+                "excerpt",
+                "candidates",
+                "application_id",
+                "created_at",
+                "expires_at",
+            ]
+            # Nested JSON, not a string — the client reads the choices off it.
+            assert isinstance(item["candidates"], list)
+
+
+class TestTheStatistics:
+    async def test_the_ten_sections_are_always_all_ten(self, client: AsyncClient) -> None:
+        body = (await client.get("/api/stats")).json()
+        assert list(body) == [
+            "period",
+            "funnel",
+            "ratios",
+            "first_response",
+            "ghost",
+            "channels",
+            "channel_note",
+            "time_in_stage",
+            "compensation",
+            "seasonal",
+        ]
+
+    async def test_an_unknown_period_degrades_rather_than_failing(
+        self, client: AsyncClient
+    ) -> None:
+        assert (await client.get("/api/stats?period=banana")).json()["period"] == "12m"
+        assert (await client.get("/api/stats?period=90d")).json()["period"] == "90d"
+
+    async def test_the_funnel_is_five_bars_and_the_first_is_the_scale(
+        self, client: AsyncClient
+    ) -> None:
+        funnel = (await client.get("/api/stats")).json()["funnel"]
+        assert [bar["label"] for bar in funnel] == [
+            "Applied",
+            "Acknowledged",
+            "Screening",
+            "Interviewing",
+            "Offer",
+        ]
+        assert funnel[0]["width"] in {0, 100}
+
+    async def test_every_ratio_carries_the_denominator_it_was_computed_from(
+        self, client: AsyncClient
+    ) -> None:
+        for metric in (await client.get("/api/stats")).json()["ratios"]:
+            assert list(metric) == [
+                "label",
+                "value",
+                "numerator",
+                "denominator",
+                "excluded",
+                "gate_met",
+                "note",
+                "small_sample",
+                "display",
+            ]
+            # A ratio below its gate is null and says what unlocks it, rather
+            # than showing a number three applications wide.
+            assert metric["value"] is not None or not metric["gate_met"] or (
+                metric["denominator"] == 0
+            )
+            assert metric["note"]
+
+    async def test_a_channel_below_its_gate_shows_dashes_not_numbers(
+        self, client: AsyncClient
+    ) -> None:
+        for channel in (await client.get("/api/stats")).json()["channels"]:
+            if not channel["gate_met"]:
+                assert (channel["iv"], channel["of"], channel["ghost"]) == ("—", "—", "—")
+                assert channel["note"].endswith("needed")
+
+
+class TestIsItStillReadingMyMail:
+    async def test_the_deep_check_needs_no_session(self, anonymous: AsyncClient) -> None:
+        # A health check you have to sign in for cannot tell you why you cannot
+        # sign in.
+        body = (await anonymous.get("/health/deep")).json()
+        assert list(body) == [
+            "ok",
+            "queues",
+            "oldest_unprocessed_seconds",
+            "dead_letters",
+            "mailbox_staleness_hours",
+            "components",
+        ]
+        assert set(body["components"]) == {
+            "template_rules",
+            "calendar_detection",
+            "local_model",
+        }
+        assert set(body["queues"]) == set(Queue.ALL)
+
+    async def test_the_push_key_is_null_rather_than_an_error(
+        self, client: AsyncClient
+    ) -> None:
+        assert (await client.get("/api/push/key")).json() == {"public_key": None}
 
 
 class TestTheJavascriptHabits:

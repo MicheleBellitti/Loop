@@ -19,7 +19,7 @@ serialised as written.
 import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -27,10 +27,11 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from loop.db import Database
+from loop.services.push import VapidConfig
 
 from . import auth
 from .errors import INTERNAL_MESSAGE, ApiError, code_for, envelope
-from .routes import applications, session, today
+from .routes import applications, health, review, session, stats, today
 
 # Everything the client is allowed to load, and nowhere it may talk to but here.
 _CSP = (
@@ -57,6 +58,12 @@ class Settings:
     session_secret: str
     public_origin: str = "http://localhost:3000"
     client_dir: Path | None = None
+    # The public half reaches the browser through `/api/push/key`; the private
+    # half never leaves the notifier.
+    vapid: VapidConfig = field(default_factory=VapidConfig)
+    # Unset means the model rung is off, which is the default posture and what
+    # `/health/deep` reports as `disabled` rather than as a fault.
+    model_base_url: str | None = None
 
     @property
     def secure_cookies(self) -> bool:
@@ -70,7 +77,23 @@ class Settings:
             session_secret=os.environ.get("SESSION_SECRET", "dev-secret"),
             public_origin=os.environ.get("PUBLIC_ORIGIN", "http://localhost:3000"),
             client_dir=Path(client) if client else _default_client_dir(),
+            vapid=VapidConfig(
+                public_key=_trimmed("VAPID_PUBLIC"),
+                private_key=_trimmed("VAPID_PRIVATE"),
+                subject=os.environ.get("VAPID_SUBJECT", "mailto:loop@localhost"),
+            ),
+            model_base_url=_trimmed("MODEL_BASE_URL"),
         )
+
+
+def _trimmed(name: str) -> str | None:
+    """An empty environment variable is an unset one.
+
+    Compose writes `VAPID_PUBLIC=` for a key nobody has generated yet, and an
+    empty string that reads as "configured" is how a deployment comes to think
+    it can send notifications.
+    """
+    return (os.environ.get(name) or "").strip() or None
 
 
 def _default_client_dir() -> Path | None:
@@ -102,6 +125,9 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(session.router)
     app.include_router(today.router)
     app.include_router(applications.router)
+    app.include_router(review.router)
+    app.include_router(stats.router)
+    app.include_router(health.router)
 
     _install_client(app, settings)
     return app

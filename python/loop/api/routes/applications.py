@@ -1,23 +1,34 @@
-"""The pipeline board.
+"""The pipeline board, and one application's whole history.
 
 Seventeen keys per row, all of them always present, and four of them computed
 here rather than by the client: the stage label, how long it has been quiet, the
 sentence describing that, and the flag. That is the rule the whole design turns
 on — no statistic, no stage and no dormancy decision is derived client-side —
 and it is what makes a second client cheap later.
+
+The detail route adds `facts` and `events` to exactly those seventeen keys, so
+the drawer and the row it opened from cannot disagree about anything.
 """
 
+import re
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from loop.api import auth
-from loop.api.serialise import iso_z, num
+from loop.api import auth, narrate
+from loop.api.errors import ApiError
+from loop.api.serialise import confidence, iso_z, num, quoted
 from loop.db import load_stage_table
 from loop.domain import compute_flag, days_quiet, display_stage, is_closed, quiet_label
 
 router = APIRouter(prefix="/api")
+
+# What the reference accepts as an application id, which is not what Python
+# accepts. `uuid.UUID` takes braced and undashed forms and this does not, and a
+# route that accepts more ids than the reference is a route that 404s where the
+# reference 400s.
+_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 _SORTS = {
     "last_signal": "a.last_signal_at desc nulls last",
@@ -94,6 +105,115 @@ async def list_applications(
         # Never paginated today: the client asks for 200 and this mailbox has
         # dozens. Present and null so the shape does not change when it is.
         "next_cursor": None,
+    }
+
+
+_EVENTS = """
+select id, type, occurred_at, to_stage, payload, confidence, rung, evidence_ref
+  from application_events where application_id = $1
+ order by occurred_at desc, id desc
+"""
+
+# Not the same row as `channel`, deliberately: this is the earliest source
+# whatever it was, while `channel` is the one marked first touch. They can
+# disagree, and the reference lets them.
+_FIRST_SOURCE = """
+select ats_vendor, posting_url from sources
+ where application_id = $1 order by first_seen_at limit 1
+"""
+
+# `order by created_at` is one word more than the reference, which had no order
+# at all — with two posted ranges on one application it showed whichever row
+# came back first.
+_COMP = """
+select min_minor, max_minor, currency, kind from comp_offers
+ where application_id = $1 order by created_at
+"""
+
+
+@router.get("/applications/{application_id}")
+async def get_application(request: Request, application_id: str) -> dict[str, Any]:
+    """One application: the board row, the facts under it, and the whole log."""
+    session = auth.require(getattr(request.state, "session", None))
+    if not _UUID.match(application_id):
+        raise ApiError(400, "bad_id", "that is not an application id", "id")
+
+    db = request.app.state.db
+    now = datetime.now(UTC)
+    async with db.session(session.user_id) as connection:
+        stages = await load_stage_table(connection, session.user_id)
+        tz = await connection.fetchval("select tz from users where id = $1", session.user_id)
+        row = await connection.fetchrow(
+            f"{_ROWS} and a.id = $2", session.user_id, application_id
+        )
+        if row is None:
+            # A merged application is a 404 rather than a redirect to the row it
+            # was merged into: the id the client held is no longer an
+            # application, and saying so is more honest than quietly answering
+            # about a different one.
+            raise ApiError(404, "not_found", "no such application")
+        events = await connection.fetch(_EVENTS, application_id)
+        source = await connection.fetchrow(_FIRST_SOURCE, application_id)
+        comp = await connection.fetch(_COMP, application_id)
+        detail = await connection.fetchrow(
+            "select location, work_mode from applications where id = $1", application_id
+        )
+
+    return {
+        **_row(row, now=now, tz=tz or "UTC", stages=stages),
+        "facts": _facts(row, source, comp, detail),
+        "events": [_event(event, stages) for event in events],
+    }
+
+
+def _facts(row: Any, source: Any, comp: Any, detail: Any) -> dict[str, Any]:
+    offers = [_money(o) for o in comp if o["kind"] == "offer"]
+    posted = next((_money(o) for o in comp if o["kind"] == "posted_range"), None)
+    return {
+        "applied": iso_z(row["applied_at"]),
+        "ats": source["ats_vendor"] if source else None,
+        "posting_url": source["posting_url"] if source else None,
+        "location": _where(detail),
+        "posted_range": posted,
+        "offers": offers,
+    }
+
+
+def _where(detail: Any) -> str | None:
+    """`Milano · remote`, or one of them, or nothing at all."""
+    if detail is None:
+        return None
+    parts = [part for part in (detail["location"], detail["work_mode"]) if part]
+    return " · ".join(parts) or None
+
+
+def _money(row: Any) -> dict[str, Any]:
+    # Quoted, because the reference leaves the cast off here and the client's
+    # `money()` reads both. `/api/stats` casts the same column and sends a
+    # number; both are reproduced rather than reconciled.
+    return {
+        "min_minor": quoted(row["min_minor"]),
+        "max_minor": quoted(row["max_minor"]),
+        "currency": row["currency"],
+        "kind": row["kind"],
+    }
+
+
+def _event(event: Any, stages: Any) -> dict[str, Any]:
+    payload = event["payload"] or {}
+    return {
+        # A bigserial, and a string on the wire — the same accident of a driver
+        # that quotes the offer amounts above.
+        "id": quoted(event["id"]),
+        "when": iso_z(event["occurred_at"]),
+        "what": narrate.title(event["type"], event["to_stage"], stages),
+        "detail": narrate.detail(payload),
+        "source": narrate.provenance(event["rung"], payload),
+        # Two decimals as a string, while the application's own confidence on
+        # the same response is a bare number. One numeric(3,2), two encodings.
+        "conf": confidence(event["confidence"]),
+        "rung": event["rung"],
+        "evidence_ref": event["evidence_ref"],
     }
 
 
