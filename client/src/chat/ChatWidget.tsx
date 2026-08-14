@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ImagePlus, MessageSquareText, Plus, RefreshCw, Send, Trash2, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api } from '../api.js';
 import { encodeImage, streamChat } from './stream.js';
 import type { ChatConversation, ChatMessage, ChatModels, LiveToolCall, ToolTraceEntry } from './types.js';
@@ -257,7 +259,7 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
             <ToolChips tools={draft.tools} />
             {draft.text ? (
               <div className="chat-assistant">
-                {draft.text}
+                <Markdown content={draft.text} />
                 <span className="chat-cursor" />
               </div>
             ) : draft.failed === null ? (
@@ -390,8 +392,26 @@ function AssistantLine({ content, trace }: { content: string; trace: ToolTraceEn
       <ToolChips
         tools={trace.map((t, i) => ({ call_id: String(i), name: t.name, ok: t.ok, summary: t.summary }))}
       />
-      <div className="chat-assistant">{content}</div>
+      <div className="chat-assistant">
+        <Markdown content={content} />
+      </div>
     </div>
+  );
+}
+
+/** Model answers are markdown; `react-markdown` renders it rather than a
+ * hand-rolled approximation (decisions.md LIB-1). Links open away from the
+ * app, and raw HTML stays what react-markdown makes of it by default: text. */
+function Markdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
   );
 }
 

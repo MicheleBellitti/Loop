@@ -111,6 +111,9 @@ class Settings:
     # What the model calls itself. A single-model llama.cpp ignores it; a
     # router routes on it; the chat's picker starts from it.
     model_name: str = "qwen2.5-7b-instruct"
+    # Only needed when llama.cpp runs with `--api-key`, or the base URL points
+    # at a hosted engine (which additionally needs ALLOW_HOSTED_MODEL).
+    model_api_key: str | None = None
     google: GoogleApp = field(default_factory=GoogleApp)
     webauthn: WebAuthn = field(default_factory=WebAuthn)
 
@@ -133,6 +136,7 @@ class Settings:
             ),
             model_base_url=_trimmed("MODEL_BASE_URL"),
             model_name=_trimmed("MODEL_NAME") or "qwen2.5-7b-instruct",
+            model_api_key=_trimmed("MODEL_API_KEY"),
             google=GoogleApp(
                 client_id=_trimmed("GOOGLE_CLIENT_ID"),
                 client_secret=_trimmed("GOOGLE_CLIENT_SECRET"),

@@ -1,11 +1,11 @@
 """What the assistant may do, stated as data.
 
-Every tool is a name, a description, a JSON schema and a handler — the same
-contract an MCP server would publish, kept in-process because the gateway
-already holds the credentials and the tenant session. A handler returns a
-`ToolResult`: `payload` is what the model reads and lives only for the length
-of the turn; `summary` is one safe line, and it is the only part that is ever
-persisted or shown in the interface.
+Every tool is a name, a description, a pydantic argument model and a handler —
+the shape `langchain_core.tools.StructuredTool` consumes directly, kept
+in-process because the gateway already holds the credentials and the tenant
+session. A handler returns a `ToolResult`: `payload` is what the model reads
+and lives only for the length of the turn; `summary` is one safe line, and it
+is the only part that is ever persisted or shown in the interface.
 
 Two disciplines, both inherited from the rest of the system:
 
@@ -22,7 +22,10 @@ import logging
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, Literal
+
+from langchain_core.tools import StructuredTool
+from pydantic import BaseModel, Field
 
 from loop.connector.normalise import to_raw_message
 from loop.db import Database
@@ -67,19 +70,8 @@ class ToolResult:
 class Tool:
     name: str
     description: str
-    parameters: dict[str, Any]
+    args: type[BaseModel]
     run: Callable[[ToolContext, dict[str, Any]], Awaitable[ToolResult]]
-
-    def wire(self) -> dict[str, Any]:
-        """The OpenAI `tools` entry llama.cpp expects."""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters,
-            },
-        }
 
 
 # ── applications ────────────────────────────────────────────────────────────
@@ -420,6 +412,57 @@ def _uuid_arg(args: dict[str, Any], key: str) -> str | None:
     return value if _UUID.match(value) else None
 
 
+# ── argument models ─────────────────────────────────────────────────────────
+# Pydantic, because that is what StructuredTool consumes and what llama.cpp is
+# sent as the function schema. The handlers above still validate defensively —
+# a schema is a request, the handler is the guarantee.
+
+Phase = Literal["sent", "screening", "interviewing", "decided"]
+Status = Literal["live", "dormant", "rejected", "withdrawn", "accepted"]
+
+
+class ListApplicationsArgs(BaseModel):
+    phase: Phase | None = None
+    status: Status | None = None
+    query: str | None = Field(
+        default=None, description="matches the company or the role title"
+    )
+    limit: int | None = Field(default=None, ge=1, le=_MAX_LIST)
+
+
+class ApplicationArgs(BaseModel):
+    application_id: str = Field(description="the application's UUID")
+
+
+class StatisticsArgs(BaseModel):
+    period: Literal["90d", "12m", "all"] | None = None
+
+
+class ReadEmailArgs(BaseModel):
+    application_id: str = Field(description="the application's UUID")
+    provider_message_id: str | None = Field(
+        default=None,
+        description=(
+            "a message id from list_application_emails or an event's evidence_ref; "
+            "omit to read the most recent"
+        ),
+    )
+    limit: int | None = Field(
+        default=None,
+        ge=1,
+        le=_MAX_EMAILS_PER_CALL,
+        description="how many recent emails to read when no id is given",
+    )
+
+
+class NoArgs(BaseModel):
+    pass
+
+
+class BackfillArgs(BaseModel):
+    months: int = Field(ge=1, le=MAX_BACKFILL_MONTHS)
+
+
 def default_tools() -> tuple[Tool, ...]:
     """The registry, in the order the system prompt lists them."""
     return (
@@ -429,18 +472,7 @@ def default_tools() -> tuple[Tool, ...]:
                 "List the user's job applications: company, role, stage, status and "
                 "when each last moved. Filter by phase, status or a text query."
             ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "phase": {"type": "string", "enum": sorted(_PHASES)},
-                    "status": {"type": "string", "enum": sorted(_STATUSES)},
-                    "query": {
-                        "type": "string",
-                        "description": "matches the company or the role title",
-                    },
-                    "limit": {"type": "integer", "minimum": 1, "maximum": _MAX_LIST},
-                },
-            },
+            args=ListApplicationsArgs,
             run=_list_applications,
         ),
         Tool(
@@ -449,11 +481,7 @@ def default_tools() -> tuple[Tool, ...]:
                 "One application in full: its facts and its whole event log, each "
                 "event with its confidence and the id of the email it came from."
             ),
-            parameters={
-                "type": "object",
-                "properties": {"application_id": {"type": "string"}},
-                "required": ["application_id"],
-            },
+            args=ApplicationArgs,
             run=_get_application,
         ),
         Tool(
@@ -463,12 +491,7 @@ def default_tools() -> tuple[Tool, ...]:
                 "numerators and denominators, response times, ghost rate, channel "
                 "effectiveness, time in stage and compensation."
             ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "period": {"type": "string", "enum": ["90d", "12m", "all"]}
-                },
-            },
+            args=StatisticsArgs,
             run=_get_statistics,
         ),
         Tool(
@@ -478,11 +501,7 @@ def default_tools() -> tuple[Tool, ...]:
                 "the event each produced. No message text — use "
                 "read_application_email for that."
             ),
-            parameters={
-                "type": "object",
-                "properties": {"application_id": {"type": "string"}},
-                "required": ["application_id"],
-            },
+            args=ApplicationArgs,
             run=_list_application_emails,
         ),
         Tool(
@@ -493,20 +512,7 @@ def default_tools() -> tuple[Tool, ...]:
                 "provider_message_id from list_application_emails or an event's "
                 "evidence_ref is given."
             ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "application_id": {"type": "string"},
-                    "provider_message_id": {"type": "string"},
-                    "limit": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": _MAX_EMAILS_PER_CALL,
-                        "description": "how many recent emails to read when no id is given",
-                    },
-                },
-                "required": ["application_id"],
-            },
+            args=ReadEmailArgs,
             run=_read_application_email,
         ),
         Tool(
@@ -515,7 +521,7 @@ def default_tools() -> tuple[Tool, ...]:
                 "Whether the mailbox is connected, when it was last read, and "
                 "the backlog."
             ),
-            parameters={"type": "object", "properties": {}},
+            args=NoArgs,
             run=_get_mailbox_health,
         ),
         Tool(
@@ -524,17 +530,57 @@ def default_tools() -> tuple[Tool, ...]:
                 "Ask the connector to re-read the mailbox this many months back. "
                 "Only do this when the user explicitly asks for a backfill or rescan."
             ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "months": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": MAX_BACKFILL_MONTHS,
-                    }
-                },
-                "required": ["months"],
-            },
+            args=BackfillArgs,
             run=_start_backfill,
         ),
     )
+
+
+# What a tool result may weigh in the model's context. Payloads are for the
+# model, but a context is finite and one exuberant tool must not evict the
+# conversation.
+_MAX_RESULT_CHARS: Final = 24_000
+
+
+def rendered(result: ToolResult) -> str:
+    """The string the model reads back, `summary` included so the stream layer
+    can lift it from the ToolMessage without a side channel."""
+    text = json.dumps(
+        {"ok": result.ok, "summary": result.summary, "result": result.payload},
+        ensure_ascii=False,
+    )
+    if len(text) > _MAX_RESULT_CHARS:
+        text = text[:_MAX_RESULT_CHARS] + " …(truncated)"
+    return text
+
+
+def langchain_tools(
+    context: ToolContext, tools: tuple[Tool, ...] | None = None
+) -> list[StructuredTool]:
+    """The registry, bound to one request's context, as LangChain tools.
+
+    The wrapper never raises: whatever a handler does wrong becomes a result
+    the model reads and explains, not a 500 in the stream.
+    """
+
+    def bound(tool: Tool) -> StructuredTool:
+        async def call(**arguments: Any) -> str:
+            try:
+                result = await tool.run(context, arguments)
+            except Exception:
+                _log.exception("tool %s failed", tool.name)
+                result = ToolResult(
+                    ok=False,
+                    payload={"error": "the tool failed; try something else"},
+                    summary=f"{tool.name} failed",
+                )
+            return rendered(result)
+
+        return StructuredTool.from_function(
+            coroutine=call,
+            name=tool.name,
+            description=tool.description,
+            args_schema=tool.args,
+        )
+
+    return [bound(tool) for tool in (tools if tools is not None else default_tools())]

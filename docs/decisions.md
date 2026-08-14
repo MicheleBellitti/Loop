@@ -211,3 +211,24 @@ event can reintroduce it later without renumbering.
   argon2id password shown once at seed time — no email, so §12's no-send-path rule stays
   absolute. Session is the cookie described in §13 (HttpOnly, SameSite=Lax, Secure) plus a
   CSRF token on every mutation. Rate limit: per-IP on auth routes, per-user on mutations.
+- **LIB-1 → Prefer maintained libraries over rewriting.** Anything that an existing,
+  well-tested, maintained library already does is used from that library rather than written
+  here. Hand-writing is the exception and carries the burden of proof, not the default — a
+  bespoke implementation is a liability the moment it works: it has one maintainer, one test
+  suite, and no other users finding its bugs.
+
+  The exceptions that survive this rule are the ones already argued in place, and each names
+  the property a library cannot supply:
+  - `loop.domain` stays dependency-free — the differential harness and the sub-second test
+    suite are load-bearing, and both depend on a core that imports nothing.
+  - A byte-identical wire contract (the P3 response rules in `loop/api/serialise.py`) —
+    response models and serialisation frameworks change exactly the bytes the contract fixes.
+  - SQL a reviewer must read literally (the migration runner) — a migration DSL is a
+    translation layer over the statements that *are* the review object.
+
+  Everything else follows the rule. First application, the chat assistant: the `openai` SDK
+  speaks the model wire format, LangGraph runs the agent loop, `sse-starlette` emits the
+  event stream, `eventsource-parser` reads it and `react-markdown` renders the answers.
+  Existing hand-rolled code (the Google client) is history, not precedent: it stays until
+  touched, and the next substantial change to it is the moment to replace it with a
+  maintained equivalent that can still be tested against a stub over the real protocol.

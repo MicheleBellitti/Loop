@@ -20,7 +20,8 @@ from collections.abc import AsyncIterator
 from typing import Any, Final
 
 from fastapi import APIRouter, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
+from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from loop.api import auth
 from loop.api.errors import ApiError
@@ -32,11 +33,12 @@ from loop.chat.agent import (
     TokenEvent,
     ToolEndEvent,
     ToolStartEvent,
+    chat_model,
     run_agent,
 )
 from loop.chat.llama import LlamaClient, LlamaError
 from loop.chat.prompt import SYSTEM_PROMPT
-from loop.chat.tools import ToolContext, default_tools
+from loop.chat.tools import ToolContext
 from loop.google.client import GoogleClient
 
 _log = logging.getLogger("loop.api.chat")
@@ -46,12 +48,9 @@ router = APIRouter(prefix="/api")
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 # The same posture as `/api/stream`: no buffering anywhere between the model
-# and the panel.
-_STREAM_HEADERS: Final = {
-    "cache-control": "no-cache, no-transform",
-    "connection": "keep-alive",
-    "x-accel-buffering": "no",
-}
+# and the panel. sse-starlette owns the rest of the stream headers, and its
+# periodic ping owns the keep-alive.
+_STREAM_HEADERS: Final = {"x-accel-buffering": "no"}
 
 _IMAGE_TYPES: Final = frozenset(
     {"image/png", "image/jpeg", "image/webp", "image/gif"}
@@ -80,7 +79,7 @@ async def models(request: Request) -> dict[str, Any]:
             "models": [],
         }
 
-    client = LlamaClient(base_url=settings.model_base_url)
+    client = LlamaClient(settings.model_base_url, api_key=settings.model_api_key)
     try:
         served = await client.models()
         reachable = True
@@ -198,7 +197,7 @@ async def serve_attachment(request: Request, attachment_id: str) -> Response:
 
 
 @router.post("/chat/conversations/{conversation_id}/messages")
-async def send(request: Request, conversation_id: str) -> StreamingResponse:
+async def send(request: Request, conversation_id: str) -> EventSourceResponse:
     """One user turn in, one assistant turn out, streamed as it happens."""
     session = auth.require(getattr(request.state, "session", None))
     settings = request.app.state.settings
@@ -231,9 +230,8 @@ async def send(request: Request, conversation_id: str) -> StreamingResponse:
     )
     history = await store.model_history(db, session.user_id, conversation_id)
 
-    return StreamingResponse(
+    return EventSourceResponse(
         _frames(request, session.user_id, conversation_id, model, history),
-        media_type="text/event-stream",
         headers=_STREAM_HEADERS,
     )
 
@@ -244,7 +242,7 @@ async def _frames(
     conversation_id: str,
     model: str,
     history: list[dict[str, Any]],
-) -> AsyncIterator[str]:
+) -> AsyncIterator[ServerSentEvent]:
     """The agent's events, as SSE frames, with the clients cleaned up after.
 
     Everything in here must catch its own failures: by the time this runs the
@@ -252,7 +250,6 @@ async def _frames(
     `error` frame — never as a status code.
     """
     settings = request.app.state.settings
-    llama = LlamaClient(base_url=settings.model_base_url)
     google = (
         GoogleClient(
             client_id=settings.google.client_id or "",
@@ -263,14 +260,16 @@ async def _frames(
     )
     context = ToolContext(db=request.app.state.db, user_id=user_id, google=google)
 
-    yield ": thinking\n\n"
+    yield ServerSentEvent(comment="thinking")
     try:
         async for event in run_agent(
-            client=llama,
-            model=model,
+            model=chat_model(
+                base_url=settings.model_base_url,
+                model=model,
+                api_key=settings.model_api_key,
+            ),
             system=SYSTEM_PROMPT,
             history=history,
-            tools=default_tools(),
             context=context,
         ):
             if isinstance(event, TokenEvent):
@@ -318,13 +317,12 @@ async def _frames(
         _log.exception("the chat stream failed")
         yield _frame("error", {"code": "internal", "message": "something failed"})
     finally:
-        await llama.aclose()
         if google is not None:
             await google.aclose()
 
 
-def _frame(kind: str, payload: dict[str, Any]) -> str:
-    return f"event: {kind}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+def _frame(kind: str, payload: dict[str, Any]) -> ServerSentEvent:
+    return ServerSentEvent(event=kind, data=json.dumps(payload, ensure_ascii=False))
 
 
 async def _resolve_model(

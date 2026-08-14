@@ -34,34 +34,40 @@ async def _read_body(receive: Any) -> bytes:
             return body
 
 
+def _chunk(delta: dict[str, Any], finish: str | None = None) -> dict[str, Any]:
+    """One chat.completion.chunk, fully dressed — the SDK reads these."""
+    return {
+        "id": "chatcmpl-stub",
+        "object": "chat.completion.chunk",
+        "created": 0,
+        "model": "stub-model",
+        "choices": [{"index": 0, "delta": delta, "finish_reason": finish}],
+    }
+
+
 def _chunks_for(request: dict[str, Any]) -> list[dict[str, Any]]:
     asked_already = any(m.get("role") == "tool" for m in request["messages"])
     if asked_already:
         return [
-            {"choices": [{"delta": {"content": "La mailbox "}}]},
-            {"choices": [{"delta": {"content": "sta bene."}}]},
-            {"choices": [{"delta": {}, "finish_reason": "stop"}]},
+            _chunk({"role": "assistant", "content": "La mailbox "}),
+            _chunk({"content": "sta bene."}),
+            _chunk({}, finish="stop"),
         ]
     return [
-        {
-            "choices": [
-                {
-                    "delta": {
-                        "tool_calls": [
-                            {
-                                "index": 0,
-                                "id": "c1",
-                                "function": {
-                                    "name": "get_mailbox_health",
-                                    "arguments": "{}",
-                                },
-                            }
-                        ]
+        _chunk(
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "index": 0,
+                        "id": "c1",
+                        "type": "function",
+                        "function": {"name": "get_mailbox_health", "arguments": "{}"},
                     }
-                }
-            ]
-        },
-        {"choices": [{"delta": {}, "finish_reason": "tool_calls"}]},
+                ],
+            }
+        ),
+        _chunk({}, finish="tool_calls"),
     ]
 
 
@@ -69,7 +75,14 @@ async def _stub_llama(scope: Any, receive: Any, send: Any) -> None:
     if scope["type"] != "http":
         return
     if scope["path"].endswith("/models"):
-        payload = json.dumps({"data": [{"id": "stub-model"}]}).encode()
+        payload = json.dumps(
+            {
+                "object": "list",
+                "data": [
+                    {"id": "stub-model", "object": "model", "created": 0, "owned_by": "stub"}
+                ],
+            }
+        ).encode()
         headers = [(b"content-type", b"application/json")]
     else:
         request = json.loads(await _read_body(receive))
@@ -128,9 +141,13 @@ async def _csrf(client: AsyncClient) -> dict[str, str]:
 
 
 def _events_of(body: str) -> list[tuple[str, dict[str, Any]]]:
-    """Parse SSE frames into (event, data) pairs, comments dropped."""
+    """Parse SSE frames into (event, data) pairs, comments dropped.
+
+    sse-starlette writes CRLF line endings; normalised here rather than
+    handled twice below.
+    """
     found: list[tuple[str, dict[str, Any]]] = []
-    for frame in body.split("\n\n"):
+    for frame in body.replace("\r\n", "\n").split("\n\n"):
         kind, data = "", ""
         for line in frame.splitlines():
             if line.startswith("event:"):

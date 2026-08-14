@@ -1,3 +1,4 @@
+import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { ApiError, getCsrf } from '../api.js';
 import type { ToolTraceEntry } from './types.js';
 
@@ -5,8 +6,9 @@ import type { ToolTraceEntry } from './types.js';
  * The message stream.
  *
  * `EventSource` cannot POST, so this reads the same SSE frames the rest of the
- * app already speaks off a `fetch` body instead. Frames are separated by a
- * blank line; a frame with no `event:` line is a comment and is dropped.
+ * app already speaks off a `fetch` body instead. The wire format is parsed by
+ * `eventsource-parser` rather than by hand (decisions.md LIB-1) — comments,
+ * CRLF endings and split frames are its business, not ours.
  */
 
 export interface StreamHandlers {
@@ -46,36 +48,26 @@ export async function streamChat(
     );
   }
 
+  const parser = createParser({
+    onEvent: (message: EventSourceMessage) => {
+      const kind = message.event;
+      if (!kind || !message.data) return;
+      const payload = JSON.parse(message.data) as never;
+      if (kind === 'token') handlers.onToken((payload as { text: string }).text);
+      else if (kind === 'tool.start') handlers.onToolStart(payload);
+      else if (kind === 'tool.end') handlers.onToolEnd(payload);
+      else if (kind === 'done') handlers.onDone(payload);
+      else if (kind === 'error') handlers.onError(payload);
+    },
+  });
+
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
-
-  const dispatch = (frame: string): void => {
-    let kind = '';
-    let data = '';
-    for (const line of frame.split('\n')) {
-      if (line.startsWith('event:')) kind = line.slice(6).trim();
-      else if (line.startsWith('data:')) data += line.slice(5).trim();
-    }
-    if (!kind || !data) return;
-    const payload = JSON.parse(data) as never;
-    if (kind === 'token') handlers.onToken((payload as { text: string }).text);
-    else if (kind === 'tool.start') handlers.onToolStart(payload);
-    else if (kind === 'tool.end') handlers.onToolEnd(payload);
-    else if (kind === 'done') handlers.onDone(payload);
-    else if (kind === 'error') handlers.onError(payload);
-  };
-
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    // Frames end in a blank line; whatever trails the last one stays buffered.
-    const frames = buffer.split('\n\n');
-    buffer = frames.pop() ?? '';
-    for (const frame of frames) dispatch(frame);
+    parser.feed(decoder.decode(value, { stream: true }));
   }
-  if (buffer.trim()) dispatch(buffer);
 }
 
 /** Read a picked file into the JSON the attachment route accepts. */

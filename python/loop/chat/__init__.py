@@ -1,15 +1,17 @@
 """The assistant that answers questions about this pipeline.
 
-Four modules, layered so the testable parts stay pure-ish:
+Assembled from maintained libraries rather than rewrites (decisions.md LIB-1),
+with four thin modules of our own around them:
 
-    llama.py   the llama.cpp wire client — OpenAI chat completions, streamed
-    tools.py   what the model may do: read applications, statistics, the mail
-    agent.py   the loop: model → tool calls → model, until there is an answer
+    llama.py   the model server through the openai SDK — llama.cpp serves it
+    tools.py   what the model may do, as LangChain StructuredTools over our
+               handlers: applications, statistics, the mail, the backfill
+    agent.py   LangGraph's agent loop, translated to the five events the
+               panel renders and the store persists
     store.py   conversations and messages, in Postgres, under the same RLS
 
-The agent takes its model through a protocol and its tools as values, which is
-what lets the whole loop run in a test against a scripted model with no server,
-no database and no network.
+The agent takes its model as a `BaseChatModel`, which is what lets the whole
+loop run in a test against a scripted model with no server and no network.
 """
 
 from .agent import (
@@ -19,26 +21,26 @@ from .agent import (
     TokenEvent,
     ToolEndEvent,
     ToolStartEvent,
+    chat_model,
     run_agent,
 )
-from .llama import Completion, LlamaClient, LlamaError, TokenDelta, ToolCall
-from .tools import Tool, ToolContext, ToolResult, default_tools
+from .llama import LlamaClient, LlamaError
+from .tools import Tool, ToolContext, ToolResult, default_tools, langchain_tools
 
 __all__ = [
     "AgentEvent",
-    "Completion",
     "ErrorEvent",
     "FinalEvent",
     "LlamaClient",
     "LlamaError",
-    "TokenDelta",
     "TokenEvent",
     "Tool",
-    "ToolCall",
     "ToolContext",
     "ToolEndEvent",
     "ToolResult",
     "ToolStartEvent",
+    "chat_model",
     "default_tools",
+    "langchain_tools",
     "run_agent",
 ]

@@ -695,12 +695,48 @@ td.emphasis { font: 600 14px var(--font-heading); color: var(--color-accent-800)
   overflow-wrap: anywhere;
 }
 
+/* Markdown, rendered — so spacing comes from the elements, not from pre-wrap. */
 .chat-assistant {
   max-width: 95%;
   font-size: 13.5px;
   line-height: 1.5;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.chat-assistant p { margin: 0 0 var(--space-2); }
+.chat-assistant p:last-child { margin-bottom: 0; }
+.chat-assistant ul, .chat-assistant ol { margin: 0 0 var(--space-2); padding-left: 18px; }
+.chat-assistant li { margin-bottom: 2px; }
+.chat-assistant h1, .chat-assistant h2, .chat-assistant h3, .chat-assistant h4 {
+  font: 600 13px var(--font-heading);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: var(--space-3) 0 var(--space-2);
+}
+.chat-assistant code {
+  font-size: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  padding: 0 3px;
+}
+.chat-assistant pre {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  overflow-x: auto;
+}
+.chat-assistant pre code { border: 0; padding: 0; background: none; }
+.chat-assistant table { border-collapse: collapse; margin: 0 0 var(--space-2); font-size: 12.5px; }
+.chat-assistant th, .chat-assistant td {
+  border: 1px solid var(--color-divider);
+  padding: 3px var(--space-2);
+  text-align: left;
+}
+.chat-assistant blockquote {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-accent-400);
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
 }
 
 .chat-cursor {
