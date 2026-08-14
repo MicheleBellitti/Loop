@@ -52,8 +52,12 @@ class TestAskingForOptions:
         assert body["authenticatorSelection"]["userVerification"] == "required"
 
     async def test_signing_in_is_public_and_says_what_is_enrolled(
-        self, anonymous: AsyncClient
+        self, anonymous: AsyncClient, user_id: str
     ) -> None:
+        # Public to *call*, but there has to be an account to sign in to: the
+        # route is a `limit 1` over `users` and 404s at `not_seeded` without
+        # one. The fixture is what makes this pass on an empty database rather
+        # than only on a developer's seeded one.
         body = (await anonymous.post("/api/auth/login/options")).json()
         assert set(body) == {
             "rpId",
@@ -105,7 +109,7 @@ class TestTheChallenge:
 
 class TestSigningIn:
     async def test_an_unknown_passkey_does_not_burn_the_challenge(
-        self, anonymous: AsyncClient, db: Database
+        self, anonymous: AsyncClient, db: Database, user_id: str
     ) -> None:
         issued = (await anonymous.post("/api/auth/login/options")).json()["challenge"]
 
