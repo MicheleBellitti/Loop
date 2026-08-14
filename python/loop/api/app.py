@@ -34,6 +34,7 @@ from .errors import INTERNAL_MESSAGE, ApiError, code_for, envelope
 from .routes import (
     account,
     applications,
+    chat,
     export,
     health,
     mailboxes,
@@ -103,8 +104,13 @@ class Settings:
     # half never leaves the notifier.
     vapid: VapidConfig = field(default_factory=VapidConfig)
     # Unset means the model rung is off, which is the default posture and what
-    # `/health/deep` reports as `disabled` rather than as a fault.
+    # `/health/deep` reports as `disabled` rather than as a fault. The chat
+    # assistant is behind the same switch: one variable decides whether a
+    # model runs anywhere.
     model_base_url: str | None = None
+    # What the model calls itself. A single-model llama.cpp ignores it; a
+    # router routes on it; the chat's picker starts from it.
+    model_name: str = "qwen2.5-7b-instruct"
     google: GoogleApp = field(default_factory=GoogleApp)
     webauthn: WebAuthn = field(default_factory=WebAuthn)
 
@@ -126,6 +132,7 @@ class Settings:
                 subject=os.environ.get("VAPID_SUBJECT", "mailto:loop@localhost"),
             ),
             model_base_url=_trimmed("MODEL_BASE_URL"),
+            model_name=_trimmed("MODEL_NAME") or "qwen2.5-7b-instruct",
             google=GoogleApp(
                 client_id=_trimmed("GOOGLE_CLIENT_ID"),
                 client_secret=_trimmed("GOOGLE_CLIENT_SECRET"),
@@ -186,6 +193,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(passkeys.router)
     app.include_router(today.router)
     app.include_router(applications.router)
+    app.include_router(chat.router)
     app.include_router(review.router)
     app.include_router(stats.router)
     app.include_router(suggestions.router)

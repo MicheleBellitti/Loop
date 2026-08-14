@@ -13,6 +13,7 @@ days is a sample of about four applications.
 
 from typing import Any, Final, Literal
 
+import asyncpg
 from fastapi import APIRouter, Request
 
 from loop.api import auth
@@ -163,30 +164,35 @@ select count(distinct date_trunc('quarter', applied_at)) as n
 @router.get("/stats")
 async def stats(request: Request, period: str = _DEFAULT_PERIOD) -> dict[str, Any]:
     session = auth.require(getattr(request.state, "session", None))
+    async with request.app.state.db.session(session.user_id) as connection:
+        return await stats_payload(connection, session.user_id, period)
+
+
+async def stats_payload(
+    connection: asyncpg.Connection, user_id: str, period: str
+) -> dict[str, Any]:
+    """The whole statistics response, from an open tenant session.
+
+    Public because it is the page *and* the chat assistant's view of the same
+    figures — one definition, so the two can never disagree about a ratio.
+    """
     window = period if period in _WINDOW else _DEFAULT_PERIOD
 
-    async with request.app.state.db.session(session.user_id) as connection:
-        stages = await load_stage_table(connection, session.user_id)
-        currency = await connection.fetchval(
-            "select display_currency from users where id = $1", session.user_id
-        )
-        funnel = await connection.fetch(_funnel_sql(_WINDOW[window]), session.user_id)
-        conversion = await connection.fetchrow(
-            _conversion_sql(_REACH_WINDOW[window]), session.user_id
-        )
-        offers = await connection.fetchrow(
-            _offers_sql(_REACH_WINDOW[window]), session.user_id
-        )
-        timing = await connection.fetchrow(
-            _timing_sql(_REACH_WINDOW[window]), session.user_id
-        )
-        ghosted = await connection.fetchrow(
-            _ghosted_sql(_REACH_WINDOW[window]), session.user_id
-        )
-        channels = await connection.fetch(_CHANNELS, session.user_id)
-        dwell = await connection.fetch(_DWELL, session.user_id)
-        comp = await connection.fetch(_COMP, session.user_id)
-        quarters = await connection.fetchval(_QUARTERS, session.user_id)
+    stages = await load_stage_table(connection, user_id)
+    currency = await connection.fetchval(
+        "select display_currency from users where id = $1", user_id
+    )
+    funnel = await connection.fetch(_funnel_sql(_WINDOW[window]), user_id)
+    conversion = await connection.fetchrow(
+        _conversion_sql(_REACH_WINDOW[window]), user_id
+    )
+    offers = await connection.fetchrow(_offers_sql(_REACH_WINDOW[window]), user_id)
+    timing = await connection.fetchrow(_timing_sql(_REACH_WINDOW[window]), user_id)
+    ghosted = await connection.fetchrow(_ghosted_sql(_REACH_WINDOW[window]), user_id)
+    channels = await connection.fetch(_CHANNELS, user_id)
+    dwell = await connection.fetch(_DWELL, user_id)
+    comp = await connection.fetch(_COMP, user_id)
+    quarters = await connection.fetchval(_QUARTERS, user_id)
 
     to_interview = ratio(
         numerator=conversion["numerator"],

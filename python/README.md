@@ -26,6 +26,7 @@ why. The assertions came first; the implementation was written to satisfy them.
     loop/db/         asyncpg, the tenant session, the queue, migrations
     loop/services/   the six long-running processes
     loop/api/        FastAPI, built against the client as the specification
+    loop/chat/       the assistant: llama.cpp streamed, the tool registry, the agent loop
     loop/harness/    the corpus, the runner, the divergence table
     scripts/         replay.py, diff_against_ts.py
 
