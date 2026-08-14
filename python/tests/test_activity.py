@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from loop.api.activity_sql import filter_sql
 from loop.domain.activity import activity_of, closure_days, is_open
 
 NOW = datetime(2026, 8, 14, 9, 0, tzinfo=UTC)
@@ -80,3 +81,27 @@ def test_quiet_is_still_open_because_a_follow_up_is_worth_sending() -> None:
     assert is_open("active")
     assert is_open("stale")
     assert not is_open("closed")
+
+
+class TestTheBoardFilter:
+    """`all` means no predicate, which is not the same as "no filter given".
+
+    The reference implementation collapsed the two with a nullish fallback and
+    served the default instead, so asking for the whole history returned only
+    what was open. Same shape here, so the same trap is pinned.
+    """
+
+    def test_the_default_is_what_is_still_happening(self) -> None:
+        assert "'active','stale'" in filter_sql(None)
+        assert "'active','stale'" in filter_sql("open")
+
+    def test_all_asks_for_no_predicate_at_all(self) -> None:
+        assert filter_sql("all") == ""
+
+    def test_each_state_can_be_asked_for_on_its_own(self) -> None:
+        assert filter_sql("closed").endswith("in ('closed')")
+        assert filter_sql("stale").endswith("in ('stale')")
+        assert filter_sql("active").endswith("in ('active')")
+
+    def test_a_name_it_does_not_know_falls_back_rather_than_failing(self) -> None:
+        assert filter_sql("banana") == filter_sql("open")

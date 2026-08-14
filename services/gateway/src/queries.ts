@@ -236,7 +236,12 @@ export async function listApplications(
     where += ` and a.id > $${params.length}`;
   }
 
-  const wanted = ACTIVITY_FILTERS[opts.activity ?? DEFAULT_ACTIVITY] ?? ACTIVITY_FILTERS[DEFAULT_ACTIVITY]!;
+  // `in` rather than `??`: `all` maps to null *meaning* "no predicate", and a
+  // nullish fallback reads that as "not a filter I know" and quietly serves the
+  // default instead — so asking for the whole history returned the six open
+  // ones. The integration test in `queries.itest.ts` is the one that noticed.
+  const key = opts.activity && opts.activity in ACTIVITY_FILTERS ? opts.activity : DEFAULT_ACTIVITY;
+  const wanted = ACTIVITY_FILTERS[key];
   // Filtered in SQL rather than after the fact: applied after `limit` this
   // would hand back a short page and call it the whole pipeline.
   const activityWhere = wanted ? ` and t.activity in (${wanted.map((a) => `'${a}'`).join(',')})` : '';
