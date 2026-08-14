@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api, type ApplicationRow } from '../api.js';
+import { api, type ActivityFilter, type ApplicationList } from '../api.js';
 import { Skeleton } from '../components.js';
 
 /** Groups render in this fixed order; empty groups are omitted entirely. */
@@ -12,15 +12,22 @@ const PHASE_LABELS: Record<string, string> = {
   decided: 'Decided',
 };
 
-/** Pipeline — every application in one thumb-scroll, grouped by phase. */
+/**
+ * Pipeline — every application in one thumb-scroll, grouped by phase.
+ *
+ * "Every" now means every one that is still happening. The board opened on
+ * twelve months of history, most of it processes that ended without anybody
+ * saying so, and the count in the headline counted them too.
+ */
 export function Pipeline({ onOpen }: { onOpen: (id: string) => void }) {
   const [filter, setFilter] = useState<string>('all');
+  const [activity, setActivity] = useState<ActivityFilter>('open');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['applications', filter],
+    queryKey: ['applications', filter, activity],
     queryFn: () =>
-      api.get<{ rows: ApplicationRow[]; next_cursor: string | null }>(
-        `/api/applications${filter === 'all' ? '' : `?phase=${filter}`}`,
+      api.get<ApplicationList>(
+        `/api/applications?activity=${activity}${filter === 'all' ? '' : `&phase=${filter}`}`,
       ),
   });
 
@@ -57,10 +64,35 @@ export function Pipeline({ onOpen }: { onOpen: (id: string) => void }) {
         <div className="eyebrow">Pipeline</div>
         <h1
           className="headline"
-          style={{ fontSize: 32, marginBottom: 'var(--space-4)' }}
+          style={{ fontSize: 32, marginBottom: 'var(--space-2)' }}
         >
-          {rows.length} {rows.length === 1 ? 'application' : 'applications'}
+          {rows.length} {activity === 'closed' ? 'closed' : 'in progress'}
         </h1>
+        <p className="muted-55" style={{ fontSize: 12.5, margin: '0 0 var(--space-4)' }}>
+          {activity === 'closed'
+            ? 'Decided, withdrawn, or silent long enough to count as over.'
+            : `Still moving or worth a follow-up. ${data.counts?.closed ?? 0} closed are in History.`}
+        </p>
+      </div>
+
+      <div className="filter-row" role="group" aria-label="Show">
+        {(
+          [
+            ['open', 'In progress'],
+            ['closed', 'History'],
+            ['all', 'Everything'],
+          ] as Array<[ActivityFilter, string]>
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            className="filter-chip"
+            aria-pressed={activity === key}
+            onClick={() => setActivity(key)}
+          >
+            {label}
+            {data.counts ? <span className="chip-count">{data.counts[key] ?? 0}</span> : null}
+          </button>
+        ))}
       </div>
 
       <div className="filter-row" role="group" aria-label="Filter by phase">

@@ -1,13 +1,19 @@
 """The pipeline board, and one application's whole history.
 
-Seventeen keys per row, all of them always present, and four of them computed
+Nineteen keys per row, all of them always present, and five of them computed
 here rather than by the client: the stage label, how long it has been quiet, the
-sentence describing that, and the flag. That is the rule the whole design turns
-on — no statistic, no stage and no dormancy decision is derived client-side —
-and it is what makes a second client cheap later.
+sentence describing that, the flag, and whether the thing is still happening at
+all. That is the rule the whole design turns on — no statistic, no stage and no
+dormancy decision is derived client-side — and it is what makes a second client
+cheap later.
 
-The detail route adds `facts` and `events` to exactly those seventeen keys, so
+The detail route adds `facts` and `events` to exactly those nineteen keys, so
 the drawer and the row it opened from cannot disagree about anything.
+
+`activity` is the nineteenth-key story and it is worth reading `loop.domain.
+activity` for: `status` says what was recorded, `activity` says whether anybody
+is still working on it, and the board defaults to the second because a year of
+mail leaves most rows `live` for ever.
 """
 
 import logging
@@ -18,7 +24,7 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from loop.api import auth, narrate
+from loop.api import activity_sql, auth, narrate
 from loop.api.errors import ApiError
 from loop.api.json import read_json
 from loop.api.posting import BlockedUrl, Posting, fetch_posting, parse_posting
@@ -43,24 +49,31 @@ router = APIRouter(prefix="/api")
 # reference 400s.
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
+# Ordered from the wrapper below, so the names are the row's own and not the
+# joins' — `activity` is an expression and cannot be filtered on where it is
+# computed.
 _SORTS = {
-    "last_signal": "a.last_signal_at desc nulls last",
-    "stage_depth": "sd.depth desc nulls last",
-    "company": "c.canonical_name asc",
+    "last_signal": "t.last_signal_at desc nulls last",
+    "stage_depth": "t.depth desc nulls last",
+    "company": "t.company asc",
 }
 _DEFAULT_SORT = "last_signal"
 _MAX_LIMIT = 200
 
-_ROWS = """
+# The reference called the deadline lateral `d`; the activity fragment needs
+# that name for the dwell it reads, so the deadline is `dl` here and the dwell
+# arrives from `activity_sql.JOINS` — one join, read by both.
+_ROWS = f"""
 select a.id, c.canonical_name as company, a.role_title, a.current_stage, a.current_phase,
        a.status, a.applied_at, a.last_signal_at, a.confidence, a.needs_review,
        a.presumed_closed, s.channel,
-       sd.stale_after_days,
-       d.due_at as deadline_at, o.decide_by,
-       p.p90_days
+       sd.stale_after_days, sd.depth,
+       dl.due_at as deadline_at, o.decide_by,
+       d.p90_days,
+       nx.starts_at as next_interview_at,
+       {activity_sql.ACTIVITY} as activity
   from applications a
   join companies c on c.id = a.company_id
-  left join stage_defs sd on sd.user_id = a.user_id and sd.key = a.current_stage
   left join lateral (
     select channel from sources
      where application_id = a.id order by is_first_touch desc limit 1
@@ -68,17 +81,17 @@ select a.id, c.canonical_name as company, a.role_title, a.current_stage, a.curre
   left join lateral (
     select due_at from deadlines
      where application_id = a.id and met_at is null order by due_at limit 1
-  ) d on true
+  ) dl on true
   left join lateral (
     select decide_by from comp_offers
      where application_id = a.id and decide_by is not null order by created_at desc limit 1
   ) o on true
-  left join lateral (
-    select p90_days from stage_dwell_in
-     where user_id = a.user_id and stage = a.current_stage and n >= 5
-  ) p on true
+  {activity_sql.JOINS}
  where a.user_id = $1 and a.merged_into_id is null
 """
+
+
+_TALLY = f"select t.activity, count(*) as n from ({_ROWS}) t group by t.activity"
 
 
 @router.get("/applications")
@@ -86,6 +99,7 @@ async def list_applications(
     request: Request,
     phase: str | None = None,
     status: str | None = None,
+    activity: str | None = None,
     sort: str = _DEFAULT_SORT,
     limit: int = Query(default=50, ge=1, le=_MAX_LIMIT),
 ) -> dict[str, Any]:
@@ -105,19 +119,34 @@ async def list_applications(
 
     order = _SORTS.get(sort, _SORTS[_DEFAULT_SORT])
     params.append(limit)
-    sql = f"{_ROWS} {' '.join(conditions)} order by {order} limit ${len(params)}"
+    sql = (
+        f"select t.* from ({_ROWS} {' '.join(conditions)}) t"
+        f" where true{activity_sql.filter_sql(activity)}"
+        f" order by {order} limit ${len(params)}"
+    )
 
     now = datetime.now(UTC)
     async with db.session(session.user_id) as connection:
         stages = await load_stage_table(connection, session.user_id)
         rows = await connection.fetch(sql, *params)
+        tally = await connection.fetch(_TALLY, session.user_id)
         tz = await connection.fetchval("select tz from users where id = $1", session.user_id)
+
+    # What the other tabs would hold, so the board can label them without asking
+    # three more times.
+    counts = {"active": 0, "stale": 0, "closed": 0, "open": 0, "all": 0}
+    for row in tally:
+        counts[row["activity"]] = row["n"]
+        counts["all"] += row["n"]
+        if row["activity"] != "closed":
+            counts["open"] += row["n"]
 
     return {
         "rows": [_row(row, now=now, tz=tz or "UTC", stages=stages) for row in rows],
         # Never paginated today: the client asks for 200 and this mailbox has
         # dozens. Present and null so the shape does not change when it is.
         "next_cursor": None,
+        "counts": counts,
     }
 
 
@@ -569,7 +598,12 @@ def _row(row: Any, *, now: datetime, tz: str, stages: Any) -> dict[str, Any]:
         "quiet_label": quiet_label(quiet),
         "flag": flag.text,
         "flag_kind": flag.kind,
+        # `closed` is the row's own outcome and dims it in the table; `activity`
+        # is whether anything is still happening, which is not the same question
+        # and is the one the default filter and the live counter ask.
         "closed": is_closed(row["status"]),
+        "activity": row["activity"],
+        "next_interview_at": iso_z(row["next_interview_at"]),
         "needs_review": bool(row["needs_review"]),
         "confidence": num(row["confidence"]),
     }

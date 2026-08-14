@@ -424,6 +424,19 @@ td.emphasis { font: 600 14px var(--font-heading); color: var(--color-accent-800)
   .sheet, .drawer { animation: none; }
 }
 
+/* Four actions on one row at 520px: they wrap to two rows rather than
+   compressing their labels into two lines each. */
+.drawer-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+@media (min-width: 1200px) {
+  .drawer-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.drawer-actions button { white-space: nowrap; padding: 0 var(--space-2); }
+
 /* ── event log ───────────────────────────────────────────────────────────── */
 
 .event {
@@ -496,6 +509,184 @@ td.emphasis { font: 600 14px var(--font-heading); color: var(--color-accent-800)
   margin-top: var(--space-2);
 }
 .kpi-offer { background: var(--color-accent-100); }
+/* A withheld figure names its gate here too — an unexplained em dash in a KPI
+   strip reads as a broken number rather than as an honest one. */
+.kpi-note {
+  font-size: 11px;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  margin-top: 4px;
+}
+
+/* ── the account, behind its own avatar ──────────────────────────────────── */
+
+.profile { position: relative; margin-left: var(--space-4); }
+.profile-button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.profile-button[aria-current='page'] .avatar,
+.profile-button[aria-expanded='true'] .avatar {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  object-fit: cover;
+  background: var(--color-accent-800);
+  color: var(--color-neutral-100);
+  font: 600 12px var(--font-heading);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.profile-menu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 50;
+  min-width: 230px;
+  display: grid;
+  background: var(--color-bg);
+  border: 1px solid var(--color-divider);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-neutral-900) 12%, transparent);
+}
+.profile-menu-head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+}
+.profile-menu [role='menuitem'] {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  text-align: left;
+  background: none;
+  border: 0;
+  font: 600 12px var(--font-heading);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 75%, transparent);
+  line-height: 40px;
+  text-decoration: none;
+}
+.profile-menu [role='menuitem']:hover { background: var(--color-accent-100); }
+
+/* ── charts ──────────────────────────────────────────────────────────────── */
+
+.chart { margin: 0; }
+.chart figcaption {
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin-top: var(--space-3);
+  max-width: 68ch;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chart-legend i { width: 10px; height: 10px; display: inline-block; }
+
+.chart-plot { position: relative; }
+.chart-plot svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.chart-plot rect { transition: opacity 120ms ease-out; }
+.chart-plot:hover rect { opacity: 0.72; }
+.chart-plot rect:hover { opacity: 1; }
+/* Hairline, solid, one step off the surface: the grid is not data. */
+.chart-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--color-divider);
+  pointer-events: none;
+}
+.chart-gridline span {
+  position: absolute;
+  left: -28px;
+  top: -7px;
+  width: 24px;
+  text-align: right;
+  font-size: 10.5px;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+.chart-axis {
+  display: flex;
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.chart-axis span { text-align: center; }
+
+.outcome-bar { display: flex; height: 34px; gap: 2px; }
+.outcome-bar span {
+  display: grid;
+  place-items: center;
+  min-width: 3px;
+  font: 600 12px var(--font-heading);
+}
+
+.hbar {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 46px 44px;
+  gap: var(--space-3);
+  align-items: center;
+  margin-bottom: 7px;
+  font-size: 12.5px;
+}
+.hbar-label { color: color-mix(in srgb, var(--color-text) 70%, transparent); }
+.hbar-track { height: 14px; background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.hbar-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent-600);
+  border-radius: 0 2px 2px 0;
+}
+.hbar-value { text-align: right; font: 600 13px var(--font-heading); }
+.hbar-note { font-size: 11px; }
+
+.chip-count {
+  margin-left: 6px;
+  font-size: 10.5px;
+  opacity: 0.75;
+}
+.row-selected { background: var(--color-accent-100); }
+.row-tag {
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--color-divider);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.row-tag-accent { border-color: var(--color-accent-400); color: var(--color-accent-800); }
+
+.field {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-divider);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  border-radius: 0;
+}
 
 .desk-layout {
   display: grid;

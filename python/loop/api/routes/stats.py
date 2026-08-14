@@ -15,7 +15,7 @@ from typing import Any, Final, Literal
 
 from fastapi import APIRouter, Request
 
-from loop.api import auth
+from loop.api import activity_sql, auth
 from loop.db import load_stage_table
 from loop.domain import (
     Metric,
@@ -93,29 +93,30 @@ def _funnel_sql(window: str) -> str:
 
 def _conversion_sql(window: str) -> str:
     return f"""
-    with cohort as (
-      select r.*, a.current_phase from app_phase_reach r
-      join applications a on a.id = r.id
+    with {activity_sql.CTE}, cohort as (
+      select r.*, act.activity from app_phase_reach r
+      join act on act.id = r.id
       where r.user_id = $1 {window}
     ), judged as (
-      select *, (status = 'live' and not reached_interview
+      select *, (activity <> 'closed' and not reached_interview
                  and applied_at > now() - interval '{_IMMATURE_DAYS} days') as immature
         from cohort
     )
     select count(*) filter (where reached_interview and not immature) as numerator,
            count(*) filter (where not immature) as denominator,
            count(*) filter (where immature) as excluded,
-           count(*) filter (where status <> 'live') as closed
+           count(*) filter (where activity = 'closed') as closed
       from judged
     """
 
 
 def _offers_sql(window: str) -> str:
     return f"""
+    with {activity_sql.CTE}
     select count(*) filter (where reached_offer) as numerator,
-           count(*) filter (where reached_interview and status <> 'live') as denominator,
-           count(*) filter (where status <> 'live') as closed
-      from app_phase_reach r
+           count(*) filter (where reached_interview and act.activity = 'closed') as denominator,
+           count(*) filter (where act.activity = 'closed') as closed
+      from app_phase_reach r join act on act.id = r.id
      where r.user_id = $1 {window}
     """
 
@@ -133,20 +134,76 @@ def _timing_sql(window: str) -> str:
 
 def _ghosted_sql(window: str) -> str:
     return f"""
-    select count(*) filter (where status = 'dormant') as ghosted,
-           count(*) filter (where status <> 'live') as closed
-      from app_phase_reach r
+    with {activity_sql.CTE}
+    select count(*) filter (where {activity_sql.GHOSTED}) as ghosted,
+           count(*) filter (where act.activity = 'closed') as closed
+      from app_phase_reach r join act on act.id = r.id
      where r.user_id = $1 {window}
     """
 
 
-# The three views below carry no row-level security of their own — a plain view
-# resolves its base tables as the owner — so the `user_id` predicate in each is
-# the whole of the isolation, not a belt over a policy's braces.
-_CHANNELS = """
-select channel, sent, interviews, offers, ghosted
-  from channel_effectiveness where user_id = $1 order by sent desc
-"""
+def _channels_sql() -> str:
+    """Inlined rather than read from `channel_effectiveness`.
+
+    That view counts a ghost as `status = 'dormant'` and so under-reports it by
+    exactly the applications this change is about — the ones nothing has ever
+    marked closed. Same grouping, same first-touch attribution.
+    """
+    return f"""
+    with {activity_sql.CTE}
+    select s.channel, count(*) as sent,
+           count(*) filter (where r.reached_interview) as interviews,
+           count(*) filter (where r.reached_offer) as offers,
+           count(*) filter (where {activity_sql.GHOSTED}) as ghosted
+      from sources s
+      join app_phase_reach r on r.id = s.application_id
+      join act on act.id = s.application_id
+     where s.is_first_touch and r.user_id = $1
+     group by s.channel order by count(*) desc
+    """
+
+
+def _by_month_sql(window: str) -> str:
+    """Volume over time, and how much of each month came back.
+
+    Three series on one month axis: what you sent, what replied, what reached an
+    interview. It is the one view that answers "is this getting better?", which
+    no ratio over a twelve-month window can.
+    """
+    return f"""
+    select to_char(date_trunc('month',
+             coalesce(a.applied_at, a.created_at)), 'YYYY-MM') as month,
+           count(*) as applied,
+           count(*) filter (where r.first_human_at is not null) as replied,
+           count(*) filter (where r.reached_interview) as interviews,
+           count(*) filter (where r.reached_offer) as offers
+      from applications a
+      join app_phase_reach r on r.id = a.id
+     where a.user_id = $1 and a.merged_into_id is null {window}
+     group by 1 order by 1
+    """
+
+
+def _outcomes_sql(window: str) -> str:
+    """How they ended.
+
+    Keyed on `status` inside the closed set, so the five outcomes are mutually
+    exclusive and exhaustive — the bar sums to the cohort and no application is
+    counted under two endings.
+    """
+    return f"""
+    with {activity_sql.CTE}
+    select count(*) filter (where act.activity <> 'closed') as open,
+           count(*) filter (where act.activity = 'closed'
+                              and act.status = 'accepted') as accepted,
+           count(*) filter (where act.activity = 'closed'
+                              and act.status = 'rejected') as rejected,
+           count(*) filter (where {activity_sql.GHOSTED}) as ghosted,
+           count(*) filter (where act.activity = 'closed'
+                              and act.status = 'withdrawn') as withdrawn
+      from app_phase_reach r join act on act.id = r.id
+     where r.user_id = $1 {window}
+    """
 
 _DWELL = """
 select stage, p50_days, n from stage_dwell_in where user_id = $1 order by stage
@@ -183,10 +240,14 @@ async def stats(request: Request, period: str = _DEFAULT_PERIOD) -> dict[str, An
         ghosted = await connection.fetchrow(
             _ghosted_sql(_REACH_WINDOW[window]), session.user_id
         )
-        channels = await connection.fetch(_CHANNELS, session.user_id)
+        channels = await connection.fetch(_channels_sql(), session.user_id)
         dwell = await connection.fetch(_DWELL, session.user_id)
         comp = await connection.fetch(_COMP, session.user_id)
         quarters = await connection.fetchval(_QUARTERS, session.user_id)
+        by_month = await connection.fetch(_by_month_sql(_WINDOW[window]), session.user_id)
+        outcomes = await connection.fetchrow(
+            _outcomes_sql(_REACH_WINDOW[window]), session.user_id
+        )
 
     to_interview = ratio(
         numerator=conversion["numerator"],
@@ -228,6 +289,24 @@ async def stats(request: Request, period: str = _DEFAULT_PERIOD) -> dict[str, An
         "channels": [_channel(row) for row in channels],
         "channel_note": _CHANNEL_NOTE,
         "time_in_stage": [_stage(row, stages) for row in dwell],
+        "by_month": [
+            {
+                "month": row["month"],
+                "label": _month_label(row["month"]),
+                "applied": row["applied"],
+                "replied": row["replied"],
+                "interviews": row["interviews"],
+                "offers": row["offers"],
+            }
+            for row in by_month
+        ],
+        "outcomes": {
+            "open": outcomes["open"],
+            "accepted": outcomes["accepted"],
+            "rejected": outcomes["rejected"],
+            "ghosted": outcomes["ghosted"],
+            "withdrawn": outcomes["withdrawn"],
+        },
         "compensation": _compensation(comp, currency or "EUR"),
         # The reference emitted the "needs two quarters" sentence even once it
         # had them, from a constant rather than from its own gate. The gate is
@@ -268,6 +347,11 @@ def _channel(row: Any) -> dict[str, Any]:
         # em dash is the answer, so the column has one type either way.
         return format_percent(count / sent) if gate_met and sent else "—"
 
+    def value(count: int) -> float | None:
+        # The raw rate as well as the string: a bar cannot be drawn from an em
+        # dash, and the client is still forbidden from doing the division.
+        return count / sent if gate_met and sent else None
+
     return {
         "name": row["channel"],
         "sent": sent,
@@ -277,18 +361,41 @@ def _channel(row: Any) -> dict[str, Any]:
         # `iv` and does not mean what its neighbour means.
         "of": rate(row["offers"]),
         "ghost": rate(row["ghosted"]),
+        "iv_value": value(row["interviews"]),
+        "of_value": value(row["offers"]),
+        "ghost_value": value(row["ghosted"]),
+        "interviews": row["interviews"],
+        "offers": row["offers"],
+        "ghosted": row["ghosted"],
         "note": note,
     }
 
 
 def _stage(row: Any, stages: Any) -> dict[str, Any]:
-    metric = dwell_metric(float(row["p50_days"]), row["n"])
+    days = float(row["p50_days"])
+    metric = dwell_metric(days, row["n"])
     return {
         "stage": stages.label_of(row["stage"]),
-        "days": float(row["p50_days"]),
+        # Rounded here, and shipped with the string to print. `p50_days` is a
+        # percentile over epoch seconds, so it arrives as 12.416666666666666 and
+        # the client used to render every digit of it.
+        "days": round(days, 1),
+        "display": format_days(days),
         "n": row["n"],
         "gate_met": metric.gate_met,
     }
+
+
+_MONTHS = (
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+)
+
+
+def _month_label(month: str) -> str:
+    """"Mar 26" from "2026-03". The axis is not built in a browser either."""
+    year, number = month.split("-")
+    return f"{_MONTHS[int(number) - 1]} {year[2:]}"
 
 
 def _compensation(rows: Any, display_currency: str) -> dict[str, Any]:

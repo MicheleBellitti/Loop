@@ -186,6 +186,107 @@ event can reintroduce it later without renumbering.
 
 ---
 
+## F. Found by using it
+
+Defects that only a person with a year of their own mail in the database can find, and what
+each one turned out to be underneath.
+
+### F1 — "Live applications" counted rows nobody had closed, not applications in progress. RESOLVED
+
+`status` is `live` from the moment an application is created until something moves it: a
+rejection, the nightly sweep, or a human. Nothing else does. So a mailbox read for twelve
+months accumulates dozens of `live` rows nobody has thought about since spring, and the
+counter that leads the product read fourteen where the truth was four.
+
+The sweep is not the fix. It marks an application `dormant` past its stage's staleness and
+`presumed_closed` past ninety days of silence — but it is a cron job on a box that may have
+been off, it has been broken before for two days without anybody noticing (migration 015), and
+its verdict lands in the database seconds-to-hours after the truth changed. A figure on a
+screen should not depend on whether a job ran last night.
+
+**Adopted.** A third derived value beside `status` and `phase`, computed from the row every
+time it is read:
+
+```
+closed — status ≠ live, or presumed_closed, or silent past the closure threshold
+stale  — quiet past this stage's threshold (stale_after_days, or 2 × your own p90)
+active — moving, waiting on you, or with an interview in the calendar
+```
+
+in that order, with two rules that outrank silence: an uncancelled interview in the future
+always reads `active` — a loop booked six weeks out is a long quiet gap that means the
+opposite of what quiet usually means — and `take_home`, `offer` and `negotiating` are never
+written off, which is the same exemption the sweep already makes because the ball is in the
+user's court.
+
+The closure threshold is **90 days**, and **60 days for the `sent` phase** — `applied` or
+`acknowledged` and nothing since. The shorter number is not a guess about people; it is a
+statement about what is being waited for. Past a screening call there is a panel to convene
+and a calendar to fit, and the evidence for 90 days is in `PRESUMED_CLOSED_DAYS` (the longest
+observed revival across a real twelve-month mailbox was 20 days). Before any human has replied
+at all there is nothing to convene. Two months of that is a no that nobody typed.
+
+`packages/domain/src/activity.ts` and `loop/domain/activity.py` hold the ladder and its tests;
+the SQL that asks the same question of a whole table is built from the same constants, next to
+each, because a threshold that changes in one place and not the other is worse than either
+value alone.
+
+### F2 — Every ratio on the statistics page showed an em dash beside a funnel full of numbers. RESOLVED
+
+Same cause, and it is the reason F1 is worth the surgery rather than a relabelled counter. The
+display gates in §11 are counted in *closed* applications — eight of them before a percentage
+is honest — and "closed" meant `status <> 'live'`. On a real mailbox most applications are not
+rejected, they stop replying, so the denominator crawled and the gate never opened. The page
+withheld figures it had ample data for while showing a funnel with twenty applications in it,
+which reads as broken rather than as careful.
+
+The metric cohort is now judged by `activity`: a process silent for three months counts as the
+closed application it is. Ghost rate follows the same correction — it counts everything that
+closed without anybody ever saying no, which is precisely what the number claims to measure,
+and it was previously blind to every application the sweep had not reached. `channel_effectiveness`
+is read inline for the same reason; the view's `status = 'dormant'` under-reports by exactly
+that set.
+
+Nothing about the gates themselves moved. Eight closed applications, five transitions, three
+first-touch applications, two quarters — unchanged.
+
+### F3 — Four controls on the application record did nothing at all. RESOLVED
+
+`Draft follow-up` and `Correct stage` had no handler in the desktop drawer. `Open thread` was
+wired to `posting_url`, which is null on most rows, so it sat disabled and unexplained.
+`Archive` fired a mutation with no success and no failure path — the drawer closed whatever
+happened, including on a 403. In the bulk bar, `Set stage…` was permanently disabled and
+`Export CSV` linked at the flat export route and handed back the whole account while sitting
+under a line reading "3 selected".
+
+The interesting one is `Draft follow-up`, because it had been *written* — the mobile detail
+view called `/api/suggestions/follow_up_due:{id}/draft`, a key that exists only if a nudge rule
+happened to fire for that application. For every other row it 404s, and the sheet showed a
+loading skeleton for ever. The composition never needed a suggestion, so there is now
+`GET /api/applications/{id}/draft` beside it, and the sheet renders the failure rather than
+spinning on it.
+
+Corollary, applied everywhere: a mutation with no `onError` is a control that lies. Each one
+now reports what happened, reading `error.code` and never `error.message`, which is the §13
+contract.
+
+### F4 — The board opened on twelve months of history. RESOLVED
+
+`/api/applications` defaults to `activity=open` — active and stale, everything not written off
+— and the filter is applied in SQL rather than to the fetched page, because a filter applied
+after `limit` returns a short page and calls it the pipeline. History is a tab, with its own
+count, one click away. A quiet application stays in the default view: it is the one that most
+needs a follow-up, and hiding it would be the same mistake in the other direction.
+
+### F5 — Figures rendered with fourteen decimal places. RESOLVED
+
+`stage_dwell_in.p50_days` is a percentile over epoch seconds, so median time in stage arrived
+as `12.416666666666666` and the desktop printed all of it. The server now rounds it and ships
+the string to print beside the number, the same way every other figure in this API already
+travels with its own formatting. The client formats nothing.
+
+---
+
 ## Owner decisions — settled
 
 - **OPEN-1 → P0 through P3.** The full system, RLS on from migration 001 so the multi-tenant

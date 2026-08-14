@@ -118,25 +118,47 @@ async def draft(request: Request, key: str) -> dict[str, Any]:
         # let-it-go card and not something a draft can paper over.
         if not application_ids:
             raise ApiError(404, "not_found", "no draft for that suggestion")
-
-        application = await connection.fetchrow(
-            """
-            select c.canonical_name as company, a.current_stage
-              from applications a join companies c on c.id = a.company_id
-             where a.id = $1 and a.merged_into_id is null
-            """,
-            str(application_ids[0]),
-        )
-        if application is None:
+        composed = await _compose(connection, session.user_id, str(application_ids[0]))
+        if composed is None:
             raise ApiError(404, "not_found", "no draft for that suggestion")
-        stages = await load_stage_table(connection, session.user_id)
-        last = await connection.fetchrow(
-            """
-            select type, to_stage, payload from application_events
-             where application_id = $1 order by occurred_at desc, id desc limit 1
-            """,
-            str(application_ids[0]),
-        )
+    return composed
+
+
+@router.get("/applications/{application_id}/draft")
+async def application_draft(request: Request, application_id: str) -> dict[str, Any]:
+    """The same draft, for an application with no suggestion behind it.
+
+    "Draft follow-up" sits on every application record, but the only draft route
+    there was keyed on a suggestion — so the button worked on the two or three
+    applications a nudge rule happened to have fired for, and 404ed on the rest.
+    """
+    session = auth.require(getattr(request.state, "session", None))
+    async with request.app.state.db.session(session.user_id) as connection:
+        composed = await _compose(connection, session.user_id, application_id)
+    if composed is None:
+        raise ApiError(404, "not_found", "no such application")
+    return composed
+
+
+async def _compose(connection: Any, user_id: str, application_id: str) -> dict[str, Any] | None:
+    application = await connection.fetchrow(
+        """
+        select c.canonical_name as company, a.current_stage
+          from applications a join companies c on c.id = a.company_id
+         where a.id = $1 and a.merged_into_id is null
+        """,
+        application_id,
+    )
+    if application is None:
+        return None
+    stages = await load_stage_table(connection, user_id)
+    last = await connection.fetchrow(
+        """
+        select type, to_stage, payload from application_events
+         where application_id = $1 order by occurred_at desc, id desc limit 1
+        """,
+        application_id,
+    )
 
     payload = (last["payload"] or {}) if last else {}
     composed = build_draft(

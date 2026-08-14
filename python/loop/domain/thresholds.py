@@ -120,6 +120,13 @@ PRESUMED_CLOSED_DAYS: Final = 90
 # Never presume closure while the ball is in the user's court.
 PRESUMED_CLOSED_SKIP_STAGES: Final = frozenset({"take_home", "offer", "negotiating"})
 
+# The same judgement, earlier, for an application that never got past the
+# sending of it. `applied` and `acknowledged` mean nobody has read your name out
+# loud yet, and two months of silence there is not a slow process — it is a
+# process that never started. Sixty rather than ninety because there is nothing
+# to wait for: no interviewer's calendar, no panel to convene.
+NO_REPLY_CLOSED_DAYS: Final = 60
+
 
 # ── Connector (Spec §06) ────────────────────────────────────────────────────
 WATCH_RENEW_EVERY_HOURS: Final = 24

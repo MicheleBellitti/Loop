@@ -24,6 +24,7 @@ by a day, and off by a different day depending on the server's timezone.
 
 import csv
 import io
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -60,15 +61,35 @@ _TABLES = {
 }
 
 
+_SELECTED = """
+    select a.*, c.canonical_name as company from applications a
+      join companies c on c.id = a.company_id
+     where a.user_id = $1 and a.id = any($2::uuid[]) order by a.created_at, a.id
+"""
+# A selection is a handful of rows the user ticked, not a data-subject request.
+_MAX_SELECTED = 200
+
+
 @router.get("/export")
-async def export(request: Request, format: str = "json") -> Response:
+async def export(request: Request, format: str = "json", ids: str | None = None) -> Response:
+    """The whole account, or the rows the board has selected.
+
+    `ids` exists because the bulk bar offers "export these" while sitting under
+    a line that says how many are selected, and handing back the entire account
+    there is a different thing from the one the button names.
+    """
     session = auth.require(getattr(request.state, "session", None))
+    selected = _ids(ids)
 
     async with request.app.state.db.session(session.user_id) as connection:
         if format == "csv":
             # Only the applications, and only that query: the reference ran all
             # five and discarded four.
-            rows = await connection.fetch(_TABLES["applications"], session.user_id)
+            rows = (
+                await connection.fetch(_SELECTED, session.user_id, selected)
+                if selected
+                else await connection.fetch(_TABLES["applications"], session.user_id)
+            )
             return _csv([_plain(row) for row in rows])
         tables = {
             name: [_plain(row) for row in await connection.fetch(sql, session.user_id)]
@@ -79,6 +100,22 @@ async def export(request: Request, format: str = "json") -> Response:
         tables,
         headers={"content-disposition": 'attachment; filename="loop-export.json"'},
     )
+
+
+def _ids(raw: str | None) -> list[str]:
+    """A comma-separated selection, or nothing at all.
+
+    Anything that is not an application id is dropped rather than 400ing: the
+    fallback is the whole account, which is what the route did before `ids`
+    existed and is never wrong, only broader.
+    """
+    if not raw:
+        return []
+    candidates = [part.strip() for part in raw.split(",") if part.strip()]
+    return [c for c in candidates if _UUID.match(c)][:_MAX_SELECTED]
+
+
+_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 
 def _csv(rows: list[dict[str, Any]]) -> Response:

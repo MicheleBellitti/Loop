@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type ReviewItem } from '../api.js';
-import { Blueprint, Button, Skeleton } from '../components.js';
+import { Blueprint, Button, Skeleton, Toast } from '../components.js';
+import { failure } from '../desktop/Drawer.js';
 
 /**
  * The review queue — the ~1% the agent could not place confidently.
@@ -11,6 +13,7 @@ import { Blueprint, Button, Skeleton } from '../components.js';
  */
 export function ReviewQueue({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
+  const [toast, setToast] = useState<string | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ['review'],
     queryFn: () => api.get<{ items: ReviewItem[] }>('/api/review'),
@@ -22,7 +25,13 @@ export function ReviewQueue({ onClose }: { onClose: () => void }) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['review'] });
       void queryClient.invalidateQueries({ queryKey: ['today'] });
+      // An answer moves an application, so the board and the figures move too.
+      void queryClient.invalidateQueries({ queryKey: ['applications'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
+    // Without this the card simply stayed put on a failure and the answer
+    // looked like it had been ignored.
+    onError: (error) => setToast(failure(error, 'That answer did not save. Nothing was changed.')),
   });
 
   const items = data?.items ?? [];
@@ -116,6 +125,7 @@ export function ReviewQueue({ onClose }: { onClose: () => void }) {
           ),
         )}
       </div>
+      {toast ? <Toast message={toast} onDismiss={() => setToast(null)} /> : null}
     </div>
   );
 }

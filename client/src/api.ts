@@ -60,11 +60,18 @@ export const api = {
 
 // ── shapes ─────────────────────────────────────────────────────────────────
 
+/**
+ * `live` is applications that are actually moving — not every row the sweep has
+ * not got round to closing. `quiet` is the ones past their stage's threshold
+ * and worth chasing; `closed` is everything the pipeline is done with.
+ */
 export interface Counters {
   live: number;
+  quiet: number;
   interviewing: number;
   offer: number;
   overdue: number;
+  closed: number;
 }
 
 export interface MailboxHealth {
@@ -121,6 +128,12 @@ export interface Today {
   closing_line: string;
 }
 
+/** Derived by the server, never here. See `packages/domain/src/activity.ts`. */
+export type Activity = 'active' | 'stale' | 'closed';
+
+/** What the board can ask for. `open` is active + stale, and it is the default. */
+export type ActivityFilter = 'open' | 'active' | 'stale' | 'closed' | 'all';
+
 export interface ApplicationRow {
   id: string;
   company: string;
@@ -137,8 +150,17 @@ export interface ApplicationRow {
   flag: string;
   flag_kind: string;
   closed: boolean;
+  activity: Activity;
+  next_interview_at: string | null;
   needs_review: boolean;
   confidence: number;
+}
+
+export interface ApplicationList {
+  rows: ApplicationRow[];
+  next_cursor: string | null;
+  /** How many rows each filter would return, for the tab labels. */
+  counts: Record<ActivityFilter, number>;
 }
 
 export interface ApplicationDetail extends ApplicationRow {
@@ -186,10 +208,34 @@ export interface Stats {
     iv: string;
     of: string;
     ghost: string;
+    /** The same rates as numbers, for the bars. Null below the gate. */
+    iv_value: number | null;
+    of_value: number | null;
+    ghost_value: number | null;
+    interviews: number;
+    offers: number;
+    ghosted: number;
     note: string;
   }>;
   channel_note: string;
-  time_in_stage: Array<{ stage: string; days: number; n: number; gate_met: boolean }>;
+  time_in_stage: Array<{ stage: string; days: number; display: string; n: number; gate_met: boolean }>;
+  /** One row per month in the window: what you sent and what came back. */
+  by_month: Array<{
+    month: string;
+    label: string;
+    applied: number;
+    replied: number;
+    interviews: number;
+    offers: number;
+  }>;
+  /** Mutually exclusive and exhaustive over the cohort. */
+  outcomes: {
+    open: number;
+    accepted: number;
+    rejected: number;
+    ghosted: number;
+    withdrawn: number;
+  };
   compensation: {
     domain: { min: number; max: number; currency: string } | null;
     posted: Array<{ from: number; to: number; label: string }>;

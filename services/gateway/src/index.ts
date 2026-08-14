@@ -171,6 +171,9 @@ app.get('/api/today', async (req) =>
 const ListQuery = z.object({
   phase: z.string().optional(),
   status: z.string().optional(),
+  // Defaulted in `listApplications`, not here, so the mobile client — which
+  // sends no query at all — gets the same board as the desktop one.
+  activity: z.enum(['open', 'active', 'stale', 'closed', 'all']).optional(),
   sort: z.enum(['last_signal', 'stage_depth', 'company']).optional(),
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -491,6 +494,23 @@ app.post('/api/suggestions/:key/snooze', async (req) => {
   return { ok: true };
 });
 
+/**
+ * The draft for one application, with no suggestion behind it.
+ *
+ * "Draft follow-up" sits on every application record, but the only draft route
+ * there was keyed on a suggestion — so the button worked on the two or three
+ * applications a nudge rule happened to have fired for, and 404ed on the rest.
+ * The composition is identical; what changes is that the caller may name the
+ * application directly.
+ */
+app.get('/api/applications/:id/draft', async (req, reply) => {
+  const params = IdParam.safeParse(req.params);
+  if (!params.success) return fail(reply, 'bad_id', 'that is not an application id', 400, 'id');
+  const draft = await withUserReadOnly(userOf(req), (sql) => draftFor(sql, params.data.id), pool);
+  if (!draft) return fail(reply, 'not_found', 'no such application', 404);
+  return { ...draft, can_send: false, note: 'Loop holds a read-only scope, so it cannot send this.' };
+});
+
 app.get('/api/suggestions/:key/draft', async (req, reply) => {
   const { key } = req.params as { key: string };
   const draft = await withUserReadOnly(userOf(req), async (sql) => {
@@ -500,42 +520,7 @@ app.get('/api/suggestions/:key/draft', async (req, reply) => {
     );
     const applicationId = s.rows[0]?.application_ids?.[0];
     if (!applicationId) return null;
-
-    const a = await sql.query<{
-      company: string;
-      current_stage: string;
-      last_signal_at: Date | null;
-      label: string | null;
-    }>(
-      `select c.canonical_name as company, a.current_stage, a.last_signal_at, sd.label
-         from applications a
-         join companies c on c.id = a.company_id
-         left join stage_defs sd on sd.user_id = a.user_id and sd.key = a.current_stage
-        where a.id = $1`,
-      [applicationId],
-    );
-    const row = a.rows[0];
-    if (!row) return null;
-
-    const lastEvent = await sql.query<{ payload: Record<string, unknown>; type: string; to_stage: string | null }>(
-      `select payload, type, to_stage from application_events
-        where application_id = $1 order by occurred_at desc limit 1`,
-      [applicationId],
-    );
-
-    return buildDraft({
-      company: row.company,
-      contactName: null,
-      stageLabel: row.label ?? row.current_stage,
-      lastEventLabel: row.label ?? null,
-      daysQuiet: row.last_signal_at
-        ? Math.floor((Date.now() - row.last_signal_at.getTime()) / 86_400_000)
-        : 0,
-      language: (lastEvent.rows[0]?.payload?.language as 'it' | 'en') ?? 'en',
-      threadMessageId: (lastEvent.rows[0]?.payload?.thread_id as string) ?? null,
-      toAddress: null,
-      subject: null,
-    });
+    return draftFor(sql, applicationId);
   }, pool);
 
   if (!draft) return fail(reply, 'not_found', 'no draft for that suggestion', 404);
@@ -543,6 +528,44 @@ app.get('/api/suggestions/:key/draft', async (req, reply) => {
   // deliver it, and `npm run lint:no-send-path` asserts as much.
   return { ...draft, can_send: false, note: 'Loop holds a read-only scope, so it cannot send this.' };
 });
+
+async function draftFor(sql: pg.PoolClient, applicationId: string) {
+  const a = await sql.query<{
+    company: string;
+    current_stage: string;
+    last_signal_at: Date | null;
+    label: string | null;
+  }>(
+    `select c.canonical_name as company, a.current_stage, a.last_signal_at, sd.label
+       from applications a
+       join companies c on c.id = a.company_id
+       left join stage_defs sd on sd.user_id = a.user_id and sd.key = a.current_stage
+      where a.id = $1 and a.merged_into_id is null`,
+    [applicationId],
+  );
+  const row = a.rows[0];
+  if (!row) return null;
+
+  const lastEvent = await sql.query<{ payload: Record<string, unknown>; type: string; to_stage: string | null }>(
+    `select payload, type, to_stage from application_events
+      where application_id = $1 order by occurred_at desc limit 1`,
+    [applicationId],
+  );
+
+  return buildDraft({
+    company: row.company,
+    contactName: null,
+    stageLabel: row.label ?? row.current_stage,
+    lastEventLabel: row.label ?? null,
+    daysQuiet: row.last_signal_at
+      ? Math.floor((Date.now() - row.last_signal_at.getTime()) / 86_400_000)
+      : 0,
+    language: (lastEvent.rows[0]?.payload?.language as 'it' | 'en') ?? 'en',
+    threadMessageId: (lastEvent.rows[0]?.payload?.thread_id as string) ?? null,
+    toAddress: null,
+    subject: null,
+  });
+}
 
 // ── Push subscriptions ─────────────────────────────────────────────────────
 const Subscription = z.object({
@@ -567,14 +590,29 @@ app.get('/api/push/key', async () => ({ public_key: config.vapid.publicKey }));
 
 // ── Export and erasure ─────────────────────────────────────────────────────
 app.get('/api/export', async (req, reply) => {
-  const format = ((req.query as { format?: string }).format ?? 'json') as 'json' | 'csv';
+  const query = req.query as { format?: string; ids?: string };
+  const format = (query.format ?? 'json') as 'json' | 'csv';
   const userId = userOf(req);
+  // A selection, for the bulk bar's "export these" — which used to link at the
+  // flat route and hand back the whole account while sitting under a line that
+  // said how many were selected. Ids that are not ids are dropped rather than
+  // rejected: the fallback is everything, which is never wrong, only broader.
+  const selected = (query.ids ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
+    .slice(0, 200);
+
   // "Complete event log, machine-readable, no rate limit for the owner."
   const data = await withUserReadOnly(userId, async (sql) => {
     const applications = await sql.query(
-      `select a.*, c.canonical_name as company from applications a
-         join companies c on c.id = a.company_id where a.user_id = $1 order by a.created_at`,
-      [userId],
+      selected.length
+        ? `select a.*, c.canonical_name as company from applications a
+             join companies c on c.id = a.company_id
+            where a.user_id = $1 and a.id = any($2::uuid[]) order by a.created_at`
+        : `select a.*, c.canonical_name as company from applications a
+             join companies c on c.id = a.company_id where a.user_id = $1 order by a.created_at`,
+      selected.length ? [userId, selected] : [userId],
     );
     const events = await sql.query(
       `select * from application_events where user_id = $1 order by occurred_at, id`,

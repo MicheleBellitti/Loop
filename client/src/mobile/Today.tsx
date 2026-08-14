@@ -59,7 +59,9 @@ export function Today({
       <div className="counters">
         <div>
           <div className="counter-n">{counters.live}</div>
-          <div className="counter-label">live</div>
+          {/* "Live" counted every row nothing had got round to closing, which on
+              a year-old mailbox is most of them. It counts what is moving. */}
+          <div className="counter-label">in progress</div>
         </div>
         <div className="counter-interviewing">
           <div className="counter-n">{counters.interviewing}</div>
@@ -70,6 +72,13 @@ export function Today({
           <div className="counter-label">{counters.offer === 1 ? 'offer' : 'offers'}</div>
         </div>
       </div>
+
+      {counters.quiet > 0 ? (
+        <p className="muted-55" style={{ fontSize: 12.5, margin: '-6px 0 var(--space-4)' }}>
+          {counters.quiet} more {counters.quiet === 1 ? 'is' : 'are'} quiet past their usual wait, and{' '}
+          {counters.closed} {counters.closed === 1 ? 'is' : 'are'} closed.
+        </p>
+      ) : null}
 
       {data.next_interview ? (
         <Blueprint>

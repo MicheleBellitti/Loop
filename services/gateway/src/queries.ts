@@ -10,7 +10,10 @@ import {
   GATES,
   quietLabel,
   ratio,
+  RATIO_MATURITY_DAYS,
+  SILENCE,
   StageTable,
+  type Activity,
   type AppStatus,
   type DomainEvent,
   type Metric,
@@ -68,16 +71,48 @@ export interface ApplicationRow {
   flag: string;
   flag_kind: string;
   closed: boolean;
+  /** Whether this is still happening. See `activity.ts` for the ladder. */
+  activity: Activity;
+  next_interview_at: string | null;
   needs_review: boolean;
   confidence: number;
 }
+
+/**
+ * `activityOf`, as one SQL expression.
+ *
+ * The same ladder, in the same order, over a whole table — the numbers come
+ * from the same constants so the two cannot drift apart on a threshold change,
+ * and `activity.ts` carries the argument for each rung. It is SQL and not a
+ * post-filter in TypeScript because the board, the counters and every ratio ask
+ * this question with a `where` on it, and a filter applied after `limit` would
+ * quietly return short pages.
+ *
+ * It reads `sd`, `d` and `nx` from the select below.
+ */
+const ACTIVITY_SQL = `
+  case
+    when a.status <> 'live' then 'closed'
+    when nx.starts_at is not null then 'active'
+    when a.presumed_closed then 'closed'
+    when a.current_stage in (${SILENCE.SKIP_STAGES.map((s) => `'${s}'`).join(',')}) then 'active'
+    when a.last_signal_at is null then 'active'
+    when a.last_signal_at < now() - make_interval(days => case when a.current_phase = 'sent'
+           then ${SILENCE.NO_REPLY_CLOSED_DAYS} else ${SILENCE.PRESUMED_CLOSED_DAYS} end) then 'closed'
+    when a.last_signal_at < now() - make_interval(days =>
+           ceil(greatest(coalesce(sd.stale_after_days, 21), coalesce(2 * d.p90_days, 0)))::int) then 'stale'
+    else 'active'
+  end`;
 
 const APPLICATION_SELECT = `
   select a.id, c.canonical_name as company, a.role_title, a.current_stage, a.current_phase,
          a.status, a.applied_at, a.last_signal_at, a.needs_review, a.presumed_closed, a.confidence,
          s.channel,
          sd.stale_after_days,
+         sd.depth,
          d.p90_days,
+         nx.starts_at as next_interview_at,
+         ${ACTIVITY_SQL} as activity,
          (select min(due_at) from deadlines dl
            where dl.application_id = a.id and dl.met_at is null and dl.due_at > now()) as deadline_at,
          (select min(decide_by) from comp_offers co
@@ -87,6 +122,10 @@ const APPLICATION_SELECT = `
     left join sources s on s.application_id = a.id and s.is_first_touch
     left join stage_defs sd on sd.user_id = a.user_id and sd.key = a.current_stage
     left join stage_dwell_in d on d.user_id = a.user_id and d.stage = a.current_stage and d.n >= 5
+    left join lateral (
+      select min(i.starts_at) as starts_at from interviews i
+       where i.application_id = a.id and i.cancelled_at is null and i.starts_at > now()
+    ) nx on true
    where a.user_id = $1 and a.merged_into_id is null`;
 
 interface RawApplicationRow {
@@ -104,6 +143,8 @@ interface RawApplicationRow {
   channel: string | null;
   stale_after_days: number | null;
   p90_days: number | null;
+  next_interview_at: Date | null;
+  activity: Activity;
   deadline_at: Date | null;
   decide_by: Date | null;
 }
@@ -137,7 +178,12 @@ function toRow(r: RawApplicationRow, user: UserContext, now: Date): ApplicationR
     quiet_label: quietLabel(quiet),
     flag: flag.text,
     flag_kind: flag.kind,
+    // `closed` is the row's own outcome and dims it in the table; `activity` is
+    // whether anything is still happening, which is not the same question and
+    // is the one the default filter and the live counter ask.
     closed: r.status !== 'live',
+    activity: r.activity,
+    next_interview_at: r.next_interview_at?.toISOString() ?? null,
     needs_review: r.needs_review,
     confidence: Number(r.confidence),
   };
@@ -146,16 +192,35 @@ function toRow(r: RawApplicationRow, user: UserContext, now: Date): ApplicationR
 export interface ListOptions {
   phase?: string;
   status?: string;
+  /** open (the default), active, stale, closed, all. */
+  activity?: string;
   sort?: 'last_signal' | 'stage_depth' | 'company';
   cursor?: string;
   limit?: number;
 }
 
+/**
+ * What each `activity` filter admits.
+ *
+ * `open` is the default and it is the product's answer to "what am I actually
+ * doing": everything not written off, quiet ones included, because a quiet
+ * application is the one that most needs you. History is a deliberate second
+ * request rather than the thing you wade through to find today's work.
+ */
+const ACTIVITY_FILTERS: Record<string, readonly Activity[] | null> = {
+  open: ['active', 'stale'],
+  active: ['active'],
+  stale: ['stale'],
+  closed: ['closed'],
+  all: null,
+};
+const DEFAULT_ACTIVITY = 'open';
+
 export async function listApplications(
   sql: pg.PoolClient,
   user: UserContext,
   opts: ListOptions,
-): Promise<{ rows: ApplicationRow[]; next_cursor: string | null }> {
+): Promise<{ rows: ApplicationRow[]; next_cursor: string | null; counts: Record<string, number> }> {
   const params: unknown[] = [user.id];
   let where = '';
   if (opts.phase && opts.phase !== 'all') {
@@ -171,25 +236,49 @@ export async function listApplications(
     where += ` and a.id > $${params.length}`;
   }
 
+  const wanted = ACTIVITY_FILTERS[opts.activity ?? DEFAULT_ACTIVITY] ?? ACTIVITY_FILTERS[DEFAULT_ACTIVITY]!;
+  // Filtered in SQL rather than after the fact: applied after `limit` this
+  // would hand back a short page and call it the whole pipeline.
+  const activityWhere = wanted ? ` and t.activity in (${wanted.map((a) => `'${a}'`).join(',')})` : '';
+
   const order =
     opts.sort === 'company'
-      ? 'c.canonical_name asc, a.id asc'
+      ? 't.company asc, t.id asc'
       : opts.sort === 'stage_depth'
-        ? 'coalesce(sd.depth, 0) desc, a.id asc'
-        : 'a.last_signal_at desc nulls last, a.id asc';
+        ? 'coalesce(t.depth, 0) desc, t.id asc'
+        : 't.last_signal_at desc nulls last, t.id asc';
 
   const limit = Math.min(opts.limit ?? 100, 200);
   params.push(limit + 1);
 
+  // The select is wrapped so `activity` — an expression, and not one worth
+  // repeating in a `where` — can be filtered and ordered by name.
   const res = await sql.query<RawApplicationRow>(
-    `${APPLICATION_SELECT}${where} order by ${order} limit $${params.length}`,
+    `select t.* from (${APPLICATION_SELECT}${where}) t
+      where true${activityWhere}
+      order by ${order} limit $${params.length}`,
     params,
   );
 
   const now = new Date();
   const rows = res.rows.slice(0, limit).map((r) => toRow(r, user, now));
   const next = res.rows.length > limit ? (rows[rows.length - 1]?.id ?? null) : null;
-  return { rows, next_cursor: next };
+
+  // What the other tabs would hold, so the board can label them without asking
+  // three more times.
+  const tally = await sql.query<{ activity: Activity; n: string }>(
+    `select t.activity, count(*)::text as n from (${APPLICATION_SELECT}) t group by t.activity`,
+    [user.id],
+  );
+  const counts = { active: 0, stale: 0, closed: 0, open: 0, all: 0 };
+  for (const row of tally.rows) {
+    const n = Number(row.n);
+    counts[row.activity] = n;
+    counts.all += n;
+    if (row.activity !== 'closed') counts.open += n;
+  }
+
+  return { rows, next_cursor: next, counts };
 }
 
 export async function getApplication(
@@ -299,13 +388,25 @@ function provenance(rung: number | null, payload: Record<string, unknown>): stri
 export async function buildToday(sql: pg.PoolClient, user: UserContext) {
   const now = new Date();
 
-  const counters = await sql.query<{ live: string; interviewing: string; offer: string; overdue: string }>(
+  // Counted over `activity`, not over `status`. "Live" used to mean "a row we
+  // have never had a reason to close", which on a twelve-month mailbox is most
+  // of them; it now means what the word means on the screen it appears on.
+  const counters = await sql.query<{
+    live: string;
+    quiet: string;
+    interviewing: string;
+    offer: string;
+    overdue: string;
+    closed: string;
+  }>(
     `select
-       count(*) filter (where status = 'live')::text as live,
-       count(*) filter (where status = 'live' and current_phase = 'interviewing')::text as interviewing,
-       count(*) filter (where current_stage in ('offer','negotiating') and status = 'live')::text as offer,
-       count(*) filter (where status = 'live' and last_signal_at < now() - interval '21 days')::text as overdue
-     from applications where user_id = $1 and merged_into_id is null`,
+       count(*) filter (where t.activity = 'active')::text as live,
+       count(*) filter (where t.activity = 'stale')::text as quiet,
+       count(*) filter (where t.activity <> 'closed' and t.current_phase = 'interviewing')::text as interviewing,
+       count(*) filter (where t.activity <> 'closed' and t.current_stage in ('offer','negotiating'))::text as offer,
+       count(*) filter (where t.activity = 'stale')::text as overdue,
+       count(*) filter (where t.activity = 'closed')::text as closed
+     from (${APPLICATION_SELECT}) t`,
     [user.id],
   );
 
@@ -402,9 +503,11 @@ export async function buildToday(sql: pg.PoolClient, user: UserContext) {
     headline_kind: headline.kind,
     counters: {
       live: Number(counters.rows[0]?.live ?? '0'),
+      quiet: Number(counters.rows[0]?.quiet ?? '0'),
       interviewing: Number(counters.rows[0]?.interviewing ?? '0'),
       offer: Number(counters.rows[0]?.offer ?? '0'),
       overdue: Number(counters.rows[0]?.overdue ?? '0'),
+      closed: Number(counters.rows[0]?.closed ?? '0'),
     },
     review_count: Number(reviewCount.rows[0]?.n ?? '0'),
     next_interview: nextInterview.rows[0]
@@ -456,6 +559,13 @@ function recentLabel(
     default:
       return type.replace(/_/g, ' ');
   }
+}
+
+/** "Mar 26" from "2026-03". Written here so the axis is not built in a browser. */
+function monthLabel(month: string): string {
+  const [year, m] = month.split('-');
+  const date = new Date(Date.UTC(Number(year), Number(m) - 1, 1));
+  return `${new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' }).format(date)} ${year!.slice(2)}`;
 }
 
 export function formatMoney(minor: number, currency: string): string {
@@ -533,6 +643,31 @@ const REACH_PERIOD_SQL: Record<Period, string> = {
   all: '',
 };
 
+/**
+ * Every statistic below is gated on how many applications are *closed*, and
+ * until now "closed" meant `status <> 'live'` — a column the nightly sweep
+ * writes and nothing else does. Miss a few sweeps, or read a mailbox where half
+ * the applications simply stopped replying, and the gate never opens: the page
+ * shows an em dash beside a funnel with twenty applications in it, which is the
+ * exact complaint that started this. The cohort is judged by `activity`, so a
+ * process that has been silent for three months counts as the closed
+ * application it is.
+ */
+const ACTIVITY_CTE = `act as (
+  select a.id, a.status, a.current_stage, a.current_phase, ${ACTIVITY_SQL} as activity
+    from applications a
+    left join stage_defs sd on sd.user_id = a.user_id and sd.key = a.current_stage
+    left join stage_dwell_in d on d.user_id = a.user_id and d.stage = a.current_stage and d.n >= 5
+    left join lateral (
+      select min(i.starts_at) as starts_at from interviews i
+       where i.application_id = a.id and i.cancelled_at is null and i.starts_at > now()
+    ) nx on true
+   where a.user_id = $1 and a.merged_into_id is null
+)`;
+
+/** Closed without anybody ever saying no. That is what a ghost rate measures. */
+const GHOSTED_SQL = `act.activity = 'closed' and act.status in ('live','dormant')`;
+
 export async function buildStats(sql: pg.PoolClient, user: UserContext, period: Period) {
   const window = PERIOD_SQL[period];
   const reachWindow = REACH_PERIOD_SQL[period];
@@ -571,27 +706,28 @@ export async function buildStats(sql: pg.PoolClient, user: UserContext, period: 
     excluded: string;
     closed: string;
   }>(
-    `with cohort as (
-       select r.*, a.current_phase from app_phase_reach r
-       join applications a on a.id = r.id
+    `with ${ACTIVITY_CTE}, cohort as (
+       select r.*, act.activity from app_phase_reach r
+       join act on act.id = r.id
        where r.user_id = $1 ${reachWindow}
      )
      select
        count(*) filter (where reached_interview and not immature)::text as numerator,
        count(*) filter (where not immature)::text as denominator,
        count(*) filter (where immature)::text as excluded,
-       count(*) filter (where status <> 'live')::text as closed
-     from (select *, (status = 'live' and not reached_interview
-                      and applied_at > now() - interval '21 days') as immature
+       count(*) filter (where activity = 'closed')::text as closed
+     from (select *, (activity <> 'closed' and not reached_interview
+                      and applied_at > now() - interval '${RATIO_MATURITY_DAYS} days') as immature
              from cohort) t`,
     [user.id],
   );
 
   const offerConv = await sql.query<{ numerator: string; denominator: string; closed: string }>(
-    `select count(*) filter (where reached_offer)::text as numerator,
-            count(*) filter (where reached_interview and status <> 'live')::text as denominator,
-            count(*) filter (where status <> 'live')::text as closed
-       from app_phase_reach r
+    `with ${ACTIVITY_CTE}
+     select count(*) filter (where reached_offer)::text as numerator,
+            count(*) filter (where reached_interview and act.activity = 'closed')::text as denominator,
+            count(*) filter (where act.activity = 'closed')::text as closed
+       from app_phase_reach r join act on act.id = r.id
       where r.user_id = $1 ${reachWindow}`,
     [user.id],
   );
@@ -607,13 +743,17 @@ export async function buildStats(sql: pg.PoolClient, user: UserContext, period: 
   );
 
   const ghost = await sql.query<{ ghosted: string; closed: string }>(
-    `select count(*) filter (where status = 'dormant')::text as ghosted,
-            count(*) filter (where status <> 'live')::text as closed
-       from app_phase_reach r
+    `with ${ACTIVITY_CTE}
+     select count(*) filter (where ${GHOSTED_SQL})::text as ghosted,
+            count(*) filter (where act.activity = 'closed')::text as closed
+       from app_phase_reach r join act on act.id = r.id
       where r.user_id = $1 ${reachWindow}`,
     [user.id],
   );
 
+  // Inlined rather than read from `channel_effectiveness`, which counts a ghost
+  // as `status = 'dormant'` and so under-reports it by exactly the applications
+  // this change is about. Same grouping, same first-touch attribution.
   const channels = await sql.query<{
     channel: string;
     sent: string;
@@ -621,8 +761,58 @@ export async function buildStats(sql: pg.PoolClient, user: UserContext, period: 
     offers: string;
     ghosted: string;
   }>(
-    `select channel, sent::text, interviews::text, offers::text, ghosted::text
-       from channel_effectiveness where user_id = $1 order by sent desc`,
+    `with ${ACTIVITY_CTE}
+     select s.channel, count(*)::text as sent,
+            count(*) filter (where r.reached_interview)::text as interviews,
+            count(*) filter (where r.reached_offer)::text as offers,
+            count(*) filter (where ${GHOSTED_SQL})::text as ghosted
+       from sources s
+       join app_phase_reach r on r.id = s.application_id
+       join act on act.id = s.application_id
+      where s.is_first_touch and r.user_id = $1
+      group by s.channel order by count(*) desc`,
+    [user.id],
+  );
+
+  // Volume over time, and how much of each month came back. Three series on one
+  // month axis: what you sent, what replied, what reached an interview.
+  const byMonth = await sql.query<{
+    month: string;
+    applied: string;
+    replied: string;
+    interviews: string;
+    offers: string;
+  }>(
+    `select to_char(date_trunc('month', coalesce(a.applied_at, a.created_at)), 'YYYY-MM') as month,
+            count(*)::text as applied,
+            count(*) filter (where r.first_human_at is not null)::text as replied,
+            count(*) filter (where r.reached_interview)::text as interviews,
+            count(*) filter (where r.reached_offer)::text as offers
+       from applications a
+       join app_phase_reach r on r.id = a.id
+      where a.user_id = $1 and a.merged_into_id is null ${window}
+      group by 1 order by 1`,
+    [user.id],
+  );
+
+  // How they ended. Keyed on `status` inside the closed set, so the five
+  // outcomes are mutually exclusive and exhaustive — the bar sums to the cohort
+  // and no application is counted under two endings.
+  const outcomes = await sql.query<{
+    open: string;
+    accepted: string;
+    rejected: string;
+    ghosted: string;
+    withdrawn: string;
+  }>(
+    `with ${ACTIVITY_CTE}
+     select count(*) filter (where act.activity <> 'closed')::text as open,
+            count(*) filter (where act.activity = 'closed' and act.status = 'accepted')::text as accepted,
+            count(*) filter (where act.activity = 'closed' and act.status = 'rejected')::text as rejected,
+            count(*) filter (where ${GHOSTED_SQL})::text as ghosted,
+            count(*) filter (where act.activity = 'closed' and act.status = 'withdrawn')::text as withdrawn
+       from app_phase_reach r join act on act.id = r.id
+      where r.user_id = $1 ${reachWindow}`,
     [user.id],
   );
 
@@ -691,6 +881,14 @@ export async function buildStats(sql: pg.PoolClient, user: UserContext, period: 
         iv: gate ? formatPercent(Number(c.interviews) / sent) : '—',
         of: gate ? formatPercent(Number(c.offers) / sent) : '—',
         ghost: gate ? formatPercent(Number(c.ghosted) / sent) : '—',
+        // The raw rates as well as the strings: a bar cannot be drawn from an
+        // em dash, and the client is still forbidden from doing the division.
+        iv_value: gate ? Number(c.interviews) / sent : null,
+        of_value: gate ? Number(c.offers) / sent : null,
+        ghost_value: gate ? Number(c.ghosted) / sent : null,
+        interviews: Number(c.interviews),
+        offers: Number(c.offers),
+        ghosted: Number(c.ghosted),
         note: gate ? '' : `${sent} of ${GATES.CHANNEL_MIN_APPLICATIONS} needed`,
       };
     }),
@@ -699,10 +897,29 @@ export async function buildStats(sql: pg.PoolClient, user: UserContext, period: 
       'Referrals are reported separately on purpose — folding them into LinkedIn would flatter it.',
     time_in_stage: dwell.rows.map((d) => ({
       stage: user.stages.labelOf(d.stage),
-      days: Number(d.p50_days),
+      // Rounded here, and shipped with the string to print. `p50_days` is a
+      // percentile over epoch seconds, so it arrives as 12.416666666666666 and
+      // the client used to render every digit of it.
+      days: Math.round(Number(d.p50_days) * 10) / 10,
+      display: formatDays(Number(d.p50_days)),
       n: Number(d.n),
       gate_met: Number(d.n) >= GATES.TIME_IN_STAGE_MIN_TRANSITIONS,
     })),
+    by_month: byMonth.rows.map((m) => ({
+      month: m.month,
+      label: monthLabel(m.month),
+      applied: Number(m.applied),
+      replied: Number(m.replied),
+      interviews: Number(m.interviews),
+      offers: Number(m.offers),
+    })),
+    outcomes: {
+      open: Number(outcomes.rows[0]?.open ?? '0'),
+      accepted: Number(outcomes.rows[0]?.accepted ?? '0'),
+      rejected: Number(outcomes.rows[0]?.rejected ?? '0'),
+      ghosted: Number(outcomes.rows[0]?.ghosted ?? '0'),
+      withdrawn: Number(outcomes.rows[0]?.withdrawn ?? '0'),
+    },
     compensation: buildCompSpread(comp.rows, user.displayCurrency),
     seasonal: {
       gate_met: Number(quarters.rows[0]?.n ?? '0') >= GATES.SEASONAL_MIN_QUARTERS,

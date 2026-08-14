@@ -157,8 +157,10 @@ export function Stats() {
                   }}
                 />
               </div>
+              {/* The server formats it. `t.days` is a percentile over epoch
+                  seconds and prints as 12.416666666666666 unaided. */}
               <span style={{ fontSize: 12.5, textAlign: 'right' }} className="muted-70">
-                {t.gate_met ? `${Math.round(t.days)} d` : `${t.n}/5`}
+                {t.gate_met ? t.display : `${t.n}/5`}
               </span>
             </div>
           ))}

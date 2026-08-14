@@ -17,7 +17,13 @@ import { DraftSheet } from '../sheets/DraftSheet.js';
  */
 
 export type Tab = 'today' | 'pipeline' | 'stats';
-export type Sheet = { kind: 'add' } | { kind: 'review' } | { kind: 'draft'; suggestionKey: string } | null;
+export type Sheet =
+  | { kind: 'add' }
+  | { kind: 'review' }
+  // A draft is asked for by suggestion when a card raised it, and by
+  // application when the record did — most applications have no suggestion.
+  | { kind: 'draft'; suggestionKey?: string; applicationId?: string }
+  | null;
 
 export function MobileApp() {
   const [tab, setTab] = useState<Tab>('today');
@@ -50,7 +56,7 @@ export function MobileApp() {
     <div className="phone">
       <div className="phone-scroll" key={openId ?? tab}>
         {openId ? (
-          <Detail id={openId} onBack={back} onDraft={(key) => setSheet({ kind: 'draft', suggestionKey: key })} />
+          <Detail id={openId} onBack={back} onDraft={(applicationId) => setSheet({ kind: 'draft', applicationId })} />
         ) : tab === 'today' ? (
           <Today
             onOpen={open}
@@ -77,7 +83,11 @@ export function MobileApp() {
       {sheet?.kind === 'add' ? <QuickAddSheet onClose={() => setSheet(null)} /> : null}
       {sheet?.kind === 'review' ? <ReviewQueue onClose={() => setSheet(null)} /> : null}
       {sheet?.kind === 'draft' ? (
-        <DraftSheet suggestionKey={sheet.suggestionKey} onClose={() => setSheet(null)} />
+        <DraftSheet
+          suggestionKey={sheet.suggestionKey}
+          applicationId={sheet.applicationId}
+          onClose={() => setSheet(null)}
+        />
       ) : null}
     </div>
   );

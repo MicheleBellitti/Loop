@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
-from loop.api import auth
+from loop.api import activity_sql, auth
 from loop.api.mailbox import mailbox_health
 from loop.api.serialise import iso_z
 from loop.db import load_stage_table
@@ -25,14 +25,21 @@ _RECENT_LIMIT = 8
 _MAX_SUGGESTIONS = 3
 _WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
-_COUNTERS = """
+# Counted over `activity`, not over `status`. "Live" used to mean "a row we have
+# never had a reason to close", which on a twelve-month mailbox is most of them;
+# it now means what the word means on the screen it appears on.
+_COUNTERS = f"""
+with {activity_sql.CTE}
 select
-  count(*) filter (where status = 'live') as live,
-  count(*) filter (where status = 'live' and current_phase = 'interviewing') as interviewing,
-  count(*) filter (where current_stage in ('offer','negotiating') and status = 'live') as offer,
-  count(*) filter (where status = 'live'
-                     and last_signal_at < now() - interval '21 days') as overdue
-from applications where user_id = $1 and merged_into_id is null
+  count(*) filter (where activity = 'active') as live,
+  count(*) filter (where activity = 'stale') as quiet,
+  count(*) filter (where activity <> 'closed'
+                     and current_phase = 'interviewing') as interviewing,
+  count(*) filter (where activity <> 'closed'
+                     and current_stage in ('offer','negotiating')) as offer,
+  count(*) filter (where activity = 'stale') as overdue,
+  count(*) filter (where activity = 'closed') as closed
+from act
 """
 
 _RECENT = """
@@ -113,9 +120,11 @@ async def today(request: Request) -> dict[str, Any]:
         "headline_kind": headline.kind,
         "counters": {
             "live": counters["live"],
+            "quiet": counters["quiet"],
             "interviewing": counters["interviewing"],
             "offer": counters["offer"],
             "overdue": counters["overdue"],
+            "closed": counters["closed"],
         },
         "review_count": review_count,
         "next_interview": _next_interview(upcoming, stages),

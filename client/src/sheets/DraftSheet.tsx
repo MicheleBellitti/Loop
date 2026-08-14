@@ -9,15 +9,33 @@ import { Button, Skeleton, Toast } from '../components.js';
  * "Loop holds a read-only scope, so it cannot send this. Copying opens your own
  * mail client with the thread already selected." There is no send button here
  * because there is no send path anywhere in the system — a CI grep asserts it.
+ *
+ * Two ways in. A suggestion card names its own key; an application record names
+ * itself, which is the case the drawer's "Draft follow-up" needed and did not
+ * have — the suggestion route 404s for every application no nudge rule has
+ * fired for, which is most of them.
  */
-export function DraftSheet({ suggestionKey, onClose }: { suggestionKey: string; onClose: () => void }) {
+export function DraftSheet({
+  suggestionKey,
+  applicationId,
+  onClose,
+}: {
+  suggestionKey?: string;
+  applicationId?: string;
+  onClose: () => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [body, setBody] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['draft', suggestionKey],
-    queryFn: () => api.get<Draft>(`/api/suggestions/${encodeURIComponent(suggestionKey)}/draft`),
+  const path = suggestionKey
+    ? `/api/suggestions/${encodeURIComponent(suggestionKey)}/draft`
+    : `/api/applications/${applicationId}/draft`;
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['draft', path],
+    queryFn: () => api.get<Draft>(path),
+    retry: false,
   });
 
   const text = body ?? data?.body ?? '';
@@ -45,7 +63,14 @@ export function DraftSheet({ suggestionKey, onClose }: { suggestionKey: string; 
           </button>
         </div>
 
-        {isLoading || !data ? (
+        {isError ? (
+          // Better than a skeleton that spins for ever, which is what a 404
+          // used to produce here.
+          <p className="muted-70" style={{ fontSize: 13.5, lineHeight: 1.6 }}>
+            No draft could be composed for this one — it has no company or no
+            history to refer to. Nothing was changed.
+          </p>
+        ) : isLoading || !data ? (
           <Skeleton height={140} />
         ) : (
           <>
