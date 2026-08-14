@@ -243,12 +243,19 @@ class ResolverService:
                    coalesce(split.ids, '{}') as split_from
               from applications a
               left join lateral (
-                select array_agg(e.payload->>'to') as ids
+                -- `merged_id`, not `to`. The filter below pins `to` to the
+                -- literal 'split', so aggregating it gives every candidate the
+                -- string 'split' and never an id — and `matching.py` compares
+                -- ids, so the guard could never fire and a pair the user pulled
+                -- apart would silently merge again. The id of the row that was
+                -- freed is what `review.py` puts in `merged_id`.
+                select array_agg(e.payload->>'merged_id') as ids
                   from application_events e
                  where e.application_id = a.id
                    and e.type = 'human_corrected'
                    and e.payload->>'field' = 'merge'
                    and e.payload->>'to' = 'split'
+                   and e.payload->>'merged_id' is not null
               ) split on true
              where a.user_id = $1 and a.company_id = $2 and a.merged_into_id is null
                and a.status in ('live','dormant')

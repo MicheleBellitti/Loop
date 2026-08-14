@@ -241,15 +241,27 @@ async def quick_add(request: Request) -> dict[str, Any]:
 
     db = request.app.state.db
     async with db.session(session.user_id) as connection:
+        # `do nothing` and then look it up, rather than `do update ... returning`.
+        # The update form needs UPDATE on `companies`, and migration 014 grants
+        # the gateway INSERT only — so the *second* quick-add of a company name
+        # failed on permissions before the application was ever created. The
+        # update set the name to itself, so nothing is lost by not doing it.
         company_id = await connection.fetchval(
             """
             insert into companies (canonical_name) values ($1)
-            on conflict (lower(canonical_name), coalesce(domain, '')) do update
-              set canonical_name = excluded.canonical_name
+            on conflict (lower(canonical_name), coalesce(domain, '')) do nothing
             returning id
             """,
             company,
         )
+        if company_id is None:
+            company_id = await connection.fetchval(
+                """
+                select id from companies
+                 where lower(canonical_name) = lower($1) and coalesce(domain, '') = ''
+                """,
+                company,
+            )
         application_id = str(
             await connection.fetchval(
                 """

@@ -106,6 +106,42 @@ class TestPlacingASignal:
             )
         assert applications == 1
 
+    async def test_a_pair_the_user_pulled_apart_stays_apart(
+        self, db: Database, user_id: str
+    ) -> None:
+        # `_candidates` reads the undo-merge back out of the event log, and
+        # `find_duplicate` compares application ids against it. Aggregating the
+        # wrong key made every candidate's `split_from` the literal string
+        # 'split', so the guard could never fire and the resolver would merge
+        # the same pair again the next time a similar signal arrived.
+        await _clear_queues(db)
+        resolver = ResolverService(db)
+        kept = await resolver.resolve(signal(user_id))
+        freed = "00000000-0000-0000-0000-00000000beef"
+
+        async with db.session(user_id) as connection:
+            company_id = await connection.fetchval(
+                "select company_id from applications where id = $1", kept.application_id
+            )
+            await connection.execute(
+                """
+                insert into application_events
+                  (user_id, application_id, type, occurred_at, confidence, rung, payload)
+                values ($1,$2,'human_corrected',now(),1.0,4,$3)
+                """,
+                user_id,
+                kept.application_id,
+                # A dict, not `json.dumps`: the jsonb codec encodes it, and
+                # doing it twice stores a JSON string that reads back as one.
+                {"field": "merge", "from": "merged", "to": "split", "merged_id": freed},
+            )
+            candidates = await resolver._candidates(
+                connection, str(company_id), signal(user_id)
+            )
+
+        [mine] = [c for c in candidates if c.id == kept.application_id]
+        assert mine.split_from == frozenset({freed})
+
     async def test_one_employer_spelled_two_ways_is_one_company(
         self, db: Database, user_id: str
     ) -> None:

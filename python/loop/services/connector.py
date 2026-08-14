@@ -19,6 +19,7 @@ Loop reads.
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 from dataclasses import dataclass
@@ -30,6 +31,8 @@ import asyncpg
 from loop.connector.normalise import to_raw_message
 from loop.db import Database, publish
 from loop.db.queue import Queue
+from loop.domain.messages import CalendarInvite, MessageHeaders, RawMessage
+from loop.domain.normalise import domain_of_address
 from loop.domain.thresholds import (
     BACKFILL_BATCH,
     BACKFILL_CONCURRENCY,
@@ -37,7 +40,7 @@ from loop.domain.thresholds import (
     RELIST_DAYS,
     WATCH_RENEW_FAILURES_BEFORE_POLLING,
 )
-from loop.domain.wire import encode_raw_message
+from loop.domain.wire import Json, encode_raw_message
 from loop.google.client import (
     GoogleAuthError,
     GoogleClient,
@@ -65,6 +68,14 @@ select id, user_id, provider, address, secret_ciphertext, secret_nonce,
        dek_wrapped, dek_nonce, scopes, cursor, watch_expires_at, status, last_ok_at
   from mailbox_accounts
  where provider = 'gmail' and status in ('ok', 'error')
+"""
+
+# Only companies this user has actually applied to. A calendar read any wider
+# than that is a calendar read for no reason.
+_KNOWN_DOMAINS = """
+select distinct c.domain from companies c
+  join applications a on a.company_id = c.id
+ where a.user_id = $1 and c.domain is not null
 """
 
 
@@ -274,25 +285,47 @@ class ConnectorService:
         """
         sync_token = mailbox.cursor.get("syncToken")
         time_min = None if sync_token else _window_start()
+        domains = await self._known_domains(mailbox.user_id)
         try:
-            latest = await self._page_calendar(token, sync_token, time_min)
+            latest = await self._page_calendar(mailbox, token, sync_token, time_min, domains)
         except SyncTokenExpired:
             # Google forgets an incremental token eventually. The reference let
             # this throw on every run for ever, because nothing cleared the
             # dead token from the row.
             self._log.info("calendar sync token expired for %s; starting again", mailbox.id)
-            latest = await self._page_calendar(token, None, _window_start())
+            latest = await self._page_calendar(
+                mailbox, token, None, _window_start(), domains
+            )
         except (GoogleAuthError, GoogleRateLimit, RuntimeError, HistoryTooOld) as error:
             # A calendar that will not answer must not stop the mail being read.
             self._log.warning("calendar sync failed for %s: %s", mailbox.id, error)
             return
 
+        # Only now, and only if the pages above published what they found. The
+        # token is a promise that everything before it has been dealt with, so
+        # advancing it over unread events loses them with no way back short of
+        # a manual cursor reset.
         if latest:
             async with self._db.session(mailbox.user_id) as connection:
                 await save_cursor(connection, mailbox.id, {"syncToken": latest})
 
+    async def _known_domains(self, user_id: str) -> frozenset[str]:
+        """The companies this user has applied to, and nothing else.
+
+        The filter is the whole reason a calendar can be read at all: everything
+        else in there is somebody's life, and it is none of Loop's business.
+        """
+        async with self._db.session(user_id) as connection:
+            rows = await connection.fetch(_KNOWN_DOMAINS, user_id)
+        return frozenset(row["domain"].lower() for row in rows)
+
     async def _page_calendar(
-        self, token: str, sync_token: str | None, time_min: str | None
+        self,
+        mailbox: Mailbox,
+        token: str,
+        sync_token: str | None,
+        time_min: str | None,
+        domains: frozenset[str],
     ) -> str | None:
         page_token: str | None = None
         latest: str | None = None
@@ -300,10 +333,94 @@ class ConnectorService:
             page = await self._google.list_calendar_events(
                 token, sync_token=sync_token, time_min=time_min, page_token=page_token
             )
+            for event in page.get("items") or ():
+                if _is_relevant(event, domains):
+                    await self._publish_calendar_event(mailbox, event)
             latest = page.get("nextSyncToken") or latest
             page_token = page.get("nextPageToken")
             if not page_token:
                 return latest
+
+    async def _publish_calendar_event(self, mailbox: Mailbox, event: Json) -> None:
+        """One invitation, onto the same queue a message rides.
+
+        It is shaped as a `RawMessage` carrying an `invite` rather than given a
+        path of its own, because everything downstream — the classifier, the
+        extractor, the resolver — already knows how to read one of those.
+        """
+        starts_at = _event_start(event)
+        if starts_at is None:
+            # An event with no start says nothing about when an interview is,
+            # which is the only thing it was wanted for.
+            return
+
+        event_id = f"cal:{event.get('id')}"
+        cancelled = event.get("status") == "cancelled"
+        # A cancellation for an event already seen must still get through, so
+        # the replay key carries the state rather than the id alone.
+        key = f"{event_id}:cancelled" if cancelled else event_id
+
+        async with self._db.session(mailbox.user_id) as connection:
+            already = await connection.fetchval(
+                """
+                select 1 from seen_messages
+                 where mailbox_id = $1 and provider_message_id = $2
+                """,
+                mailbox.id,
+                key,
+            )
+        if already:
+            return
+
+        organiser = (event.get("organizer") or {}).get("email")
+        attendees = tuple(
+            attendee["email"]
+            for attendee in event.get("attendees") or ()
+            if attendee.get("email")
+        )
+        summary = event.get("summary")
+        raw = RawMessage(
+            user_id=mailbox.user_id,
+            mailbox_id=mailbox.id,
+            provider_message_id=key,
+            received_at=datetime.now(UTC),
+            headers=MessageHeaders(
+                message_id=event_id,
+                sender=organiser or "",
+                subject=summary or "Calendar event",
+                date=starts_at.isoformat(),
+                to=attendees,
+            ),
+            text=summary or "",
+            body_sha256=hashlib.sha256(key.encode()).hexdigest(),
+            invite=CalendarInvite(
+                uid=event.get("iCalUID") or event.get("id") or event_id,
+                summary=summary,
+                starts_at=starts_at,
+                ends_at=_event_moment((event.get("end") or {}).get("dateTime")),
+                location=event.get("location"),
+                organiser=organiser,
+                attendees=attendees,
+                status="cancelled" if cancelled else "confirmed",
+                method="CANCEL" if cancelled else "REQUEST",
+            ),
+        )
+
+        async with self._db.session(mailbox.user_id) as connection:
+            await connection.execute(
+                """
+                insert into seen_messages
+                  (mailbox_id, provider_message_id, user_id, body_sha256, received_at)
+                values ($1,$2,$3,$4,$5)
+                on conflict do nothing
+                """,
+                mailbox.id,
+                key,
+                mailbox.user_id,
+                bytes.fromhex(raw.body_sha256),
+                raw.received_at,
+            )
+            await publish(connection, Queue.RAW, encode_raw_message(raw))
 
     # ── the shared ingest ───────────────────────────────────────────────────
 
@@ -401,6 +518,44 @@ def _window_start() -> str:
     """How far back a first calendar read looks, in the format Google wants."""
     since = datetime.now(UTC) - timedelta(days=_CALENDAR_FIRST_WINDOW_DAYS)
     return f"{since:%Y-%m-%dT%H:%M:%SZ}"
+
+
+def _is_relevant(event: Json, domains: frozenset[str]) -> bool:
+    """Does anyone on this invitation work for a company already in the pipeline?
+
+    Organiser or attendee: an interview can be sent by a recruiter and organised
+    by a coordinator, and either address is the one that names the company.
+    """
+    if not domains:
+        return False
+    addresses = [(event.get("organizer") or {}).get("email")]
+    addresses.extend(a.get("email") for a in event.get("attendees") or ())
+    for address in addresses:
+        if not address:
+            continue
+        domain = domain_of_address(address)
+        if domain is not None and domain in domains:
+            return True
+    return False
+
+
+def _event_moment(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value).astimezone(UTC)
+    except ValueError:
+        return None
+
+
+def _event_start(event: Json) -> datetime | None:
+    """An all-day entry has a date and no time; 09:00 UTC stands in for it."""
+    start = event.get("start") or {}
+    if start.get("dateTime"):
+        return _event_moment(start["dateTime"])
+    if start.get("date"):
+        return _event_moment(f"{start['date']}T09:00:00+00:00")
+    return None
 
 
 async def mailbox_by_id(

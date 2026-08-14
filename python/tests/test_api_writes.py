@@ -45,6 +45,51 @@ class TestQuickAdd:
         assert list(response.json()) == ["id", "company", "role", "channel"]
         assert response.json()["company"] == "Prima"
 
+    async def test_a_second_application_to_the_same_company_reuses_it(
+        self, client: AsyncClient, db: Database
+    ) -> None:
+        # The upsert used to be `do update`, which needs UPDATE on `companies`;
+        # migration 014 grants the gateway INSERT only, so in a real deployment
+        # the *second* quick-add for a company failed on permissions before the
+        # application was ever created. Tests connect as the owner, so the two
+        # assertions that matter are below: this one covers the logic, and
+        # `test_the_gateway_role_can_do_it` covers the grant.
+        body = {"company": "Ripetuta", "role": "Backend Engineer"}
+        first = (await post(client, "/api/applications", body)).json()
+        second = await post(
+            client, "/api/applications", {**body, "company": "ripetuta"}
+        )
+
+        assert second.status_code == 201
+        async with db.untenanted() as connection:
+            companies = await connection.fetch(
+                "select company_id from applications where id = any($1::uuid[])",
+                [first["id"], second.json()["id"]],
+            )
+        assert len({row["company_id"] for row in companies}) == 1
+
+    async def test_the_gateway_role_can_do_it(self, db: Database) -> None:
+        # The grant, asserted against the role the API actually runs as rather
+        # than the owner the suite connects as. `do update` raises
+        # InsufficientPrivilege here; `do nothing` plus a lookup does not.
+        async with db.untenanted() as connection, connection.transaction():
+            await connection.execute("set local role loop_gateway")
+            for _ in range(2):
+                company_id = await connection.fetchval(
+                    """
+                    insert into companies (canonical_name) values ('Grantata')
+                    on conflict (lower(canonical_name), coalesce(domain, '')) do nothing
+                    returning id
+                    """,
+                ) or await connection.fetchval(
+                    """
+                    select id from companies
+                     where lower(canonical_name) = lower('Grantata')
+                       and coalesce(domain, '') = ''
+                    """
+                )
+                assert company_id is not None
+
     async def test_the_row_is_created_here_and_moved_by_the_pipeline(
         self, client: AsyncClient, db: Database
     ) -> None:
