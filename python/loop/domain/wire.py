@@ -93,15 +93,28 @@ def decode_invite(row: Json) -> CalendarInvite:
 
 
 def encode_headers(headers: MessageHeaders) -> Json:
+    """Every key `decode_headers` reads, and the same ones `normalise.ts` writes.
+
+    `in_reply_to`, `references` and `auto_submitted` were decoded and never
+    encoded, so the connector read three headers off the message and the
+    classifier one hop later could not see any of them. Nothing in the Python
+    reads them yet, which is what kept it quiet; the TypeScript on the other end
+    of the same queue does put them on the wire, and a decoder that silently
+    fills in a default for a key the encoder simply forgot is the shape of a bug
+    that only appears once something starts depending on it.
+    """
     return {
         "message_id": headers.message_id,
         "from": headers.sender,
         "to": list(headers.to),
         "subject": headers.subject,
         "date": headers.date,
+        "in_reply_to": headers.in_reply_to,
+        "references": list(headers.references),
         "list_id": headers.list_id,
         "list_unsubscribe": headers.list_unsubscribe,
         "precedence": headers.precedence,
+        "auto_submitted": headers.auto_submitted,
     }
 
 

@@ -229,7 +229,7 @@ async def apply_side_effects(
                     user_id,
                 )
         case "deadline_set":
-            await _record_deadline(connection, user_id, application_id, event)
+            await _record_deadline(connection, user_id, application_id, event, event_id)
         case "human_corrected":
             await _apply_correction(connection, user_id, event)
         case _:
@@ -335,16 +335,34 @@ async def _record_offer(
 
 
 async def _record_deadline(
-    connection: asyncpg.Connection, user_id: str, application_id: str, event: DomainEvent
+    connection: asyncpg.Connection,
+    user_id: str,
+    application_id: str,
+    event: DomainEvent,
+    event_id: str | None = None,
 ) -> None:
+    """The due date, and the event that claimed it.
+
+    `source_event_id` was dropped in the port, which left every deadline with no
+    way back to the message it came from — the same provenance `comp_offers`
+    keeps two cases further up, and the only thing that answers "why does it
+    think this is due on Friday".
+
+    No `on conflict` clause: `deadlines` has no unique constraint for one to
+    fire on, so the reference's `on conflict do nothing` never did anything.
+    What makes this safe to redeliver is upstream — `apply_side_effects` runs
+    only for an event `append_event` actually inserted, and that index is where
+    the idempotency lives. Writing a clause that reads as protection and is not
+    is worse than writing none.
+    """
     due_at = _as_datetime(event.payload.get("due_at"))
     if due_at is None:
         return
     await connection.execute(
         """
-        insert into deadlines (user_id, application_id, kind, due_at, url, source)
-        values ($1,$2,$3,$4,$5,$6)
-        on conflict do nothing
+        insert into deadlines
+          (user_id, application_id, kind, due_at, url, source, source_event_id)
+        values ($1,$2,$3,$4,$5,$6,$7)
         """,
         user_id,
         application_id,
@@ -352,6 +370,7 @@ async def _record_deadline(
         due_at,
         event.payload.get("url"),
         event.payload.get("source", "gmail"),
+        int(event_id) if event_id is not None else None,
     )
 
 

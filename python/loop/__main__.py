@@ -17,7 +17,6 @@ import asyncio
 import logging
 import os
 import sys
-from collections.abc import Awaitable, Callable
 
 from loop.db import Database, Queue
 from loop.services import (
@@ -31,7 +30,7 @@ from loop.services import (
 )
 from loop.services.connector import ConnectorService
 from loop.services.push import VapidConfig
-from loop.services.runtime import ConnectorRuntime, until_signalled
+from loop.services.runtime import ConnectorRuntime, Service, until_signalled
 
 _ROLES = {
     "connector": "loop_connector",
@@ -56,7 +55,8 @@ async def _run(name: str) -> None:
         await until_signalled(_service(name, db))
 
 
-def _service(name: str, db: Database) -> Callable[[], Awaitable[None]]:
+def _service(name: str, db: Database) -> Service:
+    """The service object, not its `run` — `until_signalled` needs `stop` too."""
     match name:
         case "connector":
             from loop.google.client import GoogleClient
@@ -69,18 +69,18 @@ def _service(name: str, db: Database) -> Callable[[], Awaitable[None]]:
                 ),
                 pubsub_topic=os.environ.get("GOOGLE_PUBSUB_TOPIC") or None,
             )
-            return ConnectorRuntime(db, connector).run
+            return ConnectorRuntime(db, connector)
         case "classifier":
-            return ClassifierService(db).consumer().run
+            return ClassifierService(db).consumer()
         case "extractor":
-            return ExtractorService(db).consumer().run
+            return ExtractorService(db).consumer()
         case "resolver":
             # Concurrency one, by construction: ordering matters, and two
             # signals arriving together must not both decide there is no
             # application at this company yet.
-            return ResolverService(db).consumer(ConsumerOptions(batch=1)).run
+            return ResolverService(db).consumer(ConsumerOptions(batch=1))
         case "pipeline":
-            return PipelineService(db).consumer(Queue.EVENT).run
+            return PipelineService(db).consumer(Queue.EVENT)
         case "notifier":
             return NotifierService(
                 db,
@@ -89,9 +89,9 @@ def _service(name: str, db: Database) -> Callable[[], Awaitable[None]]:
                     private_key=os.environ.get("VAPID_PRIVATE") or None,
                     subject=os.environ.get("VAPID_SUBJECT", "mailto:loop@localhost"),
                 ),
-            ).consumer().run
+            ).consumer()
         case "nudge":
-            return NudgeService(db).run
+            return NudgeService(db)
         case other:
             raise SystemExit(f"no service called {other}")
 

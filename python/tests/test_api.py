@@ -563,3 +563,72 @@ async def _an_application(
                 last_signal,
             )
         )
+
+
+class TestEveryFailureWearsTheSameEnvelope:
+    """`{"error": {"code": …}}`, whoever produced it.
+
+    The client reads `error.code` off every failure and nothing else, so a
+    response that answers in another shape is a failure it cannot report — it
+    falls through to "something went wrong" with the reason on the wire and
+    unread.
+    """
+
+    async def test_a_parameter_fastapi_rejects_still_answers_in_it(
+        self, client: AsyncClient
+    ) -> None:
+        # `limit` is `int` with bounds, so this never reaches the handler:
+        # FastAPI raises before it, and its own handler answers `{"detail": …}`.
+        response = await client.get("/api/applications?limit=nonsense")
+        assert response.status_code == 422
+        assert "detail" not in response.json()
+        assert response.json()["error"]["code"] == "bad_request"
+        assert response.json()["error"]["field"] == "limit"
+
+    async def test_a_parameter_out_of_range_names_the_field_too(
+        self, client: AsyncClient
+    ) -> None:
+        response = await client.get("/api/applications?limit=0")
+        assert response.status_code == 422
+        assert response.json()["error"]["field"] == "limit"
+
+    async def test_it_carries_the_same_security_headers_as_a_success(
+        self, client: AsyncClient
+    ) -> None:
+        failed = await client.get("/api/applications?limit=nonsense")
+        assert failed.headers["x-content-type-options"] == "nosniff"
+        assert "content-security-policy" in failed.headers
+
+    async def test_a_500_carries_them_too(self, dsn: str, user_id: str) -> None:
+        """The one response that used to leave without a policy.
+
+        Starlette hangs a bare `Exception` handler off `ServerErrorMiddleware`,
+        which wraps the user middleware rather than sitting inside it — so the
+        headers applied on the way out never touched a 500. It needs its own
+        route to reach, because no handler in the product raises on demand.
+        """
+        from httpx import ASGITransport, AsyncClient
+
+        from loop.api import Settings, create_app
+
+        app = create_app(Settings(dsn=dsn, session_secret="test-secret"))
+
+        @app.get("/api/boom")
+        async def _boom() -> None:
+            raise RuntimeError("the database fell over")
+
+        async with app.router.lifespan_context(app):
+            token, _session = await app.state.sessions.create(user_id)
+            async with AsyncClient(
+                transport=ASGITransport(app=app, raise_app_exceptions=False),
+                base_url="http://test",
+                cookies={auth.COOKIE_NAME: token},
+            ) as http:
+                response = await http.get("/api/boom")
+
+        assert response.status_code == 500
+        assert response.json() == {
+            "error": {"code": "internal", "message": "something failed"}
+        }
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert "content-security-policy" in response.headers

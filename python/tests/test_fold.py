@@ -369,3 +369,58 @@ class TestAPayloadNobodyCanRetract:
         assert state.applied_at is not None
         assert state.applied_at.tzinfo is not None
         assert (at("2026-07-01T09:00:00Z") - state.applied_at).days == 16
+
+
+class TestACancelledInvitation:
+    """A round that was called off must stop asserting the stage it booked.
+
+    The resolver no longer puts `stage` in a cancellation's payload, so nothing
+    it writes today depends on this. The log is append-only and the TypeScript
+    wrote plenty that do — folding one of those without the guard advances an
+    application to a round that never happened.
+    """
+
+    def test_it_does_not_advance_the_stage_it_had_booked(self) -> None:
+        state = fold(
+            [
+                ev("applied", "2026-07-01T09:00:00Z", 1.0),
+                ev(
+                    "interview_scheduled",
+                    "2026-07-02T09:00:00Z",
+                    0.95,
+                    payload={"status": "cancelled", "stage": "technical"},
+                ),
+            ]
+        )
+        assert state.current_stage == "applied"
+
+    def test_a_confirmed_one_still_does(self) -> None:
+        state = fold(
+            [
+                ev("applied", "2026-07-01T09:00:00Z", 1.0),
+                ev(
+                    "interview_scheduled",
+                    "2026-07-02T09:00:00Z",
+                    0.97,
+                    payload={"status": "confirmed", "stage": "technical"},
+                ),
+            ]
+        )
+        assert state.current_stage == "technical"
+
+    def test_a_cancellation_does_not_undo_a_round_that_already_happened(self) -> None:
+        # Dropping the claim is not the same as reversing it: the stage the
+        # earlier events reached stands until a human says otherwise.
+        state = fold(
+            [
+                ev("applied", "2026-07-01T09:00:00Z", 1.0),
+                ev("stage_advanced", "2026-07-02T09:00:00Z", 0.9, to_stage="hr_call"),
+                ev(
+                    "interview_scheduled",
+                    "2026-07-03T09:00:00Z",
+                    0.95,
+                    payload={"status": "cancelled", "stage": "technical"},
+                ),
+            ]
+        )
+        assert state.current_stage == "hr_call"

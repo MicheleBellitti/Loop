@@ -63,6 +63,32 @@ class TestTheMessageShapes:
         )
         assert decode_raw_message(encode_raw_message(message)) == message
 
+    def test_the_threading_headers_are_not_dropped_on_the_way_out(self) -> None:
+        """`decode_headers` reads three keys `encode_headers` used to omit.
+
+        The connector fills all three off the real message, so the loss was
+        silent in both directions: nothing in the Python reads them yet, and the
+        TypeScript sharing the queue writes them. A default standing in for a
+        key the encoder forgot is indistinguishable from a header that was
+        genuinely absent.
+        """
+        message = raw(
+            headers=MessageHeaders(
+                message_id="<2@x>",
+                sender="Clara <clara@prima.it>",
+                subject="Re: Machine Learning Engineer",
+                date="Thu, 30 Jul 2026 09:00:00 +0000",
+                in_reply_to="<1@x>",
+                references=("<0@x>", "<1@x>"),
+                auto_submitted="auto-replied",
+            )
+        )
+        payload = encode_raw_message(message)
+        assert payload["headers"]["in_reply_to"] == "<1@x>"
+        assert payload["headers"]["references"] == ["<0@x>", "<1@x>"]
+        assert payload["headers"]["auto_submitted"] == "auto-replied"
+        assert decode_raw_message(payload) == message
+
     def test_the_from_header_keeps_its_name_on_the_wire(self) -> None:
         # `sender` is a Python concession; the queue and the reference both
         # call it `from`.

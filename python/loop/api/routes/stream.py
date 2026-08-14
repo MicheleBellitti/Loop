@@ -37,6 +37,12 @@ CHANNEL: Final = "loop_events"
 # know about a heartbeat it should ignore.
 HEARTBEAT_SECONDS: Final = 25
 
+# How long to wait before re-opening the listener, doubling to the ceiling. A
+# Postgres restart takes a couple of seconds; anything longer is an outage, and
+# a gateway retrying at a thousand a second helps nobody through one.
+RECONNECT_MIN_SECONDS: Final = 0.5
+RECONNECT_MAX_SECONDS: Final = 30.0
+
 _HEADERS = {
     "cache-control": "no-cache, no-transform",
     "connection": "keep-alive",
@@ -49,6 +55,15 @@ class Broadcaster:
 
     Held on the app rather than at module scope so two apps in one test run —
     which is exactly what the suite does — do not share a listener.
+
+    **It re-opens itself, and it has to.** This is a single connection outside
+    the pool, held for the life of the process, and every attached browser
+    depends on it. Postgres restarting — an upgrade, an OOM kill, a `docker
+    compose restart db` — closes it, and without this the object went on looking
+    healthy while delivering nothing: every tab kept its socket, kept receiving
+    the heartbeat, and never heard about another change until it was reloaded by
+    hand. Frames only ever say "something changed", so the notifications missed
+    during the gap cost nothing once the listener is back.
     """
 
     def __init__(self, dsn: str) -> None:
@@ -56,15 +71,55 @@ class Broadcaster:
         self._connection: asyncpg.Connection | None = None
         self._listeners: dict[int, tuple[str, asyncio.Queue[str]]] = {}
         self._next_id = 0
+        self._lost = asyncio.Event()
+        self._supervisor: asyncio.Task[None] | None = None
+        self._stopping = asyncio.Event()
 
     async def start(self) -> None:
-        self._connection = await asyncpg.connect(self._dsn)
-        await self._connection.add_listener(CHANNEL, self._on_notify)
+        self._stopping.clear()
+        await self._listen()
+        self._supervisor = asyncio.create_task(self._reopen_when_dropped())
 
     async def stop(self) -> None:
+        self._stopping.set()
+        if self._supervisor is not None:
+            self._supervisor.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._supervisor
+            self._supervisor = None
         if self._connection is not None:
             await self._connection.close()
             self._connection = None
+
+    async def _listen(self) -> None:
+        connection = await asyncpg.connect(self._dsn)
+        await connection.add_listener(CHANNEL, self._on_notify)
+        # Fires on a lost connection *and* on our own `close()`, which is what
+        # `_stopping` is read for on the other side.
+        connection.add_termination_listener(self._on_terminated)
+        self._connection = connection
+
+    def _on_terminated(self, _connection: Any) -> None:
+        self._lost.set()
+
+    async def _reopen_when_dropped(self) -> None:
+        while not self._stopping.is_set():
+            await self._lost.wait()
+            self._lost.clear()
+            if self._stopping.is_set():
+                return
+            _log.warning("the event listener was dropped; re-opening")
+            delay = RECONNECT_MIN_SECONDS
+            while not self._stopping.is_set():
+                try:
+                    await self._listen()
+                except (OSError, asyncpg.PostgresError) as error:
+                    _log.warning("could not re-open the listener (%s); retrying", error)
+                    await asyncio.sleep(delay)
+                    delay = min(delay * 2, RECONNECT_MAX_SECONDS)
+                    continue
+                _log.info("the event listener is back")
+                break
 
     def attach(self, user_id: str) -> tuple[int, asyncio.Queue[str]]:
         self._next_id += 1

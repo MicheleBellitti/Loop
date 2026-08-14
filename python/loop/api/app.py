@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -156,10 +157,15 @@ def _default_client_dir() -> Path | None:
 def create_app(settings: Settings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        # The owner connection, deliberately: the auth tables have row-level
-        # security forced, and their policies read a tenant this request has not
-        # established yet.
-        async with Database(settings.dsn, role=None) as db:
+        # `DB_ROLE`, like every other container: compose runs this one as
+        # `loop_gateway`, and its grants are what stop a request from writing a
+        # row only the pipeline may write.
+        #
+        # The auth tables are reached another way. Their policies are FORCEd and
+        # read a tenant a signing-in request has not established yet, so those
+        # reads go through `Database.untenanted`, which takes no role and
+        # therefore meets no policy — see the note there before changing either.
+        async with Database(settings.dsn) as db:
             app.state.db = db
             app.state.sessions = auth.Sessions(db, settings.session_secret)
             app.state.settings = settings
@@ -206,14 +212,55 @@ def _install_error_handling(app: FastAPI) -> None:
     async def _coded(_request: Request, error: ApiError) -> JSONResponse:
         return JSONResponse(error.body(), status_code=error.status)
 
+    @app.exception_handler(RequestValidationError)
+    async def _unparseable(_request: Request, error: RequestValidationError) -> JSONResponse:
+        """A query or path parameter FastAPI would not accept.
+
+        Its own handler answers `{"detail": [...]}`, which is the one response
+        shape on this API that is not the envelope — and the client reads
+        `error.code` off every failure. `?limit=nonsense` on the applications
+        list is enough to reach it, so this is a live route rather than a
+        theoretical one.
+        """
+        first = (error.errors() or [{}])[0]
+        # `("query", "limit")` — the location, minus the part naming where it
+        # came from, which the client has no use for.
+        location = [str(part) for part in first.get("loc", ())][1:]
+        return JSONResponse(
+            envelope(
+                code_for(422),
+                str(first.get("msg") or "that is not a valid request"),
+                ".".join(location) or None,
+            ),
+            status_code=422,
+        )
+
     @app.exception_handler(Exception)
-    async def _uncoded(_request: Request, error: Exception) -> JSONResponse:
+    async def _uncoded(request: Request, error: Exception) -> JSONResponse:
         # A 500 loses its message on the way out. Whatever went wrong is worth
         # a log line and is never worth a browser seeing the SQL.
         status = getattr(error, "status_code", 500)
         code = code_for(status)
         message = INTERNAL_MESSAGE if status >= 500 else str(error)
-        return JSONResponse(envelope(code, message), status_code=status)
+        response = JSONResponse(envelope(code, message), status_code=status)
+        # Applied here as well as in the middleware, because this handler does
+        # not run behind it. Starlette hangs a bare `Exception` handler off
+        # `ServerErrorMiddleware`, which is the outermost layer of the stack —
+        # so a 500 was the one response that left without a content-security
+        # policy or `nosniff`, which is exactly the response an attacker would
+        # rather have.
+        return _secured(response, request)
+
+
+def _secured[T: Response](response: T, request: Request) -> T:
+    for name, value in _SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    settings = getattr(request.app.state, "settings", None)
+    if settings is not None and settings.public_origin.startswith("https:"):
+        response.headers.setdefault(
+            "strict-transport-security", "max-age=31536000; includeSubDomains"
+        )
+    return response
 
 
 def _install_security_headers(app: FastAPI) -> None:
@@ -221,14 +268,7 @@ def _install_security_headers(app: FastAPI) -> None:
     async def _headers(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        response = await call_next(request)
-        for name, value in _SECURITY_HEADERS.items():
-            response.headers.setdefault(name, value)
-        if request.app.state.settings.public_origin.startswith("https:"):
-            response.headers.setdefault(
-                "strict-transport-security", "max-age=31536000; includeSubDomains"
-            )
-        return response
+        return _secured(await call_next(request), request)
 
 
 def _install_gate(app: FastAPI) -> None:

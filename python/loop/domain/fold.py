@@ -165,6 +165,15 @@ def _implied_stage(ev: DomainEvent) -> str | None:
             to = ev.to_stage or ev.payload.get("to_stage")
             return to if isinstance(to, str) else None
         case "interview_scheduled":
+            # A cancelled invite must not keep asserting the stage it booked.
+            # The resolver stopped putting `stage` in a cancellation's payload,
+            # which makes this unreachable for anything it writes — but the log
+            # is append-only and the rows the TypeScript wrote *do* carry one,
+            # so folding them without this advances a stage the reference never
+            # advanced. The reversal itself is still never automatic; the claim
+            # is simply dropped and a review item asks.
+            if ev.payload.get("status") == "cancelled":
+                return None
             stage = ev.payload.get("stage")
             return stage if isinstance(stage, str) else None
         case "offer_received":

@@ -503,3 +503,77 @@ def _domain_event(payload: dict[str, object], kind: str = "interview_scheduled")
         rung=2,
         payload=payload,
     )
+
+
+class TestDeadlineSideEffects:
+    async def test_the_row_points_back_at_the_event_that_claimed_it(
+        self, db: Database, user_id: str
+    ) -> None:
+        """`source_event_id` is the only answer to "why does it think Friday?".
+
+        `comp_offers` keeps the same provenance two cases further up in the same
+        `match`; the deadline lost it in the port, so a take-home due date
+        arrived with nothing linking it to the message it was read from.
+        """
+        application_id = await _application(db, user_id)
+        async with db.session(user_id) as connection:
+            event_id = await append_event(
+                connection,
+                PendingEvent(
+                    user_id=user_id,
+                    application_id=application_id,
+                    type="deadline_set",
+                    occurred_at=NOW,
+                    confidence=0.9,
+                    evidence_ref="msg-deadline",
+                    rung=1,
+                    payload={"kind": "take_home", "due_at": NOW + timedelta(days=3)},
+                ),
+            )
+            assert event_id is not None
+            await apply_side_effects(
+                connection,
+                user_id,
+                application_id,
+                _domain_event(
+                    {"kind": "take_home", "due_at": NOW + timedelta(days=3)}, "deadline_set"
+                ),
+                event_id=event_id,
+            )
+            row = await connection.fetchrow(
+                "select kind, due_at, source_event_id from deadlines where application_id = $1",
+                application_id,
+            )
+        assert row is not None
+        assert row["kind"] == "take_home"
+        assert str(row["source_event_id"]) == str(event_id)
+
+
+class TestWhichRoleAPoolTakes:
+    """`role=None` means the owner. Omitting it means `DB_ROLE`.
+
+    They used to be the same argument, so the gateway — which asks for the owner
+    by name, and says why in a comment — silently got `loop_gateway` from the
+    environment compose sets it in. Nothing failed, because the reads that
+    needed the owner go through `untenanted`, which takes no role at all; the
+    stated intent and the behaviour had simply come apart, and the next person
+    to reconcile them would have picked the wrong one.
+    """
+
+    def test_saying_nothing_reads_the_environment(
+        self, dsn: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DB_ROLE", "loop_resolver")
+        assert Database(dsn)._role == "loop_resolver"
+
+    def test_asking_for_the_owner_is_not_asking_for_the_environment(
+        self, dsn: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DB_ROLE", "loop_resolver")
+        assert Database(dsn, role=None)._role is None
+
+    def test_a_named_role_wins_over_both(
+        self, dsn: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DB_ROLE", "loop_resolver")
+        assert Database(dsn, role="loop_nudge")._role == "loop_nudge"

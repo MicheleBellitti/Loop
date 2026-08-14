@@ -222,19 +222,27 @@ class NudgeService:
             """,
             user_id,
         )
+        # `$2`, not `now()`. Everything the rules decide is measured against the
+        # instant `tick` pinned once for the whole run, and a snapshot filtered
+        # by the server's clock is a different question asked at a different
+        # moment: `tick(now=…)` — a replay, or a test — got rows selected by the
+        # real clock and then judged against the given one, and even the
+        # ordinary path drifted by however long the users ahead of this one took.
         interviews = await connection.fetch(
             """
             select id, application_id, stage, starts_at from interviews
-             where user_id = $1 and cancelled_at is null and starts_at > now()
+             where user_id = $1 and cancelled_at is null and starts_at > $2
             """,
             user_id,
+            now,
         )
         deadlines = await connection.fetch(
             """
             select application_id, kind, due_at, source from deadlines
-             where user_id = $1 and met_at is null and due_at > now()
+             where user_id = $1 and met_at is null and due_at > $2
             """,
             user_id,
+            now,
         )
         # `stage_dwell_in` is a plain view, so row-level security on the events
         # underneath it is evaluated as the view's owner and does not apply.
@@ -252,9 +260,10 @@ class NudgeService:
             """
             select key from suggestions
              where user_id = $1 and dismissed_at is null and acted_at is null
-               and (expires_at is null or expires_at > now())
+               and (expires_at is null or expires_at > $2)
             """,
             user_id,
+            now,
         )
         stages = await load_stage_table(connection, user_id)
 

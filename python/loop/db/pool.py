@@ -28,7 +28,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
 from types import TracebackType
-from typing import Self
+from typing import Final, Self
 from uuid import UUID
 
 import asyncpg
@@ -39,6 +39,13 @@ import asyncpg
 IDLE_IN_TRANSACTION_TIMEOUT_MS = 30_000
 
 
+class _FromEnv:
+    """Distinguishes "not told which role" from "told: no role at all"."""
+
+
+_FROM_ENV: Final = _FromEnv()
+
+
 class Database:
     """An asyncpg pool with this schema's conventions applied once."""
 
@@ -46,14 +53,21 @@ class Database:
         self,
         dsn: str,
         *,
-        role: str | None = None,
+        role: str | _FromEnv | None = _FROM_ENV,
         min_size: int = 1,
         max_size: int = 10,
     ) -> None:
         self._dsn = dsn
-        # Each service runs as its own role. Unset means the owner, which is
-        # right for migrations and wrong for anything that reads a user's rows.
-        self._role = role if role is not None else os.environ.get("DB_ROLE")
+        # Each service runs as its own role, named by `DB_ROLE` per container.
+        # Omitting the argument reads that; passing `role=None` means the owner,
+        # explicitly, and the two are not the same thing.
+        #
+        # They used to be. `role if role is not None else os.environ.get(...)`
+        # made `role=None` indistinguishable from saying nothing, so the one
+        # caller that asks for the owner by name — and comments on why — got
+        # `DB_ROLE` instead, which compose sets for every container including
+        # the gateway's.
+        self._role = os.environ.get("DB_ROLE") if isinstance(role, _FromEnv) else role
         self._min_size = min_size
         self._max_size = max_size
         self._pool: asyncpg.Pool | None = None
@@ -126,6 +140,16 @@ class Database:
         Named awkwardly on purpose: reaching for this to read application data
         is how a previous measurement came to count another tenant's
         integration-test rows as this mailbox's.
+
+        **No role, and that is load-bearing rather than an omission.** The
+        gateway's whole sign-in path runs through here — `sole_user`, the
+        credential list behind `/api/auth/login/options`, the challenge — and
+        every one of those happens before there is a tenant to establish. The
+        policies on `users`, `credentials` and `auth_secrets` are FORCEd and read
+        `loop.user_id`, so as `loop_gateway` those reads return zero rows rather
+        than an error: nobody could sign in, and nothing would say why. Adding
+        `set local role` here to match `session` would look like hardening and
+        would lock everyone out of the product.
         """
         async with self.pool.acquire() as connection:
             yield connection

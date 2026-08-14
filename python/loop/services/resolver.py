@@ -18,6 +18,7 @@ import asyncpg
 
 from loop.db import Database, Message, publish
 from loop.db.queue import Queue
+from loop.db.seen import Outcome, mark_seen
 from loop.domain import normalise_role
 from loop.domain.messages import Signal
 from loop.domain.thresholds import MERGE_UNDO_DAYS
@@ -134,7 +135,7 @@ class ResolverService:
                     excerpt=_CANCELLED_INTERVIEW_QUESTION,
                 )
 
-            outcome = "placed" if events else "dropped"
+            outcome: Outcome = "placed" if events else "dropped"
             await self._mark_seen(connection, signal, outcome)
 
         self._log.info(
@@ -459,14 +460,14 @@ class ResolverService:
         )
 
     async def _mark_seen(
-        self, connection: asyncpg.Connection, signal: Signal, outcome: str
+        self, connection: asyncpg.Connection, signal: Signal, outcome: Outcome
     ) -> None:
-        await connection.execute(
-            """
-            update seen_messages set outcome = $3, processed_at = now()
-             where mailbox_id = $1 and provider_message_id = $2
-            """,
-            signal.mailbox_id,
-            signal.provider_message_id,
-            outcome,
-        )
+        """Through `loop.db.seen`, which is where the row count is read.
+
+        Under row-level security an update whose predicate matches nothing is
+        `UPDATE 0` and not an error, so a tenanting bug here and a working
+        resolver are indistinguishable from the caller's side. This service had
+        its own copy of the statement without that check — which is the one
+        thing the shared helper exists for.
+        """
+        await mark_seen(connection, signal.mailbox_id, signal.provider_message_id, outcome)

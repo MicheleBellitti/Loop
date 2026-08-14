@@ -221,3 +221,51 @@ def _an_event(user_id: str, application_id: str) -> PendingEvent:
         evidence_ref="stream-1",
         rung=1,
     )
+
+
+class TestTheListenerComingBack:
+    """One connection outside the pool, held for the life of the process.
+
+    Postgres restarting closes it, and nothing about the object said so: every
+    attached tab kept its socket and kept receiving the heartbeat, so the board
+    simply stopped moving until somebody reloaded the page. There is no failure
+    to observe from the client side — which is why this reaches in and kills the
+    backend the listener is holding.
+    """
+
+    async def test_a_dropped_listener_re_opens_itself(self, dsn: str, db: Database) -> None:
+        from loop.api.routes.stream import CHANNEL, Broadcaster
+
+        broadcaster = Broadcaster(dsn)
+        await broadcaster.start()
+        try:
+            _id, queue = broadcaster.attach("11111111-1111-1111-1111-111111111111")
+
+            before = broadcaster._connection
+            assert before is not None
+            async with db.untenanted() as connection:
+                await connection.execute(
+                    "select pg_terminate_backend($1)", before.get_server_pid()
+                )
+
+            async with asyncio.timeout(10):
+                while broadcaster._connection is before or broadcaster._connection is None:
+                    await asyncio.sleep(0.05)
+
+            async with db.untenanted() as connection:
+                await connection.execute(
+                    "select pg_notify($1, $2)",
+                    CHANNEL,
+                    json.dumps(
+                        {
+                            "type": "application.changed",
+                            "user_id": "11111111-1111-1111-1111-111111111111",
+                        }
+                    ),
+                )
+
+            async with asyncio.timeout(10):
+                frame = await queue.get()
+            assert "event: application.changed" in frame
+        finally:
+            await broadcaster.stop()

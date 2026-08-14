@@ -15,8 +15,7 @@ import contextlib
 import json
 import logging
 import signal
-from collections.abc import Awaitable, Callable
-from typing import Any, Final
+from typing import Any, Final, Protocol
 
 import asyncpg
 
@@ -29,6 +28,26 @@ _log = logging.getLogger("loop.runtime")
 
 PUSH_CHANNEL: Final = "loop_connector"
 BACKFILL_CHANNEL: Final = "loop_backfill"
+
+# Compose sends SIGTERM and waits ten seconds before SIGKILL. This is the window
+# inside it that a handler mid-write gets to finish in.
+SHUTDOWN_GRACE_SECONDS: Final = 8.0
+
+
+class Service(Protocol):
+    """Something that runs until it is asked to stop.
+
+    Both halves are the contract. `until_signalled` used to take a bare
+    `Callable[[], Awaitable[None]]` — the bound `.run` — which gave it no way to
+    reach the `stop()` every service in this package implements, so SIGTERM
+    cancelled the task instead of asking it to finish. That is precisely the
+    "killing a handler mid-write" the docstrings on `Consumer.stop` and on this
+    module both promise not to do.
+    """
+
+    async def run(self) -> None: ...
+
+    async def stop(self) -> None: ...
 
 
 class ConnectorRuntime:
@@ -127,29 +146,51 @@ class ConnectorRuntime:
         self._wake.set()
 
 
-async def _awaited(service: Callable[[], Awaitable[None]]) -> None:
-    await service()
-
-
-async def until_signalled(*services: Callable[[], Awaitable[None]]) -> None:
+async def until_signalled(
+    *services: Service, grace: float = SHUTDOWN_GRACE_SECONDS
+) -> None:
     """Run everything until SIGTERM or SIGINT, then let it finish.
 
-    Compose sends SIGTERM and waits ten seconds. That is long enough for a
-    handler mid-write, and this is what makes the difference between a clean
-    stop and a message redelivered into a half-applied state.
+    Ask, wait, then insist. `stop()` is what lets a handler complete the write it
+    is in the middle of; the grace window bounds how long that may take, and only
+    what is still running when it closes is cancelled.
+
+    A service that raises is re-raised here rather than gathered into silence.
+    Every one of these runs as its own container with `restart: unless-stopped`,
+    and a crashed process that exits 0 is one Compose has been told to leave
+    alone — the mailbox stops being read and nothing anywhere says so.
     """
+    if not services:
+        return
+
     loop = asyncio.get_running_loop()
     stopping = asyncio.Event()
     for name in (signal.SIGTERM, signal.SIGINT):
         with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(name, stopping.set)
 
-    running: list[asyncio.Task[None]] = [
-        asyncio.create_task(_awaited(service)) for service in services
-    ]
+    running = {asyncio.create_task(service.run()): service for service in services}
     waiting = asyncio.create_task(stopping.wait())
     await asyncio.wait([*running, waiting], return_when=asyncio.FIRST_COMPLETED)
     waiting.cancel()
-    for task in running:
+    with contextlib.suppress(asyncio.CancelledError):
+        await waiting
+
+    # Concurrently with the run tasks winding down, not before them: a `stop()`
+    # that waits for the message in hand — which is what `Consumer.stop` does —
+    # can only return once the loop it is stopping has made that progress.
+    stops = [asyncio.create_task(service.stop()) for service in running.values()]
+    _, pending = await asyncio.wait(running, timeout=grace)
+    for task in pending:
+        _log.warning("a service did not stop within %.0fs; cancelling it", grace)
         task.cancel()
-    await asyncio.gather(*running, return_exceptions=True)
+    outcomes = await asyncio.gather(*running, return_exceptions=True)
+    for task in stops:
+        task.cancel()
+    await asyncio.gather(*stops, return_exceptions=True)
+
+    for outcome in outcomes:
+        if isinstance(outcome, BaseException) and not isinstance(
+            outcome, asyncio.CancelledError
+        ):
+            raise outcome

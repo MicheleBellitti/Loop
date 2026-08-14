@@ -148,7 +148,14 @@ async def fetch_posting(raw: str) -> tuple[str, str]:
         timeout=TIMEOUT_SECONDS, follow_redirects=False, verify=True
     ) as client:
         for hop in range(MAX_REDIRECTS + 1):
-            response = await client.get(
+            # Streamed, so the headers can be judged before a byte of the body
+            # is kept and the read can be abandoned at the cap. A plain `get`
+            # buffers the whole response first and applies `MAX_BYTES` to what
+            # is already in memory, which makes the limit a slice of a download
+            # nobody bounded — one pasted link to a large file and the gateway
+            # holds all of it.
+            async with client.stream(
+                "GET",
                 _to_address(target),
                 headers={
                     "host": target.host,
@@ -156,21 +163,40 @@ async def fetch_posting(raw: str) -> tuple[str, str]:
                     "user-agent": "Loop/1.0 (+self-hosted application tracker)",
                 },
                 extensions={"sni_hostname": target.host},
-            )
-            if response.is_redirect:
-                location = response.headers.get("location")
-                if not location:
-                    raise BlockedUrl("redirect without a location")
-                if hop == MAX_REDIRECTS:
-                    raise BlockedUrl("too many redirects")
-                target = await resolve_public(urljoin(target.url, location))
-                continue
+            ) as response:
+                if response.is_redirect:
+                    location = response.headers.get("location")
+                    if not location:
+                        raise BlockedUrl("redirect without a location")
+                    if hop == MAX_REDIRECTS:
+                        raise BlockedUrl("too many redirects")
+                    target = await resolve_public(urljoin(target.url, location))
+                    continue
 
-            content_type = response.headers.get("content-type", "")
-            if not _HTML.match(content_type):
-                raise BlockedUrl(f"refuses a non-HTML response ({content_type or 'unknown'})")
-            return target.url, response.text[:MAX_BYTES]
+                content_type = response.headers.get("content-type", "")
+                if not _HTML.match(content_type):
+                    raise BlockedUrl(
+                        f"refuses a non-HTML response ({content_type or 'unknown'})"
+                    )
+                return target.url, await _read_capped(response)
     raise BlockedUrl("too many redirects")
+
+
+async def _read_capped(response: Any) -> str:
+    """At most `MAX_BYTES`, decoded however the response says it is encoded.
+
+    The cap is on bytes and not on characters: the point is what this process
+    agrees to hold, and a multi-byte encoding makes those two very different
+    numbers.
+    """
+    body = bytearray()
+    async for chunk in response.aiter_bytes():
+        body.extend(chunk)
+        if len(body) >= MAX_BYTES:
+            break
+    return bytes(body[:MAX_BYTES]).decode(
+        response.charset_encoding or "utf-8", errors="replace"
+    )
 
 
 def _to_address(target: _Target) -> str:
