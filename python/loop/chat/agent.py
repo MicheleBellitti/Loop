@@ -19,7 +19,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any, Final, cast
 
-import httpx
+import httpx2
 from langchain.agents import create_agent
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import RunnableConfig
@@ -92,7 +92,15 @@ def chat_model(*, base_url: str, model: str, api_key: str | None = None) -> Base
         api_key=SecretStr(api_key or "not-needed"),
         temperature=_TEMPERATURE,
         max_completion_tokens=_MAX_ANSWER_TOKENS,
-        timeout=httpx.Timeout(READ_TIMEOUT_SECONDS, connect=CONNECT_TIMEOUT_SECONDS),
+        # langchain-openai sends `max_completion_tokens` alone. llama.cpp
+        # aliased that late; older builds read only `max_tokens` and ignore
+        # what they do not know, which would drop the cap silently. Both go on
+        # the wire, so whichever the server understands is the same number.
+        extra_body={"max_tokens": _MAX_ANSWER_TOKENS},
+        # httpx2 is the transport the SDK actually runs on — an `httpx.Timeout`
+        # here is a foreign object the client stores unparsed, and survives
+        # only as long as the SDK keeps normalising it per request.
+        timeout=httpx2.Timeout(READ_TIMEOUT_SECONDS, connect=CONNECT_TIMEOUT_SECONDS),
         # The Responses API is OpenAI-only; llama.cpp speaks chat completions.
         use_responses_api=False,
     )
@@ -115,9 +123,9 @@ async def run_agent(
     failure goes back to the model as a result, and the model explains it.
     `tools` overrides the default registry; the tests script it.
     """
-    agent = create_agent(
-        model=model, tools=langchain_tools(context, tools), system_prompt=system
-    )
+    bound = langchain_tools(context, tools)
+    known = {tool.name for tool in bound}
+    agent = create_agent(model=model, tools=bound, system_prompt=system)
     # A round is one model superstep and one tool superstep, plus the closing
     # model call that answers.
     config: RunnableConfig = {"recursion_limit": 2 * max_rounds + 1}
@@ -138,8 +146,30 @@ async def run_agent(
                     spoken.append(text)
                     yield TokenEvent(text)
             elif kind == "on_chat_model_end":
+                output = data.get("output")
                 # The fallback for a model that answered without streaming.
-                last_answer = _text_of(data.get("output")) or last_answer
+                last_answer = _text_of(output) or last_answer
+                # A call to a tool that does not exist is rejected before
+                # anything runs it, so no tool callback ever fires for it. The
+                # attempt is still part of the turn, and a turn the panel
+                # cannot see is the one thing this trace exists to prevent.
+                for call in getattr(output, "tool_calls", None) or []:
+                    name = str(call.get("name") or "")
+                    if name in known:
+                        continue
+                    arguments = _arguments(call.get("args"))
+                    call_id = str(call.get("id") or "")
+                    yield ToolStartEvent(call_id=call_id, name=name, arguments=arguments)
+                    summary = f"unknown tool {name}"
+                    trace.append(
+                        {
+                            "name": name,
+                            "arguments": arguments,
+                            "ok": False,
+                            "summary": summary,
+                        }
+                    )
+                    yield ToolEndEvent(call_id=call_id, name=name, ok=False, summary=summary)
             elif kind == "on_tool_start":
                 yield ToolStartEvent(
                     call_id=str(event.get("run_id") or ""),
@@ -163,9 +193,36 @@ async def run_agent(
                     ok=ok,
                     summary=summary,
                 )
+            elif kind == "on_tool_error":
+                # Arguments the schema rejects never reach the handler, so the
+                # wrapper's own never-raises guarantee does not cover them.
+                # Without this the start event above has no partner: the chip
+                # spins for the rest of the turn and the trace loses the call.
+                name = str(event.get("name") or "")
+                arguments = _arguments(data.get("input"))
+                summary = _first_line(str(data.get("error") or "the call failed"))
+                trace.append(
+                    {
+                        "name": name,
+                        "arguments": arguments,
+                        "ok": False,
+                        "summary": summary,
+                    }
+                )
+                yield ToolEndEvent(
+                    call_id=str(event.get("run_id") or ""),
+                    name=name,
+                    ok=False,
+                    summary=summary,
+                )
     except GraphRecursionError:
+        # The note is appended, not a fallback: a model that narrated before
+        # its first tool call has already said something, and ending on that
+        # dangling sentence hides the fact that the budget is what stopped it.
+        said = "".join(spoken) or last_answer
         yield FinalEvent(
-            content="".join(spoken) or last_answer or _BUDGET_NOTE, tool_trace=trace
+            content=f"{said}\n\n{_BUDGET_NOTE}" if said else _BUDGET_NOTE,
+            tool_trace=trace,
         )
         return
     except Exception as error:
@@ -210,4 +267,12 @@ def _outcome(output: Any) -> tuple[bool, str]:
     if isinstance(parsed, dict) and "ok" in parsed:
         return bool(parsed["ok"]), str(parsed.get("summary") or "")
     failed = getattr(output, "status", None) == "error"
-    return (not failed and bool(text), text.strip().splitlines()[0][:120] if text else "")
+    stripped = text.strip()
+    return (not failed and bool(stripped), _first_line(stripped))
+
+
+def _first_line(text: str) -> str:
+    """One line, safe to persist and to print. Blank in, blank out — a string
+    of spaces is truthy and has no lines, and indexing it ends the turn."""
+    lines = text.strip().splitlines()
+    return lines[0][:120] if lines else ""

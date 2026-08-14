@@ -21,6 +21,7 @@ from typing import Any, Final
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
+from langchain_core.language_models.chat_models import BaseChatModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from loop.api import auth
@@ -49,8 +50,13 @@ _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 
 # The same posture as `/api/stream`: no buffering anywhere between the model
 # and the panel. sse-starlette owns the rest of the stream headers, and its
-# periodic ping owns the keep-alive.
-_STREAM_HEADERS: Final = {"x-accel-buffering": "no"}
+# periodic ping owns the keep-alive — but not `no-transform`, which is the
+# half of this that stops an intermediary recompressing the stream into one
+# buffered lump, so it is stated here as the sibling route states it.
+_STREAM_HEADERS: Final = {
+    "cache-control": "no-cache, no-transform",
+    "x-accel-buffering": "no",
+}
 
 _IMAGE_TYPES: Final = frozenset(
     {"image/png", "image/jpeg", "image/webp", "image/gif"}
@@ -236,6 +242,31 @@ async def send(request: Request, conversation_id: str) -> EventSourceResponse:
     )
 
 
+def _cached_chat_model(request: Request, model: str) -> BaseChatModel:
+    """One model per served model name, kept on the app.
+
+    `ChatOpenAI` owns a connection pool and offers nothing to close it with,
+    so building one per message leaks a pool per message — and the timeout it
+    holds is unhashable, so langchain's own client cache never catches the
+    duplicate either. Nothing about it is per-turn: the conversation lives in
+    the history handed to `run_agent`, not in the client.
+    """
+    settings = request.app.state.settings
+    cache: dict[tuple[str | None, str], BaseChatModel] | None
+    cache = getattr(request.app.state, "chat_models", None)
+    if cache is None:
+        cache = {}
+        request.app.state.chat_models = cache
+    key = (settings.model_base_url, model)
+    if key not in cache:
+        cache[key] = chat_model(
+            base_url=settings.model_base_url,
+            model=model,
+            api_key=settings.model_api_key,
+        )
+    return cache[key]
+
+
 async def _frames(
     request: Request,
     user_id: str,
@@ -263,11 +294,7 @@ async def _frames(
     yield ServerSentEvent(comment="thinking")
     try:
         async for event in run_agent(
-            model=chat_model(
-                base_url=settings.model_base_url,
-                model=model,
-                api_key=settings.model_api_key,
-            ),
+            model=_cached_chat_model(request, model),
             system=SYSTEM_PROMPT,
             history=history,
             context=context,

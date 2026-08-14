@@ -695,12 +695,24 @@ td.emphasis { font: 600 14px var(--font-heading); color: var(--color-accent-800)
   overflow-wrap: anywhere;
 }
 
-/* Markdown, rendered — so spacing comes from the elements, not from pre-wrap. */
+/* Markdown, rendered — block spacing comes from the elements, not from
+ * pre-wrap on the container: react-markdown puts a newline text node between
+ * every pair of blocks, and preserving those would open a blank line between
+ * each one. */
 .chat-assistant {
   max-width: 95%;
   font-size: 13.5px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+/* Newlines survive inside a block, though. Nothing asks the model for
+ * markdown — the system prompt only asks it to be brief — so an answer that
+ * puts three applications on three plain lines is ordinary, and CommonMark
+ * would otherwise fold it into one run-on sentence. */
+.chat-assistant p,
+.chat-assistant li {
+  white-space: pre-wrap;
 }
 .chat-assistant p { margin: 0 0 var(--space-2); }
 .chat-assistant p:last-child { margin-bottom: 0; }

@@ -74,15 +74,23 @@ def _hours_since(moment: datetime | None) -> float | None:
 
 
 async def _model_state(request: Request) -> str:
-    base_url = request.app.state.settings.model_base_url
+    settings = request.app.state.settings
+    base_url = settings.model_base_url
     if not base_url:
         return "disabled"
 
     import httpx
 
+    # llama.cpp started with `--api-key` answers an unauthenticated probe with
+    # a 401, which would read here as a broken model rung on a healthy box.
+    api_key = settings.model_api_key
+    headers = {"authorization": f"Bearer {api_key}"} if api_key else {}
+
     try:
         async with httpx.AsyncClient(timeout=_MODEL_TIMEOUT_SECONDS) as client:
-            response = await client.get(f"{base_url.rstrip('/')}/models")
+            response = await client.get(
+                f"{base_url.rstrip('/')}/models", headers=headers
+            )
     except httpx.HTTPError:
         return "unreachable"
     return "reachable" if response.is_success else f"http {response.status_code}"

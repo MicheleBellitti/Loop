@@ -17,6 +17,7 @@ serialised as written.
 """
 
 import os
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -134,7 +135,7 @@ class Settings:
                 private_key=_trimmed("VAPID_PRIVATE"),
                 subject=os.environ.get("VAPID_SUBJECT", "mailto:loop@localhost"),
             ),
-            model_base_url=_trimmed("MODEL_BASE_URL"),
+            model_base_url=_hosted_model_checked(_trimmed("MODEL_BASE_URL")),
             model_name=_trimmed("MODEL_NAME") or "qwen2.5-7b-instruct",
             model_api_key=_trimmed("MODEL_API_KEY"),
             google=GoogleApp(
@@ -147,6 +148,32 @@ class Settings:
                 rp_name=os.environ.get("RP_NAME", "Loop"),
             ),
         )
+
+
+_ON_BOX_MODEL = re.compile(r"^https?://(llama|vllm|localhost|127\.0\.0\.1|\[::1\])")
+
+
+def _hosted_model_checked(base_url: str | None) -> str | None:
+    """The same gate `packages/runtime/src/config.ts` applies, on the path that
+    actually carries the chat.
+
+    The gateway sends whole conversations to this URL, fenced email bodies
+    included. Pointing that off the box is a consent decision (§03), so it
+    fails loudly here rather than silently shipping mail to a third party.
+    """
+    if not base_url or _ON_BOX_MODEL.match(base_url):
+        return base_url
+    if (os.environ.get("ALLOW_HOSTED_MODEL") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return base_url
+    raise RuntimeError(
+        f"MODEL_BASE_URL points off this box ({base_url}) but ALLOW_HOSTED_MODEL "
+        "is false. Enabling a hosted model is a per-user consent decision, not "
+        "an env-file typo."
+    )
 
 
 def _trimmed(name: str) -> str | None:

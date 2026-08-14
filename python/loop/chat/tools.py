@@ -415,19 +415,24 @@ def _uuid_arg(args: dict[str, Any], key: str) -> str | None:
 # ── argument models ─────────────────────────────────────────────────────────
 # Pydantic, because that is what StructuredTool consumes and what llama.cpp is
 # sent as the function schema. The handlers above still validate defensively —
-# a schema is a request, the handler is the guarantee.
+# a schema is a request, the handler is the guarantee, and that only holds
+# while the schema stays a request: a bound LangChain enforces is one the
+# handler never gets to clamp, so a model asking for 100 rows or saying
+# "applied" gets nothing back instead of the fifty rows it meant.
 
-Phase = Literal["sent", "screening", "interviewing", "decided"]
-Status = Literal["live", "dormant", "rejected", "withdrawn", "accepted"]
+_PHASE_VALUES = ", ".join(sorted(_PHASES))
+_STATUS_VALUES = ", ".join(sorted(_STATUSES))
 
 
 class ListApplicationsArgs(BaseModel):
-    phase: Phase | None = None
-    status: Status | None = None
+    phase: str | None = Field(default=None, description=f"one of: {_PHASE_VALUES}")
+    status: str | None = Field(default=None, description=f"one of: {_STATUS_VALUES}")
     query: str | None = Field(
         default=None, description="matches the company or the role title"
     )
-    limit: int | None = Field(default=None, ge=1, le=_MAX_LIST)
+    limit: int | None = Field(
+        default=None, description=f"at most {_MAX_LIST}; larger asks are capped"
+    )
 
 
 class ApplicationArgs(BaseModel):
@@ -449,9 +454,10 @@ class ReadEmailArgs(BaseModel):
     )
     limit: int | None = Field(
         default=None,
-        ge=1,
-        le=_MAX_EMAILS_PER_CALL,
-        description="how many recent emails to read when no id is given",
+        description=(
+            "how many recent emails to read when no id is given; "
+            f"at most {_MAX_EMAILS_PER_CALL}, larger asks are capped"
+        ),
     )
 
 
@@ -460,7 +466,7 @@ class NoArgs(BaseModel):
 
 
 class BackfillArgs(BaseModel):
-    months: int = Field(ge=1, le=MAX_BACKFILL_MONTHS)
+    months: int = Field(description=f"between 1 and {MAX_BACKFILL_MONTHS}")
 
 
 def default_tools() -> tuple[Tool, ...]:
@@ -545,12 +551,22 @@ _MAX_RESULT_CHARS: Final = 24_000
 def rendered(result: ToolResult) -> str:
     """The string the model reads back, `summary` included so the stream layer
     can lift it from the ToolMessage without a side channel."""
-    text = json.dumps(
-        {"ok": result.ok, "summary": result.summary, "result": result.payload},
-        ensure_ascii=False,
-    )
+    envelope = {"ok": result.ok, "summary": result.summary, "result": result.payload}
+    text = json.dumps(envelope, ensure_ascii=False)
     if len(text) > _MAX_RESULT_CHARS:
-        text = text[:_MAX_RESULT_CHARS] + " …(truncated)"
+        # The payload is what gets cut, never the envelope around it. Slicing
+        # the finished document leaves JSON nothing can parse, and `ok` and
+        # `summary` are read back out of it — a half-written envelope reports
+        # the wrong outcome and puts raw payload, email text included, in the
+        # one field that is persisted.
+        envelope["result"] = {
+            "truncated": True,
+            "note": "too large to return in full — ask for less at a time",
+            "head": json.dumps(result.payload, ensure_ascii=False)[
+                : _MAX_RESULT_CHARS // 2
+            ],
+        }
+        text = json.dumps(envelope, ensure_ascii=False)
     return text
 
 

@@ -56,7 +56,13 @@ class LlamaClient:
             page = await self._client.models.list()
         except openai.OpenAIError as error:
             raise LlamaError(f"the model server did not answer: {error}") from error
-        return [model.id for model in page.data]
+        except Exception as error:
+            # A 200 the SDK cannot decode — an HTML page from a proxy in front
+            # of llama.cpp, say — surfaces as AttributeError or TypeError, not
+            # as an OpenAIError. This route's whole job is to degrade to
+            # "unreachable"; letting those through makes it a 500 instead.
+            raise LlamaError(f"the model server answered with junk: {error}") from error
+        return [model.id for model in page.data or ()]
 
     async def aclose(self) -> None:
         await self._client.close()

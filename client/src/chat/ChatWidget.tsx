@@ -407,7 +407,11 @@ function Markdown({ content }: { content: string }) {
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
-        a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+        // `node` is react-markdown's hast element, not a DOM attribute — it
+        // has to come off before the rest is spread onto the anchor.
+        a: ({ node, ...props }) => (
+          <a {...props} target="_blank" rel="noopener noreferrer" />
+        ),
       }}
     >
       {content}
