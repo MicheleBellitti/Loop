@@ -18,11 +18,13 @@ re-reads history from its own cursor — so the worst a forged notification can 
 is cause one extra sync.
 """
 
+import asyncio
 import base64
 import hashlib
 import hmac
 import json
 import logging
+import re
 import secrets
 import time
 from typing import Any, Final
@@ -47,6 +49,14 @@ _log = logging.getLogger("loop.api.mailboxes")
 _STATE_TTL_SECONDS: Final = 600
 
 _MAX_BACKFILL_MONTHS: Final = 60
+
+# Checked before the value reaches asyncpg, so a malformed id is a 400 rather
+# than an InvalidTextRepresentation surfacing as a 500.
+_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+
+# Built once: PyJWT caches the key set on the instance, so a client per request
+# re-fetches Google's certs every time.
+_jwks: Any = None
 
 
 @router.get("/mailboxes")
@@ -148,6 +158,19 @@ async def backfill(request: Request) -> dict[str, Any]:
                 " order by created_at, id limit 1",
                 session.user_id,
             )
+        else:
+            # A body-supplied id is a claim, not a fact. Without this the
+            # ownership predicate ran only on the branch that did not need it,
+            # and `{"mailbox_id": "<someone else's uuid>"}` went straight into
+            # the notification the connector acts on — a five-year scan of a
+            # mailbox the caller does not own.
+            if not isinstance(mailbox_id, str) or not _UUID.match(mailbox_id):
+                raise ApiError(400, "bad_body", "that is not a mailbox id", "mailbox_id")
+            mailbox_id = await connection.fetchval(
+                "select id from mailbox_accounts where id = $1 and user_id = $2",
+                mailbox_id,
+                session.user_id,
+            )
         if mailbox_id is None:
             raise ApiError(404, "not_found", "no mailbox is connected")
 
@@ -235,9 +258,15 @@ async def _google_signed(token: str, settings: Any) -> bool:
         return False
 
     try:
-        key = PyJWKClient("https://www.googleapis.com/oauth2/v3/certs").get_signing_key_from_jwt(
-            token
-        )
+        # PyJWT fetches the key set with `urllib.request.urlopen`, which is
+        # blocking and has a 30-second default timeout — on the event loop that
+        # is the whole API unresponsive for as long as Google takes. The client
+        # is cached at module level too, because its key-set cache lives on the
+        # instance and a fresh one per push defeats it.
+        global _jwks
+        if _jwks is None:
+            _jwks = PyJWKClient("https://www.googleapis.com/oauth2/v3/certs")
+        key = await asyncio.to_thread(_jwks.get_signing_key_from_jwt, token)
         decode(
             token,
             key.key,

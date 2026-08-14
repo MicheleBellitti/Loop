@@ -16,6 +16,7 @@ lookup. An earlier version returned the stored hash, which made the token
 unrecoverable after a reload.
 """
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -171,7 +172,12 @@ async def check_recovery_password(db: Database, user_id: str, password: str) -> 
         )
     if not stored:
         return False
-    return verify_scrypt(password, stored)
+    # Off the event loop. At the seeded parameters (N=2^16, r=8, p=2) this is
+    # most of a second and 64MB, and `/api/auth/recover` is public — a handful
+    # of concurrent guesses would otherwise serialise into a stall that takes
+    # every other request down with them, `/health` included. The reference got
+    # this for free by promisifying node's scrypt onto the threadpool.
+    return await asyncio.to_thread(verify_scrypt, password, stored)
 
 
 def verify_scrypt(password: str, stored: str) -> bool:

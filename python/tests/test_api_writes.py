@@ -136,6 +136,42 @@ class TestQuickAdd:
         assert response.json()["error"]["field"] == "channel"
 
 
+class TestTheBackfillRequest:
+    """Whose mailbox gets scanned is not the caller's to assert."""
+
+    async def test_it_refuses_a_mailbox_the_caller_does_not_own(
+        self, client: AsyncClient, mailbox_id: str
+    ) -> None:
+        # The ownership predicate used to run only on the branch that looked the
+        # id up, so a body-supplied one went straight into the notification the
+        # connector acts on — a five-year scan of somebody else's mail.
+        response = await post(
+            client,
+            "/api/mailboxes/backfill",
+            {"months": 60, "mailbox_id": "00000000-0000-0000-0000-0000000000ff"},
+        )
+        assert response.status_code == 404
+        assert response.json()["error"]["code"] == "not_found"
+
+    async def test_a_mailbox_id_that_is_not_an_id_is_a_400(
+        self, client: AsyncClient, mailbox_id: str
+    ) -> None:
+        response = await post(
+            client, "/api/mailboxes/backfill", {"months": 12, "mailbox_id": {}}
+        )
+        assert response.status_code == 400
+        assert response.json()["error"]["field"] == "mailbox_id"
+
+    async def test_and_accepts_one_the_caller_does_own(
+        self, client: AsyncClient, mailbox_id: str
+    ) -> None:
+        response = await post(
+            client, "/api/mailboxes/backfill", {"months": 12, "mailbox_id": mailbox_id}
+        )
+        assert response.status_code == 200
+        assert response.json() == {"ok": True, "months": 12}
+
+
 class TestArchiving:
     async def test_archiving_as_dormant_goes_quiet_rather_than_withdrawn(
         self, client: AsyncClient, db: Database

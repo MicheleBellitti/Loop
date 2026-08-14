@@ -319,8 +319,12 @@ def _compensation(rows: Any, display_currency: str) -> dict[str, Any]:
     low, high = min(amounts), max(amounts)
     span = (high - low) or 1
 
-    def at(value: int) -> int:
-        return round((value - low) / span * 100)
+    def at(value: int | None) -> int:
+        # `min_minor` and `max_minor` are both nullable, which the `amounts`
+        # comprehension above already accounts for. The reference coerced with
+        # `Number(null)` and got 0; Python raises, so an offer row with no
+        # lower bound took the whole statistics page down with a 500.
+        return round(((value or low) - low) / span * 100)
 
     ask = next((row for row in usable if row["kind"] == "ask"), None)
     return {
