@@ -197,12 +197,19 @@ async def set_backlog(connection: asyncpg.Connection, mailbox_id: str, waiting: 
 
 
 async def save_watch_expiry(
-    connection: asyncpg.Connection, mailbox_id: str, expiration_ms: str
+    connection: asyncpg.Connection, mailbox_id: str, expiration_ms: str | int
 ) -> None:
-    """Gmail reports the expiry in milliseconds, as a decimal string."""
+    """Gmail reports the expiry in milliseconds, as a decimal string.
+
+    Bound as an `int`, not the string Google sent. The `::bigint` cast makes
+    Postgres describe `$2` as int8, and asyncpg encodes to the described type
+    rather than sending everything as text the way node-postgres did — so a str
+    here raises `DataError` on every *successful* watch, from a function whose
+    contract is that it never raises.
+    """
     await connection.execute(
         "update mailbox_accounts set watch_expires_at = to_timestamp($2::bigint / 1000) "
         "where id = $1",
         mailbox_id,
-        expiration_ms,
+        int(expiration_ms),
     )

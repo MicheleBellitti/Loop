@@ -298,3 +298,74 @@ def test_timestamps_are_timezone_aware(tz: timezone) -> None:
     # against an aware one raises, so this is a real failure mode.
     s = fold([ev("applied", "2026-07-01T08:00:00Z", 1.0)])
     assert s.applied_at is not None and s.applied_at.tzinfo is not None
+
+
+class TestAPayloadNobodyCanRetract:
+    """The log is append-only, so a value that raises raises for ever.
+
+    A correction's `to` is whatever the route wrote — the API does not check its
+    shape — and it lands in an event that cannot be taken back. A fold that
+    throws on one takes that application's projection down on every rebuild
+    from then on, so every read here decides nothing rather than raising.
+    """
+
+    def test_a_comp_correction_that_is_not_an_amount_decides_nothing(self) -> None:
+        state = fold(
+            [
+                ev("applied", "2026-07-01T09:00:00Z", 1.0),
+                ev(
+                    "human_corrected",
+                    "2026-07-02T09:00:00Z",
+                    1.0,
+                    payload={"field": "comp_expectation", "to": 65000},
+                ),
+            ]
+        )
+        assert state.comp_expectation_minor is None
+        assert state.comp_currency is None
+
+    def test_a_comp_correction_missing_its_currency_decides_nothing(self) -> None:
+        state = fold(
+            [
+                ev("applied", "2026-07-01T09:00:00Z", 1.0),
+                ev(
+                    "human_corrected",
+                    "2026-07-02T09:00:00Z",
+                    1.0,
+                    payload={"field": "comp_expectation", "to": {"minor": 6500000}},
+                ),
+            ]
+        )
+        assert state.comp_expectation_minor == 6500000
+        assert state.comp_currency is None
+
+    def test_an_applied_at_that_is_not_a_date_is_ignored(self) -> None:
+        state = fold(
+            [
+                ev("applied", "2026-07-01T09:00:00Z", 1.0),
+                ev(
+                    "human_corrected",
+                    "2026-07-02T09:00:00Z",
+                    1.0,
+                    payload={"field": "applied_at", "to": "01/07/2026"},
+                ),
+            ]
+        )
+        assert state.applied_at == at("2026-07-01T09:00:00Z")
+
+    def test_a_date_with_no_time_stays_comparable_to_every_other_instant(self) -> None:
+        # Naive here would poison the first `now - applied_at` it met.
+        state = fold(
+            [
+                ev("applied", "2026-07-01T09:00:00Z", 1.0),
+                ev(
+                    "human_corrected",
+                    "2026-07-02T09:00:00Z",
+                    1.0,
+                    payload={"field": "applied_at", "to": "2026-06-15"},
+                ),
+            ]
+        )
+        assert state.applied_at is not None
+        assert state.applied_at.tzinfo is not None
+        assert (at("2026-07-01T09:00:00Z") - state.applied_at).days == 16

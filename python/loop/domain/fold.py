@@ -28,7 +28,7 @@ type), which is stable across replays. decisions.md A1.
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, TypeVar
 
 from .stages import DEFAULT_STAGES, StageTable
@@ -88,6 +88,34 @@ class _Candidate:
 
 def _sort_key(c: _Candidate) -> tuple[int, float, float, str]:
     return (c.tier, c.ev.occurred_at.timestamp(), c.ev.confidence, _tie_key(c.ev))
+
+
+def _moment(value: str) -> datetime | None:
+    """An ISO instant, or nothing.
+
+    Everything read out of a payload here is defensive for one reason: the
+    event log is append-only, so a value that raises cannot be retracted — it
+    would take that application's projection down on every rebuild, for ever.
+    A date with no time is UTC midnight, because a naive datetime poisons every
+    subtraction it later meets.
+    """
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
+def _comp_minor(value: Any) -> int | None:
+    if not isinstance(value, dict) or not isinstance(value.get("minor"), int):
+        return None
+    return int(value["minor"])
+
+
+def _comp_currency(value: Any) -> str | None:
+    if not isinstance(value, dict) or not isinstance(value.get("currency"), str):
+        return None
+    return str(value["currency"]).upper()
 
 
 def _pick(cands: list[_Candidate]) -> _Candidate | None:
@@ -361,11 +389,17 @@ def fold_with_provenance(
     # The earliest `applied`, not the latest: after a cross-channel merge the
     # two applications keep the earliest as first touch, and every timing
     # statistic is measured from that instant. A pinned correction overrides.
+    # `_moment`, not `datetime.fromisoformat` directly: the correction's value
+    # is whatever the route wrote into an append-only event, and a string that
+    # is not ISO-8601 would raise here for ever — the projection could never be
+    # rebuilt again. A date with no time is read as UTC midnight rather than as
+    # a naive instant nothing downstream can subtract from.
     applied_correction = _pick(
         [
-            _Candidate(datetime.fromisoformat(v), ev, tier_of(ev, "applied_at"))
+            _Candidate(moment, ev, tier_of(ev, "applied_at"))
             for ev in voting
             if isinstance(v := corrected(ev, "applied_at"), str)
+            and (moment := _moment(v)) is not None
         ]
     )
     applied_at: datetime | None = None
@@ -419,8 +453,8 @@ def fold_with_provenance(
         work_mode=work_mode,
         company_id=company_id,
         channel=channel,
-        comp_expectation_minor=comp_win.value["minor"] if comp_win else None,
-        comp_currency=comp_win.value["currency"].upper() if comp_win else None,
+        comp_expectation_minor=_comp_minor(comp_win.value) if comp_win else None,
+        comp_currency=_comp_currency(comp_win.value) if comp_win else None,
         # The confidence the interface shows next to the stage is the
         # confidence of the claim that produced it, not an average of
         # everything ever seen.

@@ -500,7 +500,12 @@ def _read_error(response: httpx.Response) -> str:
             for detail in (error.get("errors") or ())
             if isinstance(detail, dict) and detail.get("reason")
         ]
-        described = " — ".join([*parts, *reasons])
+        # The reasons lead. `_is_quota` matches on them, and Google's quota
+        # messages run long enough that joining them last put `accessNotConfigured`
+        # past the truncation below — turning a quota problem into a revoked
+        # grant, which is the one failure that full-screens the product and the
+        # one thing re-consenting cannot fix.
+        described = " — ".join([*reasons, *parts])
     else:
         described = text
     return _WHITESPACE.sub(" ", described)[:_ERROR_REASON_CHARS]
