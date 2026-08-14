@@ -84,19 +84,51 @@ class TestTheChallenge:
 
         async with db.untenanted() as connection:
             stored = await connection.fetchval(
-                "select webauthn_challenge from auth_secrets where user_id = $1", user_id
+                "select registration_challenge from auth_secrets where user_id = $1",
+                user_id,
             )
             assert stored == issued
 
             # The read the reference got wrong: this must hand back the value it
             # is consuming, not the null it leaves behind.
-            from loop.api.routes.passkeys import _TAKE_CHALLENGE
+            from loop.api.routes.passkeys import _TAKE_REGISTRATION_CHALLENGE
 
-            taken = await connection.fetchval(_TAKE_CHALLENGE, user_id)
+            taken = await connection.fetchval(_TAKE_REGISTRATION_CHALLENGE, user_id)
             assert taken == issued
 
-            spent_again = await connection.fetchval(_TAKE_CHALLENGE, user_id)
+            spent_again = await connection.fetchval(
+                _TAKE_REGISTRATION_CHALLENGE, user_id
+            )
             assert spent_again is None
+
+    async def test_signing_in_cannot_take_the_one_an_enrolment_is_waiting_on(
+        self, client: AsyncClient, anonymous: AsyncClient, db: Database, user_id: str
+    ) -> None:
+        """The two flows shared a slot, and only one of them needs a session.
+
+        A second tab on the sign-in screen was enough: `login/options` is public
+        by necessity, and while it wrote the same column it replaced whatever
+        `register/options` had just issued. The authenticator then came back
+        with a signature over a challenge the server no longer had, enrolment
+        answered `no_challenge`, and asking again walked into the same race.
+        """
+        token = (await client.get("/api/me")).json()["csrf"]
+        enrolling = (
+            await client.post(
+                "/api/auth/register/options", headers={"x-csrf-token": token}
+            )
+        ).json()["challenge"]
+
+        signing_in = (await anonymous.post("/api/auth/login/options")).json()["challenge"]
+        assert signing_in != enrolling
+
+        async with db.untenanted() as connection:
+            from loop.api.routes.passkeys import _TAKE_REGISTRATION_CHALLENGE
+
+            assert (
+                await connection.fetchval(_TAKE_REGISTRATION_CHALLENGE, user_id)
+                == enrolling
+            )
 
     async def test_verifying_without_one_says_so(self, client: AsyncClient) -> None:
         token = (await client.get("/api/me")).json()["csrf"]

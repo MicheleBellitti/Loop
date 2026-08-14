@@ -244,9 +244,16 @@ class TestTheConsumerLoop:
             await connection.execute("delete from mq.messages where queue = $1", Queue.NOTIFY)
             await publish(connection, Queue.NOTIFY, {"n": 1})
 
+        # Waited for rather than slept towards. A fixed sleep here is a bet that
+        # the loop has claimed a batch, extended its lease and entered the
+        # handler within it — two round trips to Postgres — and on a loaded CI
+        # runner it loses: `stop()` then finds the consumer still idle, returns
+        # at once, and the assertion fails without anything being wrong.
+        started = asyncio.Event()
         finished = asyncio.Event()
 
         async def slow(_message: object) -> None:
+            started.set()
             await asyncio.sleep(0.1)
             finished.set()
 
@@ -257,7 +264,8 @@ class TestTheConsumerLoop:
             options=ConsumerOptions(batch=1),
         )
         task = asyncio.create_task(consumer.run())
-        await asyncio.sleep(0.02)
+        async with asyncio.timeout(10):
+            await started.wait()
         await consumer.stop()
         # Killing a handler mid-write is how a message ends up half applied.
         assert finished.is_set()
