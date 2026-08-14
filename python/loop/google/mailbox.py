@@ -146,10 +146,18 @@ async def save_cursor(
 
 
 async def mark_ok(connection: asyncpg.Connection, mailbox_id: str) -> None:
+    """A clean pass, which also means nothing is waiting behind it.
+
+    `backlog_estimate` is cleared here and not only at the end of a backfill: a
+    scan killed by a restart leaves its last estimate standing, and without this
+    the "still catching up" strip would outlive the scan by forever. The runtime
+    drains backfills and steady-state syncs from the same loop, so this cannot
+    zero a scan that is still running.
+    """
     await connection.execute(
         """
         update mailbox_accounts
-           set last_ok_at = now(), status = 'ok', last_error = null
+           set last_ok_at = now(), status = 'ok', last_error = null, backlog_estimate = 0
          where id = $1
         """,
         mailbox_id,

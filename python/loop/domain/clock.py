@@ -104,6 +104,10 @@ def days_between(a: datetime, b: datetime) -> int:
     return int((b - a).total_seconds() // 86_400)
 
 
+def minutes_between(a: datetime, b: datetime) -> int:
+    return int((b - a).total_seconds() // 60)
+
+
 def hours_between(a: datetime, b: datetime) -> float:
     return (b - a).total_seconds() / 3_600
 

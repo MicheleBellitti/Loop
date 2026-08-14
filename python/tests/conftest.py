@@ -241,13 +241,24 @@ async def record_message(
     }
 
 
-@pytest.fixture
-async def mailbox_id(db: Database, user_id: str) -> str:
-    """A connected Gmail account, which `seen_messages` needs to reference.
+async def connect_mailbox(
+    db: Database,
+    user_id: str,
+    *,
+    provider: str = "gmail",
+    address: str = MAILBOX_ADDRESS,
+    last_ok_at: datetime | None = None,
+) -> str:
+    """A connected account.
+
+    Imported rather than injected as a fixture because a test about the *worst*
+    of two mailboxes needs it twice, with different arguments, in one test.
 
     The sealed-secret columns are `not null` and nothing here decrypts them, so
     they hold zeroes: what the tests need is the row and its address, and the
     address is what tells the extractor which half of a thread the user wrote.
+    `last_ok_at` starts null, which is what `store_mailbox` writes — a mailbox
+    that has been connected and not yet read.
     """
     async with db.session(user_id) as connection:
         return str(
@@ -255,11 +266,19 @@ async def mailbox_id(db: Database, user_id: str) -> str:
                 """
                 insert into mailbox_accounts
                   (user_id, provider, address, secret_ciphertext, secret_nonce,
-                   dek_wrapped, dek_nonce)
-                values ($1,'gmail',$2,'\\x00','\\x00','\\x00','\\x00')
+                   dek_wrapped, dek_nonce, last_ok_at)
+                values ($1,$2,$3,'\\x00','\\x00','\\x00','\\x00',$4)
                 returning id
                 """,
                 user_id,
-                MAILBOX_ADDRESS,
+                provider,
+                address,
+                last_ok_at,
             )
         )
+
+
+@pytest.fixture
+async def mailbox_id(db: Database, user_id: str) -> str:
+    """A connected Gmail account, which `seen_messages` needs to reference."""
+    return await connect_mailbox(db, user_id)

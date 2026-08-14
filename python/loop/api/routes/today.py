@@ -72,7 +72,10 @@ async def today(request: Request) -> dict[str, Any]:
     now = datetime.now(UTC)
 
     async with request.app.state.db.session(session.user_id) as connection:
-        tz = await connection.fetchval("select tz from users where id = $1", session.user_id)
+        tz = (
+            await connection.fetchval("select tz from users where id = $1", session.user_id)
+            or "UTC"
+        )
         stages = await load_stage_table(connection, session.user_id)
         counters = await connection.fetchrow(_COUNTERS, session.user_id)
         window = await connection.fetch(
@@ -90,9 +93,8 @@ async def today(request: Request) -> dict[str, Any]:
             "select count(*) from review_items where user_id = $1 and resolved_at is null",
             session.user_id,
         )
-        health = await mailbox_health(connection, session.user_id)
+        health = await mailbox_health(connection, session.user_id, tz=tz, now=now)
 
-    tz = tz or "UTC"
     headline = build_headline(
         events=[_as_event(row) for row in window],
         # The application id rides in `evidence_ref` so the headline can count

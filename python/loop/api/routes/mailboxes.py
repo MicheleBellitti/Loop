@@ -48,20 +48,10 @@ _STATE_TTL_SECONDS: Final = 600
 
 _MAX_BACKFILL_MONTHS: Final = 60
 
+
 @router.get("/mailboxes")
 async def list_mailboxes(request: Request) -> dict[str, Any]:
-    """The health of the connection, not a list of rows.
-
-    The name says list and the answer is a status, which reads oddly until you
-    see what asks: the shell polls this to decide whether to full-screen "access
-    revoked" and whether to send a new user to onboarding. It wants one object
-    with a `state` and a `providers` array, and it is the same object
-    `/api/today` carries — so it is the same function.
-
-    Returning a `{"mailboxes": [...]}` list here instead, which is what a route
-    called `GET /api/mailboxes` looks like it should do, blanks the entire app:
-    `App.tsx` reads `health.providers.length` before it renders anything.
-    """
+    """The health of the connection, not a list of rows — see `loop.api.mailbox`."""
     session = auth.require(getattr(request.state, "session", None))
     async with request.app.state.db.session(session.user_id) as connection:
         return await mailbox_health(connection, session.user_id)
@@ -150,9 +140,12 @@ async def backfill(request: Request) -> dict[str, Any]:
 
     async with request.app.state.db.session(session.user_id) as connection:
         if mailbox_id is None:
+            # `provider = 'gmail'`, because what a backfill scans is mail. The
+            # rows are written in one transaction and share a `created_at`, so
+            # ordering alone would pick between them by coin flip.
             mailbox_id = await connection.fetchval(
-                "select id from mailbox_accounts where user_id = $1"
-                " order by created_at limit 1",
+                "select id from mailbox_accounts where user_id = $1 and provider = 'gmail'"
+                " order by created_at, id limit 1",
                 session.user_id,
             )
         if mailbox_id is None:

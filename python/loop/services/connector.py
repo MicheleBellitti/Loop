@@ -227,33 +227,42 @@ class ConnectorService:
     async def _run_query(self, mailbox: Mailbox, token: str, query: str) -> Synced:
         read = skipped = 0
         page_token: str | None = None
-        while True:
-            page = await self._google.list_messages(
-                token, query, page_token, BACKFILL_BATCH
-            )
-            ids = [m["id"] for m in page.get("messages") or ()]
-            for slice_start in range(0, len(ids), BACKFILL_CONCURRENCY):
-                batch = ids[slice_start : slice_start + BACKFILL_CONCURRENCY]
-                outcomes = await asyncio.gather(
-                    *(self._ingest(mailbox, token, i, backfill=True) for i in batch),
-                    return_exceptions=True,
+        try:
+            while True:
+                page = await self._google.list_messages(
+                    token, query, page_token, BACKFILL_BATCH
                 )
-                for message_id, outcome in zip(batch, outcomes, strict=True):
-                    if isinstance(outcome, BaseException):
-                        # One unreadable message must not end a scan of twelve
-                        # months.
-                        self._log.warning("skipped %s: %s", message_id, outcome)
-                        skipped += 1
-                    else:
-                        read += 1
-                await self._report_progress(mailbox, read, len(ids) - read - skipped)
+                ids = [m["id"] for m in page.get("messages") or ()]
+                # Per page, because `read` and `skipped` accumulate across pages
+                # and `ids` does not: subtracting the running totals from one
+                # page's length goes negative from page two onward.
+                done = 0
+                for slice_start in range(0, len(ids), BACKFILL_CONCURRENCY):
+                    batch = ids[slice_start : slice_start + BACKFILL_CONCURRENCY]
+                    outcomes = await asyncio.gather(
+                        *(self._ingest(mailbox, token, i, backfill=True) for i in batch),
+                        return_exceptions=True,
+                    )
+                    for message_id, outcome in zip(batch, outcomes, strict=True):
+                        if isinstance(outcome, BaseException):
+                            # One unreadable message must not end a scan of twelve
+                            # months.
+                            self._log.warning("skipped %s: %s", message_id, outcome)
+                            skipped += 1
+                        else:
+                            read += 1
+                        done += 1
+                    await self._report_progress(mailbox, read, len(ids) - done)
 
-            page_token = page.get("nextPageToken")
-            if not page_token:
-                break
-
-        async with self._db.session(mailbox.user_id) as connection:
-            await set_backlog(connection, mailbox.id, 0)
+                page_token = page.get("nextPageToken")
+                if not page_token:
+                    break
+        finally:
+            # Whether the scan finished or died on the way, nothing is queued
+            # behind it any more. A backlog left standing here is an "F2 · still
+            # catching up" strip that no later code path can ever clear.
+            async with self._db.session(mailbox.user_id) as connection:
+                await set_backlog(connection, mailbox.id, 0)
         return Synced(read=read, skipped=skipped, outcome="scanned")
 
     async def _sync_calendar(self, mailbox: Mailbox, token: str) -> None:

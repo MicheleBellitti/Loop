@@ -7,9 +7,10 @@ absent one, a number where it sends a string: each of those breaks a browser and
 none of them breaks a handler.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import SOME_TUESDAY, connect_mailbox
 from httpx import AsyncClient
 
 from loop.api import auth
@@ -336,11 +337,16 @@ class TestTheStatistics:
 class TestTheMailboxHealth:
     """The shape `App.tsx` reads before it renders anything at all.
 
-    `/api/mailboxes` is a status, not a list — the name suggests otherwise and a
-    list is what the first version of this route returned, which blanked the
-    whole app: the shell reads `health.providers.length` at the top of the
-    component tree, so an absent key is a white screen and nothing in any log.
+    Why this route answers a status rather than the list its name promises is
+    argued once, in `loop.api.mailbox`.
     """
+
+    @staticmethod
+    async def _set(db: Database, user_id: str, mailbox_id: str, assignments: str) -> None:
+        async with db.session(user_id) as connection:
+            await connection.execute(
+                f"update mailbox_accounts set {assignments} where id = $1", mailbox_id
+            )
 
     async def test_it_is_the_same_object_today_carries(
         self, client: AsyncClient, mailbox_id: str
@@ -355,11 +361,19 @@ class TestTheMailboxHealth:
             "backlog",
             "state",
         ]
+        # The entries, not just the envelope: the shell keys its list on `id`
+        # and labels it with `provider` and `address`, so a rename inside the
+        # array is the same white screen one level down.
+        assert list(health["providers"][0]) == [
+            "id",
+            "provider",
+            "address",
+            "status",
+            "last_ok_at",
+        ]
         assert health == (await client.get("/api/today")).json()["mailbox_health"]
 
-    async def test_providers_is_a_list_even_with_no_mailbox(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_providers_is_a_list_even_with_no_mailbox(self, client: AsyncClient) -> None:
         health = (await client.get("/api/mailboxes")).json()
         assert health["providers"] == []
         assert health["connected"] is False
@@ -368,25 +382,42 @@ class TestTheMailboxHealth:
     async def test_a_revoked_grant_is_the_one_full_screen_failure(
         self, client: AsyncClient, db: Database, user_id: str, mailbox_id: str
     ) -> None:
-        async with db.session(user_id) as connection:
-            await connection.execute(
-                "update mailbox_accounts set status = 'needs_reauth' where id = $1",
-                mailbox_id,
-            )
+        await self._set(db, user_id, mailbox_id, "status = 'needs_reauth'")
         health = (await client.get("/api/mailboxes")).json()
         assert health["state"] == "F1"
         # A row exists and cannot be read, which is not connected.
         assert health["connected"] is False
 
+    async def test_a_mailbox_that_is_failing_is_not_a_mailbox_that_is_fine(
+        self, client: AsyncClient, db: Database, user_id: str, mailbox_id: str
+    ) -> None:
+        # The connector writes 'error' for every failure that is not an auth
+        # failure — a quota ceiling, a run of 5xx. Nothing is being read, so
+        # `connected` cannot say yes; but it is not revoked, so it is not the
+        # full screen either.
+        await self._set(db, user_id, mailbox_id, "status = 'error', last_ok_at = now()")
+        health = (await client.get("/api/mailboxes")).json()
+        assert health["connected"] is False
+        assert health["state"] == "ok"
+        assert health["providers"][0]["status"] == "error"
+
+    async def test_one_lapsed_grant_of_two_does_not_blank_the_app(
+        self, client: AsyncClient, db: Database, user_id: str, mailbox_id: str
+    ) -> None:
+        # F1 replaces the entire product. A user whose work mailbox still reads
+        # is a degraded account, not an unreachable one.
+        await self._set(db, user_id, mailbox_id, "status = 'needs_reauth', last_ok_at = now()")
+        await connect_mailbox(
+            db, user_id, address="work@pytest.invalid", last_ok_at=datetime.now(UTC)
+        )
+        health = (await client.get("/api/mailboxes")).json()
+        assert health["state"] == "ok"
+        assert health["connected"] is True
+
     async def test_a_backlog_is_a_state_of_its_own(
         self, client: AsyncClient, db: Database, user_id: str, mailbox_id: str
     ) -> None:
-        async with db.session(user_id) as connection:
-            await connection.execute(
-                "update mailbox_accounts set backlog_estimate = 40, last_ok_at = now() "
-                "where id = $1",
-                mailbox_id,
-            )
+        await self._set(db, user_id, mailbox_id, "backlog_estimate = 40, last_ok_at = now()")
         health = (await client.get("/api/mailboxes")).json()
         assert (health["state"], health["backlog"]) == ("F2", 40)
         assert health["connected"] is True
@@ -394,26 +425,62 @@ class TestTheMailboxHealth:
     async def test_freshness_is_the_worst_provider_not_the_best(
         self, client: AsyncClient, db: Database, user_id: str, mailbox_id: str
     ) -> None:
-        # A mailbox read a minute ago and a calendar last read a week ago is an
-        # account that is a week stale. Reporting the newest would call it
-        # healthy exactly when half of it had stopped.
-        async with db.session(user_id) as connection:
-            await connection.execute(
-                "update mailbox_accounts set last_ok_at = now() where id = $1", mailbox_id
-            )
-            await connection.execute(
-                """
-                insert into mailbox_accounts
-                  (user_id, provider, address, secret_ciphertext, secret_nonce,
-                   dek_wrapped, dek_nonce, last_ok_at)
-                values ($1,'google_calendar',$2,'\\x00','\\x00','\\x00','\\x00',
-                        now() - interval '7 days')
-                """,
-                user_id,
-                "calendar@pytest.invalid",
-            )
+        # A mailbox read a minute ago and one last read a week ago is an account
+        # that is a week stale. Reporting the newest would call it healthy
+        # exactly when half of it had stopped.
+        await self._set(db, user_id, mailbox_id, "last_ok_at = now()")
+        await connect_mailbox(
+            db,
+            user_id,
+            address="work@pytest.invalid",
+            last_ok_at=datetime.now(UTC) - timedelta(days=7),
+        )
         health = (await client.get("/api/mailboxes")).json()
-        assert health["minutes_since_read"] >= 7 * 24 * 60
+        # A minute of slack: the row is stamped here and the delta is measured
+        # in the API process, and the two clocks are not the same clock.
+        assert health["minutes_since_read"] >= 7 * 24 * 60 - 1
+
+    async def test_a_mailbox_that_has_never_read_is_the_worst_of_all(
+        self, client: AsyncClient, db: Database, user_id: str, mailbox_id: str
+    ) -> None:
+        # Never read is worse than any timestamp, so it cannot be filtered out
+        # on the way to the minimum — that answers with the healthy half.
+        await self._set(db, user_id, mailbox_id, "last_ok_at = now()")
+        await connect_mailbox(db, user_id, address="work@pytest.invalid")
+        health = (await client.get("/api/mailboxes")).json()
+        assert health["last_ok_at"] is None
+        assert health["minutes_since_read"] is None
+
+    async def test_it_counts_what_was_placed_today(
+        self, client: AsyncClient, db: Database, user_id: str, mailbox_id: str
+    ) -> None:
+        # The one number here that no other assertion would notice going to
+        # zero, and the number onboarding shows while it is earning trust.
+        async with db.session(user_id) as connection:
+            for index, (outcome, processed_at) in enumerate(
+                [
+                    ("placed", datetime.now(UTC)),
+                    ("placed", datetime.now(UTC) - timedelta(days=2)),
+                    ("dropped", datetime.now(UTC)),
+                ]
+            ):
+                await connection.execute(
+                    """
+                    insert into seen_messages
+                      (mailbox_id, provider_message_id, user_id, body_sha256,
+                       received_at, outcome, processed_at)
+                    values ($1,$2,$3,$4,$5,$6,$7)
+                    """,
+                    mailbox_id,
+                    f"placed-{index}",
+                    user_id,
+                    b"\x00" * 32,
+                    SOME_TUESDAY,
+                    outcome,
+                    processed_at,
+                )
+        health = (await client.get("/api/mailboxes")).json()
+        assert health["placed_today"] == 1
 
 
 class TestIsItStillReadingMyMail:

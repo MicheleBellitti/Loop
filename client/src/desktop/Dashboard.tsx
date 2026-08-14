@@ -509,10 +509,10 @@ function SettingsView({ health }: { health: MailboxHealth | undefined }) {
         <div style={{ border: '1px solid var(--color-divider)' }}>
           {(health?.providers ?? []).map((p) => (
             <div
-              key={p.provider}
+              key={p.id}
               style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-divider)', display: 'flex', justifyContent: 'space-between' }}
             >
-              <span>{p.provider === 'gmail' ? 'Gmail' : 'Google Calendar'}</span>
+              <span>{p.provider === 'gmail' ? 'Gmail' : 'Google Calendar'}<span className="muted-65"> · {p.address}</span></span>
               <span className={p.status === 'ok' ? 'emphasis' : 'muted-65'}>{p.status}</span>
             </div>
           ))}
