@@ -184,6 +184,19 @@ class TestMerging:
         assert merge is not None
         assert (merge.keep, merge.merge) == ("a1", "a2")
 
+    def test_a_row_with_no_applied_at_is_always_the_one_merged_away(self) -> None:
+        # Which is every row the resolver has just created: `_create` writes no
+        # `applied_at`, the pipeline sets it when it folds the event. So the
+        # ordinary case is that the application a signal just landed on is the
+        # one that disappears — and `resolve` has to follow the merge to the
+        # survivor, or it publishes the signal's events against a row that
+        # everything downstream filters out by `merged_into_id is null`.
+        fresh = candidate("new", "backend engineer")
+        established = candidate("old", "backend engineer", applied_at=NOW)
+        merge = find_duplicate(fresh, [established])
+        assert merge is not None
+        assert (merge.keep, merge.merge) == ("old", "new")
+
     def test_leaves_two_applications_months_apart_alone(self) -> None:
         old = candidate("a1", "backend engineer", applied_at=NOW - timedelta(days=90))
         new = candidate("a2", "backend engineer", applied_at=NOW)

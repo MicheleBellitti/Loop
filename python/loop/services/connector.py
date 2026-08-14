@@ -115,7 +115,16 @@ class ConnectorService:
         """
         results: dict[str, Synced] = {}
         for mailbox in await self._mailboxes():
-            results[mailbox.id] = await self.sync(mailbox)
+            try:
+                results[mailbox.id] = await self.sync(mailbox)
+            except Exception as error:
+                # One mailbox is not every mailbox. `sync` re-raises a rate
+                # limit deliberately, and an unreadable secret raises from
+                # `_token`; without this the first failure ends the pass, and
+                # because the order is stable the same mailbox fails first on
+                # every poll, so everyone behind it starves.
+                self._log.exception("sync failed for %s: %s", mailbox.id, error)
+                results[mailbox.id] = Synced(read=0, skipped=0, outcome="error")
         return results
 
     async def sync(self, mailbox: Mailbox) -> Synced:

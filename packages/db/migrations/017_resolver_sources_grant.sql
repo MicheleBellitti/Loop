@@ -1,0 +1,18 @@
+-- 017 · the resolver re-points sources when it merges two applications
+--
+-- `_merge_a_duplicate` moves the losing application's provenance onto the
+-- survivor — `update sources set application_id = $1 where application_id = $2`
+-- — because a job seen on LinkedIn and again on the company's own site is one
+-- application with two provenances, and that is the whole basis of channel
+-- attribution.
+--
+-- 003_rls.sql granted `sources` writes to `loop_pipeline` only, so under
+-- `DB_ROLE=loop_resolver` that statement raised 42501 and aborted the whole
+-- `resolve()` transaction: no events published, `seen_messages.outcome` never
+-- set, the message retried five times and then dead-lettered with its body
+-- stripped. Every automatic merge silently destroyed the signal that triggered
+-- it, and no test could see it because the suite connects as the owner.
+--
+-- UPDATE only. The resolver never creates or deletes a source — the pipeline
+-- owns that — and this is the one column it needs to move.
+grant update on sources to loop_resolver;

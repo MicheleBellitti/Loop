@@ -107,6 +107,15 @@ class ResolverService:
                     application_id = decision.application_id
 
                 merged = await self._merge_a_duplicate(connection, signal, application_id)
+                if merged is not None and merged.merge == application_id:
+                    # The row this signal just landed on is the one that got
+                    # merged away — which is the normal case, not the odd one:
+                    # a row `_create` just inserted has no `applied_at`, and
+                    # `find_duplicate` keeps the earlier of the two. Everything
+                    # downstream filters on `merged_into_id is null`, so events
+                    # left pointing here would land on a row the board, the
+                    # candidate search and the nudge snapshot all hide.
+                    application_id = merged.keep
             else:
                 merged = None
 
@@ -424,12 +433,19 @@ class ResolverService:
         excerpt: str | None = None,
         candidates: list[dict[str, object]] | None = None,
     ) -> None:
+        # `where not exists`, not `on conflict do nothing`: this table's only
+        # unique constraint is a generated primary key, so there is nothing for
+        # a conflict to arc across and a redelivered signal asked the same
+        # question twice. `extractor.py` documents the same fix.
         await connection.execute(
             """
             insert into review_items
               (user_id, kind, evidence_ref, application_id, excerpt, candidates)
-            values ($1,$2,$3,$4,$5,$6)
-            on conflict do nothing
+            select $1,$2,$3,$4,$5,$6
+             where not exists (
+               select 1 from review_items
+                where user_id = $1 and kind = $2 and evidence_ref = $3
+                  and resolved_at is null)
             """,
             signal.user_id,
             kind,
