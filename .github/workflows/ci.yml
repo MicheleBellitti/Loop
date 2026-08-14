@@ -31,3 +31,33 @@ jobs:
       - run: npm run test:integration
 
       - run: npm run -w @loop/client build
+
+  # The Python port ships the API the client talks to, so its gates run here
+  # too. Without this job the contract tests are a local ritual: a route that
+  # returns the wrong shape is a white screen with a 200 in every log, and
+  # nothing else in this file would notice.
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { enable-cache: true }
+
+      # `ruff check` and `mypy`, which is what python/README.md documents as the
+      # gates. `ruff format` is deliberately not one of them: most of the tree
+      # predates it and enforcing it here would be a reformat, not a check.
+      - run: uv run ruff check .
+        working-directory: python
+      - run: uv run --extra ladder --extra api --extra db --extra connector --extra push mypy loop
+        working-directory: python
+
+      # The same image compose uses, so the extensions and the RLS roles are
+      # the ones the tests are making claims about.
+      - run: docker build -t loop-postgres:16 infra/postgres
+      - run: node scripts/test-db.mjs up
+
+      # Without DATABASE_URL every integration test skips, which reads as green.
+      - run: uv run --extra api --extra db --extra connector --extra push --extra ladder pytest
+        working-directory: python
+        env:
+          DATABASE_URL: postgres://loop:loop@localhost:55432/loop

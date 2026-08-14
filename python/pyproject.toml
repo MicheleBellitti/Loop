@@ -1,0 +1,111 @@
+[project]
+name = "loop"
+version = "0.1.0"
+description = "A job application tracker that reads your mailbox instead of asking you to update it"
+requires-python = ">=3.12"
+
+# The core has no runtime dependencies on purpose.
+#
+# `loop.domain` is the fold, the stage machine, every threshold and the nudge
+# rules, and it must stay importable with nothing installed: no database, no
+# clock, no network. That is what lets its tests run in under a second and what
+# makes the port verifiable — a pure module can be diffed against the
+# TypeScript one message at a time.
+dependencies = []
+
+[project.optional-dependencies]
+db = [
+    "asyncpg>=0.30",
+]
+api = [
+    "fastapi>=0.115",
+    "webauthn>=2.5",
+    "pydantic>=2.9",
+    "uvicorn[standard]>=0.32",
+]
+ladder = ["pyyaml>=6.0", "httpx>=0.27", "pydantic>=2.9"]
+ml = ["sentence-transformers>=3.3", "rapidfuzz>=3.10"]
+# Web Push. `pywebpush` layers py-vapid, http-ece and cryptography, and it is
+# the only outbound network dependency in the product — a deployment that never
+# pushes never installs it, and every rule around it is testable without it.
+push = ["pywebpush>=2.0"]
+# The connector: an HTTP client for Google, and AES-GCM for the one secret this
+# system stores.
+connector = ["httpx>=0.27", "cryptography>=43", "pyjwt[crypto]>=2.9"]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.8",
+  "mypy>=1.13",
+  "types-pyyaml>=6.0.12.20260724",
+  "httpx>=0.28.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["loop"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Two kinds of test, split by marker rather than by directory so a module's
+# pure and integration tests can sit next to the code they cover.
+markers = [
+  "integration: needs a real Postgres",
+]
+addopts = "-q --strict-markers"
+# The integration tests build their own database and are skipped without a
+# DATABASE_URL, so the default run stays pure and fast.
+# One event loop for the whole run. The database fixtures are session-scoped
+# and a pool created on one loop cannot be used from another.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+
+[tool.ruff]
+line-length = 96
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# RUF001/002/003 flag en dashes and typographic quotes as "ambiguous unicode".
+# They are deliberate: the comments in this codebase are prose, they explain why
+# a threshold is what it is, and mangling them into hyphens to satisfy a linter
+# would trade readability for nothing. The rule exists to catch homoglyph
+# attacks in identifiers, which is not what is happening here.
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+# A shared list of events built once per class is the point of the determinism
+# test; rebuilding it per method would test a different thing each time.
+"tests/*" = ["RUF012"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+
+# asyncpg ships no py.typed marker. Its own annotations are good; the
+# package simply predates the convention, and a per-call ignore in every
+# module that touches the database would be worse than saying it once.
+[[tool.mypy.overrides]]
+module = "asyncpg.*"
+ignore_missing_imports = true
+
+# `pywebpush` ships no annotations at all. It is imported in exactly one
+# function, whose whole job is to turn the library's exceptions into the four
+# results the notifier branches on — so the boundary is narrow and typed on
+# this side of it.
+[[tool.mypy.overrides]]
+module = "pywebpush.*"
+ignore_missing_imports = true
+
+# `pyjwt` ships stubs in a separate distribution and is imported in exactly one
+# function — verifying the bearer token on the Pub/Sub webhook.
+[[tool.mypy.overrides]]
+module = "jwt.*"
+ignore_missing_imports = true

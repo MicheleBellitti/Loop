@@ -69,7 +69,13 @@ export interface Counters {
 
 export interface MailboxHealth {
   connected: boolean;
-  providers: Array<{ provider: string; status: string; last_ok_at: string | null }>;
+  providers: Array<{
+    id: string;
+    provider: string;
+    address: string;
+    status: string;
+    last_ok_at: string | null;
+  }>;
   last_ok_at: string | null;
   minutes_since_read: number | null;
   placed_today: number;
