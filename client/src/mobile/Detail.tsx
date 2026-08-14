@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft } from 'lucide-react';
 import { api, type ApplicationDetail } from '../api.js';
-import { Button, Mark, Provenance, Skeleton, Tag, Toast } from '../components.js';
+import { Button, Mark, Provenance, Skeleton, StagePicker, Tag, Toast } from '../components.js';
+import { failure } from '../desktop/Drawer.js';
 
 /**
  * The application record. The event log is the core of the screen: every
@@ -16,7 +17,8 @@ export function Detail({
 }: {
   id: string;
   onBack: () => void;
-  onDraft: (suggestionKey: string) => void;
+  /** The application to draft for — not a suggestion key, which most rows lack. */
+  onDraft: (applicationId: string) => void;
 }) {
   const queryClient = useQueryClient();
   const [correcting, setCorrecting] = useState(false);
@@ -33,9 +35,11 @@ export function Detail({
       setCorrecting(false);
       setToast('Correction recorded. The agent will not overwrite it.');
       void queryClient.invalidateQueries({ queryKey: ['application', id] });
+      void queryClient.invalidateQueries({ queryKey: ['applications'] });
       void queryClient.invalidateQueries({ queryKey: ['today'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
-    onError: () => setToast('That did not save. Nothing was changed.'),
+    onError: (error) => setToast(failure(error, 'That did not save. Nothing was changed.')),
   });
 
   if (isLoading || !data) {
@@ -124,7 +128,7 @@ export function Detail({
       </section>
 
       <div style={{ display: 'grid', gap: 'var(--space-2)', marginTop: 'var(--space-6)' }}>
-        <Button variant="primary" style={{ minHeight: 48 }} onClick={() => onDraft(`follow_up_due:${id}`)}>
+        <Button variant="primary" style={{ minHeight: 48 }} onClick={() => onDraft(id)}>
           Draft a follow-up
         </Button>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
@@ -134,38 +138,22 @@ export function Detail({
             }}
             disabled={!data.facts.posting_url}
           >
-            Open thread
+            Open posting
           </Button>
-          <Button onClick={() => setCorrecting((v) => !v)}>Correct stage</Button>
+          <Button aria-expanded={correcting} onClick={() => setCorrecting((v) => !v)}>
+            Correct stage
+          </Button>
         </div>
       </div>
 
       {correcting ? (
-        <div style={{ marginTop: 'var(--space-3)', border: '1px solid var(--color-divider)', padding: 'var(--space-3)' }}>
-          <div className="eyebrow" style={{ marginBottom: 'var(--space-2)' }}>
-            Set the stage to
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-            {['applied', 'acknowledged', 'recruiter_reachout', 'hr_call', 'take_home', 'technical', 'system_design', 'onsite_loop', 'final', 'offer', 'negotiating'].map(
-              (key) => (
-                <button
-                  key={key}
-                  className="filter-chip"
-                  onClick={() => correct.mutate(key)}
-                  disabled={correct.isPending}
-                >
-                  {key.replace(/_/g, ' ')}
-                </button>
-              ),
-            )}
-          </div>
-        </div>
+        <StagePicker
+          busy={correct.isPending}
+          current={data.stage}
+          onPick={(key) => correct.mutate(key)}
+          note="Correcting the stage writes a human_corrected event at confidence 1.0 — the agent will not overwrite it."
+        />
       ) : null}
-
-      <p className="muted-50" style={{ fontSize: 11.5, lineHeight: 1.5, marginTop: 'var(--space-4)' }}>
-        Correcting the stage writes a <code>human_corrected</code> event at confidence 1.0 — the agent
-        will not overwrite it.
-      </p>
 
       {toast ? <Toast message={toast} onDismiss={() => setToast(null)} /> : null}
     </>

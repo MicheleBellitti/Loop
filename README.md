@@ -111,6 +111,15 @@ for the same reason.
 numerator, denominator and exclusion count is a bug, not a styling choice.
 Below its gate a figure is withheld and the gate is named.
 
+**`status` is not the same question as "is this still happening".** An
+application is `live` until something closes it, and on a twelve-month mailbox
+most processes end by simply stopping — so `live` counted fourteen where the
+truth was four, and held every ratio's gate shut behind it. `activity` is the
+answer to the second question, derived on every read from silence, stage and
+the calendar rather than from a nightly sweep having run. The board, the
+counters and the statistics all use it, and
+[docs/decisions.md](docs/decisions.md) §F1 is the argument.
+
 **Provenance is on every automated claim.** Source and confidence, on every
 event row. It is the mechanism by which you learn when to trust the thing.
 

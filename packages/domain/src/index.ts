@@ -4,6 +4,7 @@ export * from './thresholds.js';
 export * from './fold.js';
 export * from './headline.js';
 export * from './flags.js';
+export * from './activity.js';
 export * from './normalise.js';
 export * from './time.js';
 export * from './nudges.js';

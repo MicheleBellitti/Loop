@@ -149,6 +149,14 @@ export const QUEUE = {
 export const SILENCE = {
   /** Past this, with no inbound signal, treat the application as closed. */
   PRESUMED_CLOSED_DAYS: 90,
+  /**
+   * The same judgement, earlier, for an application that never got past the
+   * sending of it. `applied` and `acknowledged` mean nobody has read your name
+   * out loud yet, and two months of silence there is not a slow process — it is
+   * a process that never started. Sixty days rather than ninety because there
+   * is nothing to wait for: no interviewer's calendar, no panel to convene.
+   */
+  NO_REPLY_CLOSED_DAYS: 60,
   /** Never presume closure while the ball is in the user's court. */
   SKIP_STAGES: ['take_home', 'offer', 'negotiating'] as readonly string[],
 } as const;

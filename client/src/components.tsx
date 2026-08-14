@@ -163,6 +163,68 @@ export function Skeleton({ width = '100%', height = 14 }: { width?: string | num
   return <div className="skeleton" style={{ width, height }} />;
 }
 
+/**
+ * The eleven stage keys, in depth order.
+ *
+ * The client is not allowed to *derive* a stage — that is the stage machine's
+ * job and it lives on the server — but correcting one means naming one, and
+ * there is no endpoint that lists them. This is the same list the mobile detail
+ * view has always carried, lifted so the two cannot disagree about what you are
+ * allowed to say happened.
+ */
+export const STAGE_KEYS = [
+  'applied',
+  'acknowledged',
+  'recruiter_reachout',
+  'hr_call',
+  'take_home',
+  'technical',
+  'system_design',
+  'onsite_loop',
+  'final',
+  'offer',
+  'negotiating',
+] as const;
+
+export function StagePicker({
+  current,
+  onPick,
+  busy = false,
+  note,
+}: {
+  current?: string;
+  onPick: (key: string) => void;
+  busy?: boolean;
+  note?: string;
+}) {
+  return (
+    <div style={{ marginTop: 'var(--space-3)', border: '1px solid var(--color-divider)', padding: 'var(--space-3)' }}>
+      <div className="eyebrow" style={{ marginBottom: 'var(--space-2)' }}>
+        Set the stage to
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+        {STAGE_KEYS.map((key) => (
+          <button
+            key={key}
+            className="filter-chip"
+            aria-pressed={key === current}
+            onClick={() => onPick(key)}
+            disabled={busy || key === current}
+            style={key === current ? undefined : { opacity: busy ? 0.45 : 1 }}
+          >
+            {key.replace(/_/g, ' ')}
+          </button>
+        ))}
+      </div>
+      {note ? (
+        <p className="muted-50" style={{ fontSize: 11.5, lineHeight: 1.5, margin: 'var(--space-3) 0 0' }}>
+          {note}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function Toast({
   message,
   action,

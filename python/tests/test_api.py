@@ -91,10 +91,12 @@ class TestTheSession:
 
 
 class TestThePipelineBoard:
-    async def test_every_row_carries_all_seventeen_keys(self, client: AsyncClient) -> None:
+    async def test_every_row_carries_all_nineteen_keys(self, client: AsyncClient) -> None:
         body = (await client.get("/api/applications?limit=200")).json()
-        assert set(body) == {"rows", "next_cursor"}
+        assert set(body) == {"rows", "next_cursor", "counts"}
         assert body["next_cursor"] is None
+        # One tally per filter, so the board can label its tabs in one request.
+        assert set(body["counts"]) == {"active", "stale", "closed", "open", "all"}
         for row in body["rows"]:
             assert list(row) == [
                 "id",
@@ -112,6 +114,8 @@ class TestThePipelineBoard:
                 "flag",
                 "flag_kind",
                 "closed",
+                "activity",
+                "next_interview_at",
                 "needs_review",
                 "confidence",
             ]
@@ -183,7 +187,7 @@ class TestToday:
 
     async def test_the_counters_are_numbers(self, client: AsyncClient) -> None:
         counters = (await client.get("/api/today")).json()["counters"]
-        assert set(counters) == {"live", "interviewing", "offer", "overdue"}
+        assert set(counters) == {"live", "quiet", "interviewing", "offer", "overdue", "closed"}
         assert all(isinstance(v, int) for v in counters.values())
 
 
@@ -269,7 +273,7 @@ class TestTheReviewQueue:
 
 
 class TestTheStatistics:
-    async def test_the_ten_sections_are_always_all_ten(self, client: AsyncClient) -> None:
+    async def test_the_twelve_sections_are_always_all_twelve(self, client: AsyncClient) -> None:
         body = (await client.get("/api/stats")).json()
         assert list(body) == [
             "period",
@@ -280,6 +284,8 @@ class TestTheStatistics:
             "channels",
             "channel_note",
             "time_in_stage",
+            "by_month",
+            "outcomes",
             "compensation",
             "seasonal",
         ]

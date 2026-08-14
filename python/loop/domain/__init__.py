@@ -9,6 +9,7 @@ The spec was wrong in roughly twenty places; that document is the corrected
 version and the reason each correction exists.
 """
 
+from .activity import Activity, activity_of, closure_days, is_open
 from .clock import (
     at_local_time,
     days_between,
@@ -59,6 +60,7 @@ from .types import ApplicationState, AppStatus, DomainEvent, EventType, Phase, S
 
 __all__ = [
     "DEFAULT_STAGES",
+    "Activity",
     "AppStatus",
     "ApplicationState",
     "CalendarInvite",
@@ -81,9 +83,11 @@ __all__ = [
     "StageDef",
     "StageTable",
     "Suggestion",
+    "activity_of",
     "at_local_time",
     "build_headline",
     "channel_gate",
+    "closure_days",
     "company_key",
     "compute_flag",
     "date_eyebrow",
@@ -102,6 +106,7 @@ __all__ = [
     "hours_between",
     "html_to_text",
     "is_closed",
+    "is_open",
     "is_quiet_hour",
     "iso_z",
     "matches_domain_suffix",
