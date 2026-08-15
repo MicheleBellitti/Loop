@@ -14,7 +14,7 @@ it — and every row they create belongs to a user they delete afterwards.
 
 import os
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -52,6 +52,29 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
         if "integration" in item.keywords:
             item.add_marker(skip)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _sse_streams_survive_the_stub_servers() -> Iterator[None]:
+    """Keep one test's uvicorn shutdown from ending the next test's stream.
+
+    sse-starlette drains every open event stream when the server it is running
+    under shuts down — which it detects by looking at whoever installed the
+    SIGTERM handler. In this process that is whichever stub server a fixture
+    last started, so tearing one down told every later `EventSourceResponse`
+    in the session that the application was going away, and those responses
+    ended before they began. The library's own switch turns the automatic
+    detection off; nothing here needs it, because nothing here shuts a real
+    server down while a stream is open.
+    """
+    from sse_starlette.sse import AppStatus
+
+    AppStatus.disable_automatic_graceful_drain()
+    try:
+        yield
+    finally:
+        AppStatus.should_exit = False
+        AppStatus.enable_automatic_graceful_drain_mode()
 
 
 @pytest.fixture(scope="session")

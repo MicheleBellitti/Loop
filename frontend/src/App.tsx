@@ -4,6 +4,8 @@ import { api, setCsrf, type MailboxHealth } from './api.js';
 import { useLiveUpdates } from './sse.js';
 import { MobileApp } from './mobile/MobileApp.js';
 import { Dashboard } from './desktop/Dashboard.js';
+import { ChatWidget } from './chat/ChatWidget.js';
+import { ViewingProvider } from './chat/viewing.js';
 import { Onboarding } from './onboarding/Onboarding.js';
 import { SignIn } from './SignIn.js';
 import { AccessRevoked } from './states/AccessRevoked.js';
@@ -66,7 +68,14 @@ export function App() {
     return <Onboarding onDone={() => void mailboxes.refetch()} />;
   }
 
-  return viewport === 'mobile' ? <MobileApp /> : <Dashboard />;
+  // The assistant rides alongside either layout: same panel, same toggle, and
+  // the provider between them is how it knows which record is open.
+  return (
+    <ViewingProvider>
+      {viewport === 'mobile' ? <MobileApp /> : <Dashboard />}
+      <ChatWidget />
+    </ViewingProvider>
+  );
 }
 
 function Splash() {

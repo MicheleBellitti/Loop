@@ -30,6 +30,7 @@ them.
     loop/db/         asyncpg, the tenant session, the queue, migrations, rebuild
     loop/services/   the eight long-running processes
     loop/api/        FastAPI, built against the client as the specification
+    loop/chat/       the assistant: LangGraph's loop over llama.cpp, our tools
     loop/runtime/    the log: allow-listed fields, redacted secrets
     loop/harness/    the corpus, the runner, the divergence table
     migrations/      numbered .sql — schema, RLS, grants, the queue, the sweeps

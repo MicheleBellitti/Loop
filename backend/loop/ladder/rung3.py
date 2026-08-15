@@ -121,6 +121,11 @@ class ModelConfig:
     """
 
     base_url: str | None = None
+    # Every server MODEL_BASE_URL names, each gated in its own right. The rung
+    # uses the first — it wants one model and asks it a closed question — while
+    # the chat's picker ranges over all of them, because `llama-server` loads
+    # one model per process and a choice needs more than one process.
+    base_urls: tuple[str, ...] = ()
     name: str = "qwen2.5-7b-instruct"
     timeout_seconds: float = 30.0
     allow_hosted: bool = False
@@ -129,15 +134,19 @@ class ModelConfig:
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "ModelConfig":
         source = os.environ if env is None else env
-        base_url = (source.get("MODEL_BASE_URL") or "").strip() or None
+        raw = (source.get("MODEL_BASE_URL") or "").strip()
+        base_urls = tuple(part.strip() for part in raw.split(",") if part.strip())
         allow_hosted = (source.get("ALLOW_HOSTED_MODEL") or "").strip() in {"true", "1"}
-        if base_url and not allow_hosted and not _is_on_this_box(base_url):
-            raise ValueError(
-                f"MODEL_BASE_URL points off this box ({base_url}) but ALLOW_HOSTED_MODEL "
-                "is false. Set it to true only alongside a named processor in settings."
-            )
+        for base_url in base_urls:
+            if not allow_hosted and not _is_on_this_box(base_url):
+                raise ValueError(
+                    f"MODEL_BASE_URL points off this box ({base_url}) but "
+                    "ALLOW_HOSTED_MODEL is false. Set it to true only alongside a "
+                    "named processor in settings."
+                )
         return cls(
-            base_url=base_url,
+            base_url=base_urls[0] if base_urls else None,
+            base_urls=base_urls,
             name=(source.get("MODEL_NAME") or "").strip() or "qwen2.5-7b-instruct",
             timeout_seconds=_milliseconds(source.get("MODEL_TIMEOUT_MS"), 30_000) / 1000,
             allow_hosted=allow_hosted,
