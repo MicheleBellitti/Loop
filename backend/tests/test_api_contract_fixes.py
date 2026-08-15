@@ -24,7 +24,7 @@ pytestmark = pytest.mark.integration
 
 class TestTheBoardsDefaults:
     async def test_asking_for_no_limit_gets_a_hundred(self, client: AsyncClient) -> None:
-        # `client/src/mobile/Pipeline.tsx` is the one caller that sends no
+        # `frontend/src/mobile/Pipeline.tsx` is the one caller that sends no
         # `limit` at all. The port's default was 50, so the mobile board showed
         # half a pipeline and said nothing about the other half.
         #
