@@ -119,19 +119,33 @@ async def callback(request: Request, code: str = "", state: str = "") -> Respons
         tokens = await client.exchange_code(code, _redirect_uri(settings), claims["v"])
         profile = await client.profile(tokens.access_token)
         async with request.app.state.db.session(claims["u"]) as connection:
-            for provider in ("gmail", "google_calendar"):
-                # Two rows for one grant. The calendar is read by the same
-                # connector on the same secret, and it is a separate row because
-                # each provider carries its own cursor — a Gmail history id and
-                # a Calendar sync token are not interchangeable, and a single
-                # row would make the second connector's first run a full list.
-                await store_mailbox(
-                    connection,
-                    user_id=claims["u"],
-                    provider=provider,
-                    address=profile["emailAddress"],
-                    tokens=tokens,
-                )
+            # One row for one grant, which is what `loop.api.mailbox` documents
+            # and what the rest of the system assumes.
+            #
+            # A second `google_calendar` row was written here for a while, on
+            # the reasoning that each provider carries its own cursor. Nothing
+            # in this codebase reads it: `ConnectorService` selects
+            # `where provider = 'gmail'`, and `_sync_calendar` stores its
+            # `syncToken` in the *gmail* row's `cursor` alongside the history id
+            # — a merge, precisely so the two can share one column. The row was
+            # therefore inert, and inert was the least of it. Its `last_ok_at`
+            # stayed null for ever, so `mailbox_health`'s `all(seen_at)` made
+            # the freshness reading permanently null; its `status` stayed 'ok',
+            # so a revoked grant never satisfied `all(status == 'needs_reauth')`
+            # and the F1 screen could not appear; and `DELETE /api/mailboxes/{id}`
+            # removes one row by id, so disconnecting left a second sealed copy
+            # of the refresh token behind.
+            #
+            # A calendar row belongs here on the day a calendar connector reads
+            # one — with its own cursor, its own `mark_ok`, and `disconnect`
+            # taught that one grant is one revoke.
+            await store_mailbox(
+                connection,
+                user_id=claims["u"],
+                provider="gmail",
+                address=profile["emailAddress"],
+                tokens=tokens,
+            )
             await _record_consent(connection, claims["u"], tokens.scope)
     except NoRefreshToken:
         # Google withholds the refresh token when a grant already exists.
@@ -304,7 +318,12 @@ async def _record_consent(connection: Any, user_id: str, granted: str) -> None:
         " values ($1,'mailbox_scopes',$2,$3)",
         user_id,
         SCOPE_VERSION,
-        json.dumps({"scopes": granted.split()}),
+        # A dict, not `json.dumps(...)`: every pooled connection installs a
+        # `jsonb` codec whose encoder is already `json.dumps` (see
+        # `loop.db.pool._prepare_connection`), so a string here is encoded twice
+        # and stored as a JSON *string*. `detail->'scopes'` then reads back
+        # null, and a subject-access request answers with nothing.
+        {"scopes": granted.split()},
     )
 
 

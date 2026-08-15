@@ -15,6 +15,7 @@ is the whole setup, and no library needs mocking.
 
 import argparse
 import base64
+import calendar
 import json
 import re
 import time
@@ -27,8 +28,14 @@ from urllib.parse import unquote, urlparse
 
 PORT = 8787
 FIXTURE_DIRS = ("fixtures/ats", "fixtures/negatives")
-_FIXED_INSTANT = time.strptime("2026-07-30 09:12:00", "%Y-%m-%d %H:%M:%S")
-INTERNAL_DATE = str(int(time.mktime(_FIXED_INSTANT)) * 1000)
+# UTC, via `calendar.timegm`. `time.mktime` reads the struct as *local* time
+# and guesses DST, so the constant named `_FIXED_INSTANT` moved with the
+# developer's timezone: 09:12Z in CI, 07:12Z in Europe/Rome, and the previous
+# calendar day — inside the quiet-hours window e2e sets — in Pacific/Auckland.
+# The fixtures' own `Date:` headers are timezone-qualified, so the harness and
+# the stub have to agree on one instant or they measure the same message twice.
+_FIXED_INSTANT = time.strptime("2026-07-30 07:12:00", "%Y-%m-%d %H:%M:%S")
+INTERNAL_DATE = str(calendar.timegm(_FIXED_INSTANT) * 1000)
 
 
 def backend_root() -> Path:

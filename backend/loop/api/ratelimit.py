@@ -41,6 +41,11 @@ LOGIN = (20, 60)
 PUSH = (600, 60)
 QUICK_ADD = (60, 60)
 
+# The most distinct callers one window will track. Reached only by something
+# pathological — a single-tenant box has one user and one proxy — so evicting
+# the least recently seen is a bound on memory rather than a policy.
+MAX_KEYS = 1024
+
 
 class TooManyRequests(ApiError):
     def __init__(self, retry_after: int) -> None:
@@ -79,22 +84,29 @@ class SlidingWindow:
             hits.popleft()
 
         if len(hits) >= self.limit:
+            self._prune(cutoff)
             raise TooManyRequests(retry_after=max(1, int(hits[0] + self.window_seconds - now)))
 
         hits.append(now)
         self._prune(cutoff)
 
     def _prune(self, cutoff: float) -> None:
-        """Keys nobody has hit in a whole window are dropped.
+        """Keys nobody has hit in a whole window are dropped, and then the
+        oldest are dropped anyway if that was not enough.
 
-        Without this the dictionary grows one entry per distinct client address
-        for the life of the process, which on a public route is an attacker's
-        cheapest denial of service.
+        Ageing alone cannot bound this: every key hit *inside* the window
+        survives it, so a caller producing distinct keys faster than the window
+        expires them grows the dictionary without limit. `MAX_KEYS` is the hard
+        ceiling, and evicting the least-recently-hit key is the right thing to
+        lose — it is the one furthest from its budget.
         """
-        if len(self._hits) < 1024:
+        if len(self._hits) < MAX_KEYS:
             return
         for key in [k for k, hits in self._hits.items() if not hits or hits[-1] <= cutoff]:
             del self._hits[key]
+        while len(self._hits) >= MAX_KEYS:
+            oldest = min(self._hits, key=lambda k: self._hits[k][-1] if self._hits[k] else 0.0)
+            del self._hits[oldest]
 
 
 def caller(request: Request) -> str:
@@ -104,16 +116,25 @@ def caller(request: Request) -> str:
     be spoofed. The four public routes have no session by definition, so those
     fall back to the peer address — which behind Caddy is Caddy, and is why the
     proxy sets `X-Forwarded-For` and why this reads it.
+
+    **The right-most entry, not the left-most.** Caddy's `reverse_proxy`
+    *appends* the peer it saw to whatever `X-Forwarded-For` arrived, so a client
+    that sends its own header keeps every entry it wrote — and the left-most one
+    is therefore entirely attacker-chosen. Reading it gave a caller a fresh
+    bucket per request: the 5-per-15-minutes budget on `/api/auth/recover` never
+    fired, and `SlidingWindow._hits` grew one deque per forged address. The
+    last entry is the one hop this deployment actually trusts, because Caddy is
+    the only thing that can reach this port and Caddy wrote it. A second proxy
+    in front of Caddy means counting hops here, not going back to the front.
     """
     session = getattr(request.state, "session", None)
     if session is not None:
         return f"user:{session.user_id}"
     forwarded = request.headers.get("x-forwarded-for", "")
     if forwarded:
-        # The left-most entry is the original client; everything after it was
-        # added by a hop. Only trustworthy because nothing but our own proxy can
-        # reach the port this listens on.
-        return f"ip:{forwarded.split(',')[0].strip()}"
+        appended = forwarded.rsplit(",", 1)[-1].strip()
+        if appended:
+            return f"ip:{appended}"
     return f"ip:{request.client.host if request.client else 'unknown'}"
 
 

@@ -51,6 +51,26 @@ class FixtureCase:
     path: str
 
 
+# Fixtures that do not have the shape the mail they stand for has.
+#
+# Both were written before the rules were rewritten against 24 real messages,
+# and neither carries a From display name — which is where real ATS mail puts
+# the employer, and therefore where the rules read it. The TypeScript fails on
+# these two as well and for the same reason, so they are marked rather than
+# quietly accommodated: rebuilding the corpus from real anonymised mail is what
+# clears them.
+#
+# One list, here, because both readers must agree about it. `tests/test_harness`
+# holds them as strict xfails so the day they start passing is a day something
+# says so, and `scripts/corpus_gate` takes them out of the arithmetic entirely —
+# two copies could drift into a suite that goes red while the merge gate stays
+# green.
+STALE_FIXTURES: Mapping[str, str] = {
+    "fixtures/ats/lever-ack-01.eml": "no display name, and no Lever template fits the subject",
+    "fixtures/ats/ashby-ack-01.eml": "no display name to read the employer out of",
+}
+
+
 def load_fixtures(root: Path | None = None) -> list[FixtureCase]:
     base = root or repo_root()
     manifest = json.loads((base / "fixtures" / "manifest.json").read_text(encoding="utf-8"))

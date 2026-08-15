@@ -99,8 +99,10 @@ services:
         - python
         - -c
         - |
-          import urllib.request, sys
-          sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3000/health').status == 200 else 1)
+          import os, urllib.request, sys
+          port = os.environ.get('PORT', '3000')
+          url = 'http://127.0.0.1:' + port + '/health'
+          sys.exit(0 if urllib.request.urlopen(url).status == 200 else 1)
       interval: 30s
       timeout: 3s
       start_period: 10s

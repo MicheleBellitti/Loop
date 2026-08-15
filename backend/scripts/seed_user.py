@@ -24,7 +24,13 @@ def _password() -> str:
 
 async def seed(dsn: str, email: str, tz: str, *, reset: bool) -> None:
     async with Database(dsn, role=None) as db, db.untenanted() as connection:
-        existing = await connection.fetchrow("select id, email from users limit 1")
+        # `order by created_at`, matching `loop.api.auth.sole_user` — the row
+        # the API actually signs in as. An unordered `limit 1` can name a
+        # different row the moment a stray user survives a failed test run, and
+        # then this reissues a password for a user nobody can sign in as.
+        existing = await connection.fetchrow(
+            "select id, email from users order by created_at limit 1"
+        )
 
         if existing is not None and not reset:
             raise SystemExit(
@@ -45,9 +51,15 @@ async def seed(dsn: str, email: str, tz: str, *, reset: bool) -> None:
                     "reset a password for an address that is not the one on record."
                 )
             fresh = _password()
+            # Upsert, not update. A first run that inserted the user and then
+            # failed before writing `auth_secrets` leaves a box with no
+            # recovery hash at all — and a bare UPDATE matching zero rows would
+            # print a password that can never work, on the one box where no
+            # passkey exists yet either.
             await connection.execute(
-                "update auth_secrets"
-                " set recovery_hash = $2, recovery_used_at = null where user_id = $1",
+                "insert into auth_secrets (user_id, recovery_hash) values ($1, $2)"
+                " on conflict (user_id) do update"
+                " set recovery_hash = excluded.recovery_hash, recovery_used_at = null",
                 existing["id"],
                 hash_scrypt(fresh),
             )
@@ -60,16 +72,20 @@ async def seed(dsn: str, email: str, tz: str, *, reset: bool) -> None:
             return
 
         password = _password()
-        user_id = await connection.fetchval(
-            "insert into users (email, tz) values ($1, $2) returning id", email, tz
-        )
-        await connection.execute("select seed_stage_defs($1)", user_id)
-        await connection.execute(
-            "insert into auth_secrets (user_id, recovery_hash) values ($1, $2)"
-            " on conflict (user_id) do update set recovery_hash = excluded.recovery_hash",
-            user_id,
-            hash_scrypt(password),
-        )
+        # One transaction: a user without stage definitions or without a
+        # recovery hash is a box that reports "already has a user" on the next
+        # run and cannot be signed into on any run.
+        async with connection.transaction():
+            user_id = await connection.fetchval(
+                "insert into users (email, tz) values ($1, $2) returning id", email, tz
+            )
+            await connection.execute("select seed_stage_defs($1)", user_id)
+            await connection.execute(
+                "insert into auth_secrets (user_id, recovery_hash) values ($1, $2)"
+                " on conflict (user_id) do update set recovery_hash = excluded.recovery_hash",
+                user_id,
+                hash_scrypt(password),
+            )
         print(_CREATED.format(email=email, tz=tz, password=password))
 
 

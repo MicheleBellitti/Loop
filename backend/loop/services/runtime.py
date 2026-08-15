@@ -180,14 +180,26 @@ async def until_signalled(
     # that waits for the message in hand — which is what `Consumer.stop` does —
     # can only return once the loop it is stopping has made that progress.
     stops = [asyncio.create_task(service.stop()) for service in running.values()]
+    deadline = loop.time() + grace
     _, pending = await asyncio.wait(running, timeout=grace)
     for task in pending:
         _log.warning("a service did not stop within %.0fs; cancelling it", grace)
         task.cancel()
     outcomes = await asyncio.gather(*running, return_exceptions=True)
-    for task in stops:
-        task.cancel()
-    await asyncio.gather(*stops, return_exceptions=True)
+
+    # And `stop()` gets what is left of the same window, rather than being
+    # cancelled the instant `run()` returns. The work a `stop()` has after its
+    # run loop ends is exactly the work that could not be done while it was
+    # still going: the pipeline's final `refresh materialized view` is one, and
+    # it always lost that race, because setting the stop flag is what ends
+    # `run()` and issuing the refresh is the statement after it. Losing it left
+    # every phase-reach ratio on the funnel reading pre-shutdown data.
+    if stops:
+        _, unfinished = await asyncio.wait(stops, timeout=max(0.0, deadline - loop.time()))
+        for task in unfinished:
+            _log.warning("a service did not finish stopping within %.0fs; cancelling it", grace)
+            task.cancel()
+        await asyncio.gather(*stops, return_exceptions=True)
 
     for outcome in outcomes:
         if isinstance(outcome, BaseException) and not isinstance(

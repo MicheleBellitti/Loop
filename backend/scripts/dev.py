@@ -46,17 +46,32 @@ def repo_root() -> Path:
 
 
 def load_env(path: Path) -> dict[str, str]:
-    """`.env`, read the way compose reads it: `KEY=value`, no interpolation."""
+    """`.env`, read the way compose reads it: `KEY=value`, no interpolation.
+
+    Including the precedence. Compose resolves the shell environment *ahead* of
+    the file, and seeding from `os.environ` and then writing over it does the
+    opposite — so `DATABASE_URL=… python scripts/dev.py`, which is how the
+    README says to point the fleet at the throwaway test database, silently ran
+    against whatever is committed in `.env`.
+    """
     if not path.is_file():
         raise SystemExit(f"no {path.name} found — copy .env.example and fill it in")
-    env = dict(os.environ)
+    env: dict[str, str] = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or "=" not in stripped:
             continue
         key, _, value = stripped.partition("=")
-        env[key.strip()] = value.strip().strip('"').strip("'")
-    return env
+        env[key.strip()] = _unquoted(value.strip())
+    return env | os.environ
+
+
+def _unquoted(value: str) -> str:
+    """One matched pair of quotes, not every quote at either end."""
+    for quote in ('"', "'"):
+        if len(value) >= 2 and value.startswith(quote) and value.endswith(quote):
+            return value[1:-1]
+    return value
 
 
 def pump(name: str, stream: object, out: object) -> None:

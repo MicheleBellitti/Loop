@@ -214,6 +214,12 @@ class _PipelineRuntime:
         self._consumer = consumer
         self._debounce = debounce
         self._stopping = asyncio.Event()
+        # `stop()` and the debounce loop can both reach a refresh at once — the
+        # loop wakes the moment `_stopping` is set, which is the instant before
+        # `stop()` issues its own. Two concurrent
+        # `refresh materialized view concurrently` on the same view is work
+        # Postgres does not need to be asked to do twice.
+        self._refreshing = asyncio.Lock()
 
     async def run(self) -> None:
         await asyncio.gather(self._consumer.run(), self._refresh_when_stale())
@@ -235,15 +241,21 @@ class _PipelineRuntime:
             # Let the burst finish. Everything that arrives in the window is
             # covered by the one refresh at the end of it.
             await self._either(asyncio.sleep(self._debounce))
-            stale.clear()
             await self._refresh_once()
 
     async def _refresh_once(self) -> None:
-        self._service._projection_is_stale.clear()
-        try:
-            await self._service.refresh_the_view()
-        except Exception:
-            self._service._log.exception("projection refresh failed")
+        """Clear the flag, then refresh. In that order, and one at a time.
+
+        Clearing first is what makes an event arriving *during* the refresh set
+        the flag again and earn its own pass, rather than being folded into a
+        refresh that had already read past it.
+        """
+        async with self._refreshing:
+            self._service._projection_is_stale.clear()
+            try:
+                await self._service.refresh_the_view()
+            except Exception:
+                self._service._log.exception("projection refresh failed")
 
     async def _either(self, waiting: Coroutine[Any, Any, object]) -> None:
         """Wait for `waiting`, or for the stop signal, whichever comes first."""

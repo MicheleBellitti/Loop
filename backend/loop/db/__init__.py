@@ -30,7 +30,6 @@ from .queue import (
     publish_many,
 )
 from .rebuild import (
-    NON_DERIVED_COLUMNS,
     rebuild_all,
     rebuild_application,
     refresh_projections,
@@ -39,7 +38,6 @@ from .rebuild import (
 )
 
 __all__ = [
-    "NON_DERIVED_COLUMNS",
     "Database",
     "Message",
     "MigrationError",

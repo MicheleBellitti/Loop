@@ -18,28 +18,30 @@ must never leave your machine.
 import argparse
 import hashlib
 import re
+from functools import lru_cache
 from pathlib import Path
 
 # Domains that are the whole signal, and therefore must not be rewritten.
-KEEP_DOMAINS = (
-    "greenhouse-mail.io",
-    "greenhouse.io",
-    "lever.co",
-    "myworkday.com",
-    "workday.com",
-    "ashbyhq.com",
-    "smartrecruiters.com",
-    "workablemail.com",
-    "workable.com",
-    "icims.com",
-    "taleo.net",
-    "recruitee.com",
-    "bamboohr.com",
+#
+# Read out of `rules/ats/*.yaml` rather than copied, because a copy is a copy
+# that drifts: the hand-written list here was missing `taleo.com`,
+# `myworkdayjobs.com` and `oraclecloud.com`, so this script was rewriting the
+# `sender_domains` rung 1 matches on and the corpus it produced reported recall
+# misses that were its own doing. `linkedin.com` and the rest are not vendors
+# with a rule file, so they stay written out.
+_NOT_IN_THE_RULES = (
     "linkedin.com",
     "indeed.com",
     "indeedemail.com",
     "allibo.com",
 )
+
+
+def keep_domains() -> tuple[str, ...]:
+    from loop.ladder import RuleRegistry
+
+    return tuple(dict.fromkeys(RuleRegistry.load().ats_domains + _NOT_IN_THE_RULES))
+
 
 _ADDRESS = re.compile(r"([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})")
 _DISPLAY_NAME = re.compile(r"^(From|To|Cc|Reply-To):\s*\"?([^\"<\n]+)\"?\s*<", re.I | re.M)
@@ -53,8 +55,16 @@ def alias(value: str, prefix: str) -> str:
     return f"{prefix}-{digest}"
 
 
+@lru_cache(maxsize=1)
+def _keepers() -> tuple[str, ...]:
+    return keep_domains()
+
+
 def keep(domain: str) -> bool:
-    return any(domain == d or domain.endswith(f".{d}") for d in KEEP_DOMAINS)
+    """`loop.domain.matches_domain_suffix`, which is the one rule for this."""
+    from loop.domain import matches_domain_suffix
+
+    return any(matches_domain_suffix(domain, d) for d in _keepers())
 
 
 def anonymise(raw: str) -> str:
@@ -78,9 +88,23 @@ def anonymise(raw: str) -> str:
         return f"https://{alias(host, 'host')}.example/{alias(rest, 'path')}"
 
     def some_digits(match: re.Match[str]) -> str:
+        """A pseudonym of exactly the same length, from the whole digest.
+
+        Keeping only the decimal characters of an eight-character hex digest
+        left on average five, padded to six — so a fourteen-digit Workday
+        requisition became six characters and roughly half of all inputs
+        collapsed into a space far smaller than the one they came from. Rules
+        that match on the length of a digit run were then measuring a corpus
+        shaped differently from the mail it stands for.
+        """
         original = match.group(0)
-        digits = re.sub(r"\D", "", alias(original, "id"))
-        return digits.ljust(6, "0")[: len(original)]
+        digest = hashlib.sha256(f"id:{original}".encode()).digest()
+        stream = int.from_bytes(digest, "big")
+        out = []
+        for _ in range(len(original)):
+            stream, digit = divmod(stream, 10)
+            out.append(str(digit))
+        return "".join(out)
 
     out = _ADDRESS.sub(an_address, raw)
     out = _DISPLAY_NAME.sub(a_display_name, out)

@@ -8,25 +8,17 @@ one: these tests say the ladder still does what it did, not that it is right.
 
 import pytest
 
-from loop.harness import LadderRunner, load_fixtures, parse_eml, summarise
+from loop.harness import STALE_FIXTURES, LadderRunner, load_fixtures, parse_eml, summarise
 
 CASES = load_fixtures()
 VERDICTS = {
     v.provider_message_id: v for v in LadderRunner().judge_all(c.message for c in CASES)
 }
 
-# Fixtures that do not have the shape the mail they stand for has.
-#
-# Both were written before the rules were rewritten against 24 real messages,
-# and neither carries a From display name — which is where real ATS mail puts
-# the employer, and therefore where the rules read it. The TypeScript fails on
-# these two as well and for the same reason, so they are marked rather than
-# quietly accommodated: rebuilding the corpus from real anonymised mail is what
-# clears them, and `strict` makes the marker fall over on the day it happens.
-STALE_FIXTURES = {
-    "fixtures/ats/lever-ack-01.eml": "no display name, and no Lever template fits the subject",
-    "fixtures/ats/ashby-ack-01.eml": "no display name to read the employer out of",
-}
+# `STALE_FIXTURES` lives in `loop.harness` because `scripts/corpus_gate.py`
+# needs the same list: it takes these two out of the arithmetic, and `strict`
+# here makes the xfail fall over on the day one starts passing. Two copies could
+# drift into a suite that goes red while the merge gate stays green.
 
 
 def _case_id(case) -> str:

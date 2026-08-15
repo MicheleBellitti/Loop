@@ -27,22 +27,12 @@ import asyncpg
 
 from .events import project_application
 
-# Columns a rebuild does not touch, because nothing in the log determines them:
-# identity, the company the resolver decided on, the embedding it computed, and
-# the two flags that record how the row came to exist.
-NON_DERIVED_COLUMNS: Final = (
-    "id",
-    "user_id",
-    "company_id",
-    "role_normalised",
-    "role_embedding",
-    "manually_created",
-    "merged_into_id",
-    "created_at",
-)
-
-# Everything a rebuild does compare. `role_embedding` is excluded because it is
-# a 384-dimensional float vector recomputed by the resolver, not the fold.
+# Everything a rebuild compares. `role_embedding` is excluded because it is a
+# 384-dimensional float vector recomputed by the resolver, not the fold. The
+# complement — identity, the company the resolver decided on, that embedding,
+# and the flags recording how the row came to exist — is deliberately not
+# written out a second time: a list nothing reads is a comment that goes stale
+# without a test noticing.
 _SNAPSHOT_COLUMNS: Final = """
     id, company_id, role_title, seniority, location, work_mode,
     current_stage, current_phase, status, applied_at, last_signal_at,
@@ -86,20 +76,44 @@ async def reset_projection(connection: asyncpg.Connection, application_id: str) 
 
 async def rebuild_application(
     connection: asyncpg.Connection, user_id: str, application_id: str
-) -> None:
+) -> bool:
+    """Reset and re-fold one application. False means there was nothing to fold.
+
+    The guard is not defensive tidiness, it is the difference between a rebuild
+    and a deletion. `project_application` returns early when an application has
+    no events, so blanking first and folding second would leave such a row at
+    `role_title = ''`, `applied_at = null`, `confidence = 1.0` with nothing to
+    put it back. Rows in that state are ordinary, not corrupt: `quick_add` and
+    the resolver both insert the row and *publish* the first event, so every
+    application is event-less for the moment before the pipeline consumes it,
+    and a row merged away by `_merge_a_duplicate` never receives one at all.
+    """
+    has_events = await connection.fetchval(
+        "select exists (select 1 from application_events where application_id = $1)",
+        application_id,
+    )
+    if not has_events:
+        return False
     await reset_projection(connection, application_id)
     await project_application(connection, user_id, application_id)
+    return True
 
 
 async def rebuild_all(connection: asyncpg.Connection, user_id: str) -> int:
-    """Every application this user has, in id order. Returns how many."""
+    """Every application this user has, in id order.
+
+    Returns how many were rebuilt, which is not necessarily how many exist —
+    an application with no events yet is left exactly as it is.
+    """
     rows = await connection.fetch(
         "select id from applications where user_id = $1 order by id", user_id
     )
+    rebuilt = 0
     for row in rows:
-        await rebuild_application(connection, user_id, str(row["id"]))
+        if await rebuild_application(connection, user_id, str(row["id"])):
+            rebuilt += 1
     await refresh_projections(connection)
-    return len(rows)
+    return rebuilt
 
 
 async def refresh_projections(connection: asyncpg.Connection) -> None:

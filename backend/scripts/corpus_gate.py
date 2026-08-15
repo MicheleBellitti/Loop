@@ -26,7 +26,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from loop.harness import FixtureCase, LadderRunner, Verdict, load_fixtures
+from loop.harness import STALE_FIXTURES, FixtureCase, LadderRunner, Verdict, load_fixtures
 
 # §17. Precision first: a wrong merge rewrites history silently, and a miss is
 # a review item somebody can see.
@@ -37,21 +37,16 @@ RECALL_GATE = 0.90
 # are the ones the recall audit found the classifier most likely to lose.
 NO_FALSE_NEGATIVES_FROM = ("linkedin", "indeed")
 
-# Fixtures that do not have the shape the mail they stand for has. Both predate
-# the rules being rewritten against real messages and neither carries a From
-# display name — which is where real ATS mail puts the employer and therefore
-# where the rules read it. Excluded from the gate rather than quietly accepted,
-# and `tests/test_harness.py` holds them as strict xfails so the day they start
-# passing is a day something says so.
-STALE_FIXTURES = frozenset(
-    {"fixtures/ats/lever-ack-01.eml", "fixtures/ats/ashby-ack-01.eml"}
-)
+# A gate that judged nothing passes with two perfect scores, because an empty
+# numerator over an empty denominator is 1.0. Every route out of the scoring
+# loop — `requires_model` with the model off, a stale fixture — is a case that
+# does not count, so the count itself has to be a gate.
+MIN_SCORED = 15
 
 
 @dataclass
 class Row:
     expected: int = 0
-    found: int = 0
     correct: int = 0
 
 
@@ -59,6 +54,7 @@ class Row:
 class Report:
     total: int = 0
     scored: int = 0
+    excluded: int = 0
     deferred_to_model: int = 0
     passed: int = 0
     precision: float = 1.0
@@ -76,17 +72,14 @@ def judge(case: FixtureCase, verdict: Verdict) -> str | None:
     if verdict.outcome == "drop":
         return f"dropped, scored {verdict.score}"
 
-    wanted_intent = expect.get("intent")
-    if wanted_intent and verdict.intent != wanted_intent:
-        return f"read as {verdict.intent!r}, not {wanted_intent!r}"
-
-    wanted_company = expect.get("company")
-    if wanted_company and verdict.company != wanted_company:
-        return f"company {verdict.company!r}, not {wanted_company!r}"
-
-    wanted_vendor = expect.get("vendor")
-    if wanted_vendor and verdict.vendor != wanted_vendor:
-        return f"vendor {verdict.vendor!r}, not {wanted_vendor!r}"
+    for name, read in (
+        ("intent", verdict.intent),
+        ("company", verdict.company),
+        ("vendor", verdict.vendor),
+    ):
+        wanted = expect.get(name)
+        if wanted and read != wanted:
+            return f"{name} {read!r}, not {wanted!r}"
     return None
 
 
@@ -107,8 +100,16 @@ def summarise(cases: list[FixtureCase], verdicts: dict[str, Verdict]) -> Report:
             report.deferred_to_model += 1
             continue
 
+        # Excluded means excluded. Suppressing only the failure *message* left
+        # these two in the recall denominator and in the false-negative check,
+        # so a fixture the docstring calls excluded could still fail the gate —
+        # and, worse, fail it while `failures` was empty and named nobody.
+        if case.path in STALE_FIXTURES:
+            report.excluded += 1
+            continue
+
         report.scored += 1
-        why = judge(case, verdict) if case.path not in STALE_FIXTURES else None
+        why = judge(case, verdict)
         if why is None:
             report.passed += 1
         else:
@@ -117,8 +118,6 @@ def summarise(cases: list[FixtureCase], verdicts: dict[str, Verdict]) -> Report:
         key = str(case.expect.get("intent") or ("drop" if case.expect.get("drop") else "other"))
         row = report.by_intent[key]
         row.expected += 1
-        if verdict.intent is not None:
-            row.found += 1
         if why is None:
             row.correct += 1
 
@@ -148,10 +147,16 @@ def render(report: Report) -> None:
     print("\n  corpus\n  ──────")
     print(f"  cases      {report.total}")
     print(f"  passing    {report.passed}")
+    print(f"  scored     {report.scored}   (gate ≥ {MIN_SCORED})")
     if report.deferred_to_model:
         print(
             f"  deferred   {report.deferred_to_model}   (need rung 3; with the model off "
             "they become review items — failure state F4)"
+        )
+    if report.excluded:
+        print(
+            f"  excluded   {report.excluded}   (stale fixtures; "
+            "tests/test_harness.py holds them as strict xfails)"
         )
     print(f"  precision  {pct(report.precision)}   (gate ≥ {pct(PRECISION_GATE)})")
     print(f"  recall     {pct(report.recall)}   (gate ≥ {pct(RECALL_GATE)})")
@@ -187,6 +192,13 @@ def main() -> None:
     render(report)
 
     failed = False
+    if report.scored < MIN_SCORED:
+        print(
+            f"\n  only {report.scored} of {report.total} fixtures were scored, "
+            f"below the floor of {MIN_SCORED} — the gate is measuring almost nothing",
+            file=sys.stderr,
+        )
+        failed = True
     if report.false_negatives:
         print(
             "\n  FALSE NEGATIVES — the classifier dropped mail it must keep:", file=sys.stderr

@@ -129,6 +129,16 @@ def main() -> None:
             factory=True,
             host="0.0.0.0",
             port=int(os.environ.get("PORT", "3000")),
+            # uvicorn's access log renders the *full* path and hangs off a
+            # logger that does not propagate, so it never reached the redacting
+            # formatter `configure_logging` just installed — and the OAuth
+            # callback carries Google's authorization code in its query string.
+            # `_install_access_log` writes the same line without it.
+            access_log=False,
+            # And its default `log_config` would replace the handlers above on
+            # the error logger too. Uvicorn's own lines belong in the same
+            # format as everything else in the container.
+            log_config=None,
         )
         return
     if name == "migrate":

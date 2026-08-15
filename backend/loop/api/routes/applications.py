@@ -343,6 +343,12 @@ async def quick_add(request: Request) -> dict[str, Any]:
                         "channel": channel,
                         "posting_url": posting_url or None,
                         "role_title": role,
+                        # `location` is written to the row above *and* carried
+                        # here, because `reset_projection` blanks it and the
+                        # fold can only put back what the log holds. Written to
+                        # the row only, a rebuild would silently drop it — the
+                        # exact bug `loop.db.rebuild` says it fixed.
+                        "location": found.location,
                     },
                     source=EventSource(
                         channel=channel,

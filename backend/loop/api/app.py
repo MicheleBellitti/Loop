@@ -16,7 +16,9 @@ and a null one is load-bearing here. Every handler returns a dict and it is
 serialised as written.
 """
 
+import logging
 import os
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -49,6 +51,8 @@ from .routes import (
     suggestions,
     today,
 )
+
+_access_log = logging.getLogger("loop.api.access")
 
 # Everything the client is allowed to load, and nowhere it may talk to but here.
 _CSP = (
@@ -219,6 +223,9 @@ def create_app(settings: Settings) -> FastAPI:
     # from the gate still has to carry the same policy as every other response.
     _install_gate(app)
     _install_security_headers(app)
+    # Outermost, so the line records what the client was actually sent —
+    # including a 401 the gate produced before any handler ran.
+    _install_access_log(app)
 
     app.include_router(session.router)
     app.include_router(passkeys.router)
@@ -295,6 +302,49 @@ def _secured[T: Response](response: T, request: Request) -> T:
             "strict-transport-security", "max-age=31536000; includeSubDomains"
         )
     return response
+
+
+def _install_access_log(app: FastAPI) -> None:
+    """One line per request, without the query string.
+
+    uvicorn's own access log is switched off in `loop.__main__` and replaced by
+    this. Its `AccessFormatter` renders the *full* path, and it hangs off a
+    logger that does not propagate — so it bypassed the redacting formatter
+    entirely and wrote `GET /api/mailboxes/gmail/callback?code=4/0A…` to stdout
+    in plain text, which is a live Google authorization code in a log file. The
+    Caddyfile says the same thing about its own log and for the same reason.
+
+    Path, not route template: the parameterised form is not known this early,
+    and an application id in a log line is an identifier this system already
+    allows itself.
+    """
+
+    @app.middleware("http")
+    async def _access(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        started = time.monotonic()
+        status = 500
+        try:
+            response = await call_next(request)
+            status = response.status_code
+            return response
+        finally:
+            # `finally`, because a handler that raised is the request most
+            # worth having a line for, and `ServerErrorMiddleware` sits outside
+            # this one and would otherwise be the only thing that saw it.
+            _access_log.info(
+                "%s %s %d",
+                request.method,
+                request.url.path,
+                status,
+                extra={
+                    "method": request.method,
+                    "endpoint": request.url.path,
+                    "status": status,
+                    "duration_ms": round((time.monotonic() - started) * 1000, 1),
+                },
+            )
 
 
 def _install_security_headers(app: FastAPI) -> None:

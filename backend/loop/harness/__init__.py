@@ -10,6 +10,7 @@ every difference is either a fixed bug or one of the deliberate improvements in
 """
 
 from .corpus import (
+    STALE_FIXTURES,
     Baseline,
     BaselineCase,
     BaselineContext,
@@ -24,6 +25,7 @@ from .runner import LadderRunner, Verdict, summarise
 __all__ = [
     "COMPARED_FIELDS",
     "DIVERGENCES",
+    "STALE_FIXTURES",
     "Baseline",
     "BaselineCase",
     "BaselineContext",

@@ -29,8 +29,8 @@ from loop.resolver import (
     Candidate,
     Created,
     Embedder,
-    LexicalEmbedder,
     Merge,
+    create_embedder,
     decide,
     events_for_signal,
     find_duplicate,
@@ -68,7 +68,11 @@ class ResolverService:
     ) -> None:
         self._db = db
         self._registry = registry or RuleRegistry.load()
-        self._embedder = embedder or LexicalEmbedder()
+        # `create_embedder`, not `LexicalEmbedder()`: it is the only thing that
+        # reads `EMBEDDING_MODEL`, and hardcoding the lexical stand-in here made
+        # the documented switch a setting that changed nothing — no error, no
+        # log line, still 384-dimensional hashes.
+        self._embedder = embedder or create_embedder()
         self._log = log or logging.getLogger("loop.resolver")
 
     def consumer(self, options: ConsumerOptions | None = None) -> Consumer:
