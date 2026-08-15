@@ -180,6 +180,44 @@ async def check_recovery_password(db: Database, user_id: str, password: str) -> 
     return await asyncio.to_thread(verify_scrypt, password, stored)
 
 
+# What a fresh hash is written with. Verification reads the parameters back out
+# of the stored string instead, so raising these does not invalidate anything
+# already on disk.
+_SCRYPT_N = 2**16
+_SCRYPT_R = 8
+_SCRYPT_P = 2
+
+
+def hash_scrypt(password: str) -> str:
+    """`scrypt$N$r$p$<salt>$<hash>`, byte-compatible with the reference.
+
+    Sixteen bytes of salt, sixty-four of output, and NFKC first so a password
+    typed with a composed accent verifies against one stored with a combining
+    one. Roughly a second and 64MB per call at these parameters, which is the
+    point: `/api/auth/recover` is public.
+    """
+    salt = secrets.token_bytes(16)
+    derived = hashlib.scrypt(
+        unicodedata.normalize("NFKC", password).encode(),
+        salt=salt,
+        n=_SCRYPT_N,
+        r=_SCRYPT_R,
+        p=_SCRYPT_P,
+        dklen=_SCRYPT_DKLEN,
+        maxmem=_SCRYPT_MAXMEM,
+    )
+    return "$".join(
+        (
+            "scrypt",
+            str(_SCRYPT_N),
+            str(_SCRYPT_R),
+            str(_SCRYPT_P),
+            base64.b64encode(salt).decode(),
+            base64.b64encode(derived).decode(),
+        )
+    )
+
+
 def verify_scrypt(password: str, stored: str) -> bool:
     """`scrypt$N$r$p$<salt>$<hash>`, both base64 with padding.
 

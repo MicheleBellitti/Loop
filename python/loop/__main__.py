@@ -1,7 +1,7 @@
 """One entrypoint, six processes.
 
     python -m loop connector | classifier | extractor | resolver | pipeline
-                   | notifier | nudge | api
+                   | notifier | nudge | api | migrate
 
 Each name starts exactly one service, because each has a different role, a
 different rate budget and a different reason to be restarted. The database
@@ -17,7 +17,7 @@ import asyncio
 import os
 import sys
 
-from loop.db import Database, Queue
+from loop.db import Database, Queue, migrate
 from loop.runtime import configure_logging
 from loop.services import (
     ClassifierService,
@@ -96,6 +96,25 @@ def _service(name: str, db: Database) -> Service:
             raise SystemExit(f"no service called {other}")
 
 
+async def _migrate() -> None:
+    """Apply the migrations, then exit. Compose runs this before anything else.
+
+    Not a service: it has no loop and nothing to stop. It is here rather than in
+    `scripts/` because compose needs one image and one entrypoint, and a
+    container whose command is a path into a directory that only exists in a
+    checkout is a container that works until it is built properly.
+    """
+    configure_logging()
+    async with (
+        Database(os.environ["DATABASE_URL"], role=None) as db,
+        db.untenanted() as connection,
+    ):
+        result = await migrate(connection)
+    for name in result.applied:
+        print(f"applied {name}")
+    print(f"{len(result.applied)} applied, {len(result.already_applied)} already there")
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit(__doc__)
@@ -104,12 +123,16 @@ def main() -> None:
         # The API is served rather than looped, so it is uvicorn's to run.
         import uvicorn
 
+        configure_logging()
         uvicorn.run(
             "loop.api:app_from_env",
             factory=True,
             host="0.0.0.0",
             port=int(os.environ.get("PORT", "3000")),
         )
+        return
+    if name == "migrate":
+        asyncio.run(_migrate())
         return
     asyncio.run(_run(name))
 
