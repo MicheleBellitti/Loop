@@ -8,6 +8,20 @@
 # Each service connects as its own database role, so the grants in migration 003
 # are the enforcement of "only the pipeline writes to the event log" — and RLS
 # actually applies, which it does not for a superuser.
+#
+# Run it from this directory, and name the environment file explicitly:
+#
+#     cd infra && docker compose --env-file ../.env build
+#     cd infra && docker compose --env-file ../.env up -d
+#
+# The flag is not optional and `env_file:` below is not a substitute for it.
+# They are two different mechanisms: `env_file:` puts variables inside a
+# container at run time, while `${POSTGRES_PASSWORD}` here is interpolated into
+# this file at parse time — and interpolation reads only the shell environment
+# and the `.env` sitting in compose's project directory, which is `infra/`.
+# The file `.env.example` tells you to create is at the repository root, so
+# without `--env-file` compose parses this with nothing to substitute and stops
+# before it builds anything.
 
 name: loop
 
@@ -15,6 +29,13 @@ x-service: &service
   build:
     context: ..
     dockerfile: infra/Dockerfile
+  # One image, named — which is what makes the Dockerfile's opening line true.
+  # Without it each service takes compose's default name, `loop-gateway`,
+  # `loop-nudge` and seven more, and `docker compose build` runs nine identical
+  # builds of the same Dockerfile concurrently. That is nine times the work for
+  # one result, and the concurrency is what drove uv's cache into `EAGAIN` while
+  # nine copies of it cloned the same wheels at once.
+  image: loop:local
   restart: always
   env_file: ../.env
   depends_on:

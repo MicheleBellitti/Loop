@@ -50,6 +50,22 @@ status is on the dashboard and in `/health/deep`.
 
 ## Common operations
 
+### Run compose at all
+
+```bash
+cd infra && docker compose --env-file ../.env build
+cd infra && docker compose --env-file ../.env up -d
+```
+
+Every `docker compose` line below assumes both: run from `infra/`, and pass
+`--env-file ../.env`. The flag is what supplies `POSTGRES_PASSWORD`, and
+`compose.yaml` refuses to parse without it — `env_file: ../.env` covers what a
+container sees at run time, not what this file interpolates at parse time, and
+interpolation looks only in `infra/`. `POSTGRES_PASSWORD` must also be
+non-empty: `${POSTGRES_PASSWORD:?…}` counts an empty value as missing, so a
+`.env` copied from `.env.example` and left unedited fails the same way as no
+`.env` at all.
+
 ### Apply migrations
 
 ```bash

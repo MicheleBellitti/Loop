@@ -23,6 +23,17 @@ WORKDIR /app
 # the tests ran against rather than whatever resolves today.
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# uv's default link mode clones out of its cache with a reflink, falling back to
+# a hardlink — which is what a copy-on-write filesystem wants and what the
+# overlay a build runs on cannot always give. The clone comes back `EAGAIN`, and
+# the step that fails is uv installing its own build backend into the isolated
+# environment it builds `loop` in, so the error names hatchling and not
+# anything this repository wrote.
+#
+# `copy` is the mode for building an image. The cost is one extra copy of each
+# wheel, into a layer that is discarded before the runtime stage anyway.
+ENV UV_LINK_MODE=copy
+
 # Dependencies before source: this layer is invalidated by a lock change, not by
 # every edit to a route.
 COPY backend/pyproject.toml backend/uv.lock ./
