@@ -29,8 +29,17 @@ from .queue import (
     publish,
     publish_many,
 )
+from .rebuild import (
+    NON_DERIVED_COLUMNS,
+    rebuild_all,
+    rebuild_application,
+    refresh_projections,
+    reset_projection,
+    snapshot_applications,
+)
 
 __all__ = [
+    "NON_DERIVED_COLUMNS",
     "Database",
     "Message",
     "MigrationError",
@@ -50,5 +59,10 @@ __all__ = [
     "project_application",
     "publish",
     "publish_many",
+    "rebuild_all",
+    "rebuild_application",
+    "refresh_projections",
+    "reset_projection",
+    "snapshot_applications",
     "to_domain_event",
 ]

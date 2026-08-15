@@ -75,3 +75,17 @@ def wrap_dek(dek: bytes, kek: bytes | None = None) -> Sealed:
 
 def unwrap_dek(wrapped: Sealed, kek: bytes | None = None) -> bytes:
     return open_sealed(wrapped, kek or load_kek())
+
+
+def rewrap_dek(wrapped: Sealed, old_kek: bytes, new_kek: bytes) -> Sealed:
+    """KEK rotation, one data key at a time.
+
+    `scripts/rotate_kek.py` drives it over every row in one transaction, and a
+    test covers it — because the runbook promises rotation works, and an
+    untested rotation is a promise rather than a procedure.
+
+    Note what this does *not* touch: the sealed refresh token itself. Rotating
+    the key-encryption key re-wraps the data keys and leaves every ciphertext
+    where it is, which is the whole reason for the envelope.
+    """
+    return seal(unwrap_dek(wrapped, old_kek), new_kek)

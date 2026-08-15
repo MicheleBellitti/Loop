@@ -36,6 +36,7 @@ from loop.resolver import (
     find_duplicate,
     parse_vector,
     plan_lookup,
+    role_facts,
     to_vector,
 )
 
@@ -296,6 +297,9 @@ class ResolverService:
         embedding: list[float],
     ) -> str:
         normalised = normalise_role(signal.role) if signal.role else None
+        # The same three the event payload carries, from the same function, so
+        # the row and the log cannot disagree about what a rebuild should find.
+        facts = role_facts(signal)
         return str(
             await connection.fetchval(
                 """
@@ -310,9 +314,9 @@ class ResolverService:
                 (signal.role or "").strip() or "Unknown role",
                 signal.role_normalised or (normalised.role if normalised else None),
                 to_vector(embedding),
-                normalised.seniority if normalised else None,
-                signal.location or (normalised.location if normalised else None),
-                signal.work_mode or (normalised.work_mode if normalised else None),
+                facts.seniority,
+                facts.location,
+                facts.work_mode,
                 signal.confidence,
             )
         )

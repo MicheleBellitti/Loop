@@ -14,11 +14,11 @@ decorative — which is exactly the state the TypeScript version was in.
 """
 
 import asyncio
-import logging
 import os
 import sys
 
 from loop.db import Database, Queue
+from loop.runtime import configure_logging
 from loop.services import (
     ClassifierService,
     ConsumerOptions,
@@ -44,10 +44,7 @@ _ROLES = {
 
 
 async def _run(name: str) -> None:
-    logging.basicConfig(
-        level=os.environ.get("LOG_LEVEL", "INFO"),
-        format="%(asctime)s %(name)s %(levelname)s %(message)s",
-    )
+    configure_logging()
     dsn = os.environ["DATABASE_URL"]
     role = os.environ.get("DB_ROLE") or _ROLES.get(name)
 
@@ -80,7 +77,10 @@ def _service(name: str, db: Database) -> Service:
             # application at this company yet.
             return ResolverService(db).consumer(ConsumerOptions(batch=1))
         case "pipeline":
-            return PipelineService(db).consumer(Queue.EVENT)
+            # `service`, not `consumer`: the funnel's materialised view is
+            # refreshed by the thing that writes the rows under it, and the
+            # last refresh is worth doing only once the consumer has stopped.
+            return PipelineService(db).service(Queue.EVENT)
         case "notifier":
             return NotifierService(
                 db,

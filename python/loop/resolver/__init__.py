@@ -11,11 +11,13 @@ from .embed import (
     EMBEDDING_DIMS,
     Embedder,
     LexicalEmbedder,
+    SentenceTransformerEmbedder,
     cosine,
+    create_embedder,
     parse_vector,
     to_vector,
 )
-from .events import events_for_signal
+from .events import RoleFacts, events_for_signal, role_facts
 from .matching import (
     Ambiguous,
     Attached,
@@ -40,8 +42,11 @@ __all__ = [
     "Embedder",
     "LexicalEmbedder",
     "Merge",
+    "RoleFacts",
+    "SentenceTransformerEmbedder",
     "cosine",
     "country_of",
+    "create_embedder",
     "decide",
     "domain_label",
     "events_for_signal",
@@ -49,5 +54,6 @@ __all__ = [
     "merge_is_forbidden",
     "parse_vector",
     "plan_lookup",
+    "role_facts",
     "to_vector",
 ]

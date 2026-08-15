@@ -28,6 +28,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from loop.db import Database
+from loop.runtime import configure_logging
 from loop.services.push import VapidConfig
 
 from . import auth
@@ -361,4 +362,8 @@ def _looks_like_a_file(path: str) -> bool:
 
 
 def app_from_env() -> FastAPI:
+    # Before the settings are read, so a failure to read them is logged through
+    # the same redacting formatter as everything else — a `DATABASE_URL` in a
+    # traceback is a password in a log.
+    configure_logging()
     return create_app(Settings.from_env())

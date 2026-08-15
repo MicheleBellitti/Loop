@@ -14,11 +14,39 @@ claim the evidence actually supports.
 """
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from loop.domain.messages import EventSource, PendingEvent, Signal
+from loop.domain.normalise import normalise_role
 from loop.domain.stages import UNSPECIFIED_INTERVIEW
-from loop.domain.types import EventType
+from loop.domain.types import EventType, WorkMode
+
+
+@dataclass(frozen=True, slots=True)
+class RoleFacts:
+    """What a signal says about the job, beyond its title.
+
+    Read in two places that must not drift: the row the resolver inserts when it
+    creates an application, and the payload of every event it appends. The
+    reference derived them for the row only, so `rebuild_all` blanked a
+    `seniority` nothing in the log could put back.
+    """
+
+    seniority: str | None = None
+    location: str | None = None
+    work_mode: WorkMode | None = None
+
+
+def role_facts(signal: Signal) -> RoleFacts:
+    normalised = normalise_role(signal.role) if signal.role else None
+    if normalised is None:
+        return RoleFacts(location=signal.location, work_mode=signal.work_mode)
+    return RoleFacts(
+        seniority=normalised.seniority,
+        location=signal.location or normalised.location,
+        work_mode=signal.work_mode or normalised.work_mode,
+    )
 
 
 def events_for_signal(signal: Signal, application_id: str) -> list[PendingEvent]:
@@ -107,11 +135,12 @@ def events_for_signal(signal: Signal, application_id: str) -> list[PendingEvent]
 class _Builder:
     """The parts of an event that do not depend on the intent."""
 
-    __slots__ = ("_application_id", "_signal")
+    __slots__ = ("_application_id", "_facts", "_signal")
 
     def __init__(self, signal: Signal, application_id: str) -> None:
         self._signal = signal
         self._application_id = application_id
+        self._facts = role_facts(signal)
 
     def event(
         self,
@@ -132,8 +161,13 @@ class _Builder:
             payload={
                 "thread_id": signal.thread_id,
                 "role_title": signal.role,
-                "location": signal.location,
-                "work_mode": signal.work_mode,
+                # The same three facts the row gets, so the row stays derivable.
+                # The reference put them on the row alone, and `seniority` in
+                # particular came only from `normalise_role` — so a rebuild
+                # blanked a column nothing in the log could put back.
+                "seniority": self._facts.seniority,
+                "location": self._facts.location,
+                "work_mode": self._facts.work_mode,
                 "channel": signal.channel,
                 **(payload or {}),
             },

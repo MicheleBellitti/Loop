@@ -56,8 +56,18 @@ class Database:
         role: str | _FromEnv | None = _FROM_ENV,
         min_size: int = 1,
         max_size: int = 10,
+        idle_in_transaction_timeout_ms: int = IDLE_IN_TRANSACTION_TIMEOUT_MS,
     ) -> None:
         self._dsn = dsn
+        # An open transaction with nothing to do holds its locks and pins the
+        # vacuum horizon. Only a caller that waits on something slow inside one
+        # has any reason to raise this, and it must not raise it for everybody
+        # else — which is what the reference did, coupling the timeout to the
+        # model's, and is the coupling `loop.ladder` removed by running outside
+        # any transaction at all. Nothing in this codebase raises it today; the
+        # argument exists so that a caller who needs to does not edit a constant
+        # every other caller reads.
+        self._idle_in_transaction_timeout_ms = idle_in_transaction_timeout_ms
         # Each service runs as its own role, named by `DB_ROLE` per container.
         # Omitting the argument reads that; passing `role=None` means the owner,
         # explicitly, and the two are not the same thing.
@@ -91,7 +101,9 @@ class Database:
             max_size=self._max_size,
             init=_prepare_connection,
             server_settings={
-                "idle_in_transaction_session_timeout": str(IDLE_IN_TRANSACTION_TIMEOUT_MS),
+                "idle_in_transaction_session_timeout": str(
+                    self._idle_in_transaction_timeout_ms
+                ),
                 "application_name": "loop",
             },
         )

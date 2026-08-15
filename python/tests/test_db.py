@@ -4,6 +4,7 @@ Marked `integration` and skipped without a `DATABASE_URL`, so the pure suite
 still runs in a fraction of a second with nothing installed.
 """
 
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -577,3 +578,113 @@ class TestWhichRoleAPoolTakes:
     ) -> None:
         monkeypatch.setenv("DB_ROLE", "loop_resolver")
         assert Database(dsn, role="loop_nudge")._role == "loop_nudge"
+
+
+class TestErasure:
+    """Article 17, and the reason it is one function rather than a cascade.
+
+    `application_events` is append-only and its trigger refuses a delete, so
+    `erase_user` opens the one escape hatch there is — and it also has to purge
+    the queue, which no foreign key reaches.
+    """
+
+    async def test_leaves_no_row_in_any_table_for_that_user(
+        self, db: Database, dsn: str
+    ) -> None:
+        async with db.untenanted() as connection:
+            doomed = await connection.fetchval(
+                "insert into users (email) values ($1) returning id",
+                f"{uuid.uuid4().hex}@erasure.invalid",
+            )
+            await connection.execute("select seed_stage_defs($1)", doomed)
+
+        user_id = str(doomed)
+        application_id = await _application(db, user_id)
+        async with (
+            Database(dsn, role="loop_pipeline") as pipeline,
+            pipeline.session(user_id) as connection,
+        ):
+            await append_event(connection, _event(user_id, application_id))
+        async with db.untenanted() as connection:
+            await connection.execute(
+                "select mq.send('event_pending', $1::jsonb)",
+                json.dumps({"user_id": user_id}),
+            )
+
+            await connection.execute("select erase_user($1)", doomed)
+
+            # Every table that names a user, asked from the catalogue rather
+            # than from a list somebody has to remember to extend. A new table
+            # with a `user_id` and no erasure path fails here on the day it is
+            # added, which is the only time the fix is cheap.
+            tables = [
+                row["table_name"]
+                for row in await connection.fetch(
+                    """
+                    select table_name from information_schema.columns
+                     where table_schema = 'public' and column_name = 'user_id'
+                       and table_name in (
+                         select table_name from information_schema.tables
+                          where table_schema = 'public' and table_type = 'BASE TABLE')
+                     order by table_name
+                    """
+                )
+            ]
+            assert len(tables) >= 18, "the catalogue query stopped finding tables"
+
+            left: dict[str, int] = {}
+            for table in tables:
+                remaining = await connection.fetchval(
+                    f'select count(*) from "{table}" where user_id = $1', doomed
+                )
+                if remaining:
+                    left[table] = remaining
+            assert left == {}
+
+            queued = await connection.fetchval(
+                "select count(*) from mq.messages where message->>'user_id' = $1", user_id
+            )
+        assert queued == 0
+
+
+class TestThePoolsWiring:
+    """The two settings a caller can get wrong, and one hazard that is gone.
+
+    The reference's pool needed an `error` listener: node-postgres is an
+    EventEmitter, an `error` with nothing listening is an uncaught exception,
+    and a Postgres restart, a failover or an administrative
+    `pg_terminate_backend` therefore took the service down. asyncpg has no such
+    edge — a connection that died while idle is discovered on acquire and
+    replaced — so there is nothing here to test, which is the answer rather
+    than an omission.
+    """
+
+    async def test_keeps_idle_transactions_on_a_short_leash_by_default(
+        self, dsn: str
+    ) -> None:
+        async with Database(dsn, role=None) as db, db.untenanted() as connection:
+            setting = await connection.fetchval(
+                "select current_setting('idle_in_transaction_session_timeout')"
+            )
+        assert setting == "30s"
+
+    async def test_lets_a_single_caller_raise_it(self, dsn: str) -> None:
+        async with (
+            Database(dsn, role=None, idle_in_transaction_timeout_ms=90_000) as raised,
+            raised.untenanted() as connection,
+        ):
+            setting = await connection.fetchval(
+                "select current_setting('idle_in_transaction_session_timeout')"
+            )
+        assert setting == "90s"
+
+    async def test_without_touching_the_default(self, dsn: str) -> None:
+        async with (
+            Database(dsn, role=None, idle_in_transaction_timeout_ms=90_000),
+            Database(dsn, role=None) as other,
+            other.untenanted() as connection,
+        ):
+            setting = await connection.fetchval(
+                "select current_setting('idle_in_transaction_session_timeout')"
+            )
+        assert setting == "30s"

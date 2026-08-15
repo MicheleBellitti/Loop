@@ -16,6 +16,8 @@ phase-2 differential means nothing.
 """
 
 import math
+import os
+from collections.abc import Mapping
 from hashlib import sha1
 from itertools import pairwise
 from typing import Protocol
@@ -128,3 +130,58 @@ def parse_vector(raw: str | None) -> list[float]:
         return []
     inner = raw.strip().removeprefix("[").removesuffix("]")
     return [float(part) for part in inner.split(",")] if inner else []
+
+
+class SentenceTransformerEmbedder:
+    """bge-small-en-v1.5 in process, which is what the spec asked for.
+
+    Loaded lazily and imported inside the method, so a deployment that never
+    sets `EMBEDDING_MODEL` never pays for torch. The reference's escape hatch was
+    an `OnnxEmbedder` that raised on every call — a placeholder for a tokenizer
+    nobody bound — so this is the first version of it that returns a vector.
+
+    **Switching is not free, and it is not a configuration change.** The
+    resolver's thresholds were tuned against `LexicalEmbedder`'s geometry:
+    attach at 0.72, attach-among-many at 0.82, merge at 0.93. A real encoder puts
+    unrelated titles at cosines the lexical hash never produced, and a merge
+    threshold that is too low rewrites two applications' history into one
+    silently. Re-tune against the corpus with the harness first (§3.3); that is
+    P4, and this class is what P4 turns on.
+    """
+
+    def __init__(self, model: str = "BAAI/bge-small-en-v1.5") -> None:
+        self.name = model
+        self._model = model
+        self._encoder: object | None = None
+
+    def embed(self, text: str) -> list[float]:
+        encoder = self._loaded()
+        vector = encoder.encode(text, normalize_embeddings=True)  # type: ignore[attr-defined]
+        values = [float(x) for x in vector]
+        if len(values) != EMBEDDING_DIMS:
+            raise ValueError(
+                f"{self._model} produced {len(values)} dimensions; the schema's "
+                f"vector column is {EMBEDDING_DIMS}. Changing it is a migration, "
+                "not a setting."
+            )
+        return values
+
+    def _loaded(self) -> object:
+        if self._encoder is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as error:  # pragma: no cover - depends on the extra
+                raise RuntimeError(
+                    "EMBEDDING_MODEL is set but sentence-transformers is not "
+                    "installed. Install the `ml` extra, or unset the variable to "
+                    "use the lexical embedder."
+                ) from error
+            self._encoder = SentenceTransformer(self._model)
+        return self._encoder
+
+
+def create_embedder(env: Mapping[str, str] | None = None) -> Embedder:
+    """Lexical unless told otherwise, and told otherwise is a deliberate act."""
+    source = os.environ if env is None else env
+    model = (source.get("EMBEDDING_MODEL") or "").strip()
+    return SentenceTransformerEmbedder(model) if model else LexicalEmbedder()

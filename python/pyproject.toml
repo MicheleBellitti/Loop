@@ -109,3 +109,10 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "jwt.*"
 ignore_missing_imports = true
+
+# `sentence-transformers` lives behind the `ml` extra and is imported inside one
+# method, so a checkout that has not installed torch still type-checks. Turning
+# it on is P4's decision, not a default.
+[[tool.mypy.overrides]]
+module = "sentence_transformers.*"
+ignore_missing_imports = true

@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from loop.domain.messages import MessageHeaders, RawMessage
+from loop.domain.messages import CalendarInvite, MessageHeaders, RawMessage
 from loop.ladder import ClassifierContext, RuleRegistry, classify
 
 # The real registry, so that "is this sender an ATS" is answered by the rule
@@ -17,6 +17,7 @@ def msg(
     list_id: str | None = None,
     list_unsubscribe: str | None = None,
     precedence: str | None = None,
+    invite: CalendarInvite | None = None,
 ) -> RawMessage:
     return RawMessage(
         user_id="u",
@@ -35,6 +36,7 @@ def msg(
         ),
         text=text,
         body_sha256="",
+        invite=invite,
     )
 
 
@@ -184,3 +186,55 @@ class TestPenalties:
             msg(sender="GitHub <notifications@github.com>", subject="Security alert"), ctx()
         )
         assert result.outcome == "drop"
+
+
+class TestTheThreeOutcomes:
+    """The classifier's whole job is one of three answers, and the middle one
+    is the reason `costly` exists on a rung.
+    """
+
+    def test_a_borderline_message_goes_down_the_cheap_rungs_only(self) -> None:
+        # `cheap_only` is what stops a maybe from being worth an inference. It
+        # was unreachable in Python until rung 3 existed, and untested either
+        # way — a flag nothing reads is indistinguishable from a flag that is
+        # wrong.
+        assert (
+            classify(
+                msg(
+                    sender="someone@unknown-company.example",
+                    subject="About the role",
+                    text="Following up about the role we discussed.",
+                ),
+                ctx(),
+            ).outcome
+            == "cheap_only"
+        )
+
+    def test_a_calendar_invite_always_passes(self) -> None:
+        # An invitation is the one thing that never needs the vocabulary: a
+        # meeting somebody scheduled with you is evidence on its own.
+        invited = msg(
+            sender="talent@somecompany.example",
+            subject="Invitation",
+            invite=CalendarInvite(
+                uid="ics-1",
+                summary="Technical interview",
+                starts_at=datetime(2026, 7, 31, 8, 0, tzinfo=UTC),
+                organiser="talent@somecompany.example",
+            ),
+        )
+        assert classify(invited, ctx()).outcome != "drop"
+
+    def test_a_newsletter_drops(self) -> None:
+        assert (
+            classify(
+                msg(
+                    sender="news@newsletter.example",
+                    subject="This week in tech",
+                    list_id="weekly",
+                    precedence="bulk",
+                ),
+                ctx(),
+            ).outcome
+            == "drop"
+        )
