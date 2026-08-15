@@ -72,12 +72,19 @@ which pairs every real message with the verdict the TypeScript gave it. Only
 `scripts/export-baseline.ts` could write that file, and it needed the TypeScript
 classifier, rules and extractor — all of which have been deleted.
 
-That is recoverable, not lost. The tag `typescript-final` is the last commit
-holding them:
+That is recoverable, not lost. Commit **`0ceb07c`** is the last one holding
+them — the parent of the first commit on the branch that removed them, and an
+ancestor of `main`, so it is never collected:
 
-    git checkout typescript-final
+    git checkout 0ceb07c
     npm install && npm run export:baseline    # writes fixtures/private/
     git checkout -
+
+Worth tagging so it has a name rather than a hash. The credentials this branch
+was pushed with could not create one:
+
+    git tag -a typescript-final 0ceb07c -m "the TypeScript reference"
+    git push origin typescript-final
 
 The baseline it writes is git-ignored and needs no database, no network and no
 mailbox afterwards, so the comparison stays reproducible after the mail has
@@ -93,7 +100,7 @@ justifies it; a difference the table cannot explain fails the diff.
 | P1 | the ladder and the differential harness | **done** — 974/1000 identical, 26 deliberate, nothing unexplained |
 | P2 | connector, classifier, extractor, resolver, pipeline, nudge, notifier | **done** — `python -m loop <service>` |
 | P3 | FastAPI, response contract byte-identical | **done** — every route the client calls |
-| — | the TypeScript retires | **done** — `typescript-final` is what it was |
+| — | the TypeScript retires | **done** — commit `0ceb07c` is what it was |
 | P4 | real embeddings, spaCy, the stage detector, the corrections loop | |
 | P5 | the interface | |
 
