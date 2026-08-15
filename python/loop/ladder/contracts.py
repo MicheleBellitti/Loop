@@ -59,3 +59,19 @@ class ExtractionRung(Protocol):
         """True for a rung a `cheap_only` message may not pay for."""
 
     def extract(self, msg: CandidateMessage, ctx: LadderContext) -> Extraction | None: ...
+
+
+class TransientRungError(RuntimeError):
+    """A costly rung could not be reached.
+
+    Distinct from abstaining because the answer is "not yet" rather than
+    "never": the message is parked and brought back, not dropped and not put to
+    a human who would only be guessing at what the model would have said. It
+    lives on the contract rather than in the service because it is the third
+    thing a rung may do — read, abstain, or be unavailable — and the ladder has
+    to let it past rather than treat it as a reading.
+    """
+
+    def __init__(self, kind: str, detail: str = "") -> None:
+        super().__init__(f"{kind}: {detail}" if detail else kind)
+        self.kind = kind

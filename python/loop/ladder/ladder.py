@@ -16,6 +16,8 @@ event — which the idempotency key on the event makes safe to retry.
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+import httpx
+
 from loop.domain import excerpt
 from loop.domain.messages import CandidateMessage, Intent, Signal
 from loop.domain.thresholds import REVIEW_BELOW
@@ -24,6 +26,7 @@ from .addresses import address_of
 from .contracts import Extraction, ExtractionRung, LadderContext
 from .rung1 import TemplateRung
 from .rung2 import HeuristicRung
+from .rung3 import ModelConfig, ModelRung
 from .signal import build_signal
 
 
@@ -104,3 +107,18 @@ def deterministic_ladder() -> Ladder:
     differential harness measures.
     """
     return Ladder([TemplateRung(), HeuristicRung()])
+
+
+def model_ladder(
+    config: ModelConfig | None = None, *, client: httpx.Client | None = None
+) -> Ladder:
+    """Rungs 1 to 3. The third abstains on its own when no model is configured.
+
+    Adding the rung unconditionally rather than branching on `base_url` is what
+    keeps the two postures one code path: with the model off, the rung returns
+    `None` on its first line and the ladder behaves exactly as the deterministic
+    one — which is the posture the harness measured, and the posture a
+    deployment runs in until someone sets `MODEL_BASE_URL`.
+    """
+    rung = ModelRung(config=config or ModelConfig(), client=client)
+    return Ladder([TemplateRung(), HeuristicRung(), rung])

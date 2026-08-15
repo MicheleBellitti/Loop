@@ -14,6 +14,7 @@ The four outcomes are all terminal here, and only one of them produces a signal:
     TransientRungError  → parked, to be brought back by the drain
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -30,25 +31,16 @@ from loop.ladder import (
     Ignored,
     Ladder,
     LadderContext,
+    ModelConfig,
     NeedsReview,
     RuleRegistry,
-    deterministic_ladder,
+    TransientRungError,
+    model_ladder,
 )
 
 from .consumer import Consumer, ConsumerOptions
 
-
-class TransientRungError(RuntimeError):
-    """A costly rung could not be reached.
-
-    Distinct from every other failure because the answer is "not yet" rather
-    than "never": the message is parked and brought back, not dropped and not
-    put to a human who would only be guessing at what the model would have said.
-    """
-
-    def __init__(self, kind: str) -> None:
-        super().__init__(kind)
-        self.kind = kind
+__all__ = ["ExtractorService", "Reading", "TransientRungError"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,9 +64,11 @@ class ExtractorService:
     ) -> None:
         self._db = db
         self._registry = registry or RuleRegistry.load()
-        # Rungs 1 and 2 by default — no model, no network. P4 passes a ladder
-        # with a third rung and nothing else here moves.
-        self._ladder = ladder or deterministic_ladder()
+        # All three rungs. The third abstains on its own line when
+        # `MODEL_BASE_URL` is unset, which is the default posture — so this is
+        # the deterministic ladder until someone configures a model, and
+        # nothing here moves when they do.
+        self._ladder = ladder or model_ladder(ModelConfig.from_env())
         self._log = log or logging.getLogger("loop.extractor")
 
     @property
@@ -105,7 +99,12 @@ class ExtractorService:
         context = await self.context_for(user_id)
 
         try:
-            outcome = self._ladder.run(msg, context)
+            # Off the loop, not off the transaction — the transaction is
+            # already closed. Rung 3 blocks for as long as an inference takes,
+            # and a process whose only loop is stalled cannot answer a SIGTERM
+            # or renew the lease on the message it is holding. Rungs 1 and 2
+            # pay a thread hop measured in microseconds for the privilege.
+            outcome = await asyncio.to_thread(self._ladder.run, msg, context)
         except TransientRungError as error:
             return await self._park(msg, error)
 
