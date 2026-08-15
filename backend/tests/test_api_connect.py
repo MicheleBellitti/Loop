@@ -75,7 +75,7 @@ async def connect(
 
 
 class TestTheCallback:
-    async def test_stores_both_halves_of_the_grant(
+    async def test_one_grant_is_one_row(
         self,
         client: AsyncClient,
         db: Database,
@@ -94,9 +94,17 @@ class TestTheCallback:
                     user_id,
                 )
             ]
-        # One consent, one secret, two cursors: a Gmail history id and a
-        # Calendar sync token are not interchangeable, so they are two rows.
-        assert providers == ["gmail", "google_calendar"]
+        # A second `google_calendar` row was written here for a while, on the
+        # reasoning that two cursors want two rows. Nothing read it:
+        # `ConnectorService` selects `where provider = 'gmail'` and
+        # `_sync_calendar` stores its sync token in that row's cursor beside
+        # the history id. What the extra row did do was stay at
+        # `last_ok_at = null` and `status = 'ok'` for ever, which made
+        # `mailbox_health`'s freshness reading permanently null and the F1
+        # revoked-access screen unreachable — and `DELETE /api/mailboxes/{id}`
+        # removes one row by id, so disconnecting left a second sealed copy of
+        # the refresh token behind.
+        assert providers == ["gmail"]
 
     async def test_records_the_consent_with_the_scopes_that_were_granted(
         self,
@@ -114,7 +122,17 @@ class TestTheCallback:
         assert row is not None
         assert row["kind"] == "mailbox_scopes"
         assert row["version"] == mailboxes.SCOPE_VERSION
-        assert "gmail.readonly" in row["detail"]
+        # A dict, because `detail` is `jsonb` and the pool's codec encodes it.
+        # This read `"gmail.readonly" in row["detail"]` and passed as a
+        # *substring* test — which is what a doubly-encoded value decodes to,
+        # so the assertion that was meant to prove the column was written
+        # correctly was the one thing that could not fail when it was not.
+        assert row["detail"] == {
+            "scopes": [
+                "https://www.googleapis.com/auth/gmail.readonly",
+                "https://www.googleapis.com/auth/calendar.readonly",
+            ]
+        }
 
     async def test_records_what_google_granted_not_what_was_asked_for(
         self,
@@ -133,7 +151,10 @@ class TestTheCallback:
             detail = await connection.fetchval(
                 "select detail from consents where user_id = $1", user_id
             )
-        assert "calendar.readonly" not in detail
+        # Against the list, not against the object: `in` on a dict asks about
+        # keys, so `"calendar.readonly" not in detail` was true whether or not
+        # the calendar scope had been granted.
+        assert detail["scopes"] == [partial]
 
     async def test_the_gateway_role_may_write_all_three(
         self, client: AsyncClient, dsn: str, user_id: str, monkeypatch: pytest.MonkeyPatch
