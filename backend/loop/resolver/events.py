@@ -36,6 +36,10 @@ class RoleFacts:
     seniority: str | None = None
     location: str | None = None
     work_mode: WorkMode | None = None
+    # The normalised title, which is a fourth thing derived from the same parse
+    # and was being derived a second time by the caller. `normalise_role` runs
+    # roughly thirty word-boundary substitutions per title.
+    role: str | None = None
 
 
 def role_facts(signal: Signal) -> RoleFacts:
@@ -46,6 +50,7 @@ def role_facts(signal: Signal) -> RoleFacts:
         seniority=normalised.seniority,
         location=signal.location or normalised.location,
         work_mode=signal.work_mode or normalised.work_mode,
+        role=normalised.role,
     )
 
 

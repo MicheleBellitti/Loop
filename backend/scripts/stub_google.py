@@ -26,8 +26,10 @@ from pathlib import Path
 from typing import Any, ClassVar
 from urllib.parse import unquote, urlparse
 
+from loop.harness import load_fixtures
+from loop.paths import backend_root
+
 PORT = 8787
-FIXTURE_DIRS = ("fixtures/ats", "fixtures/negatives")
 # UTC, via `calendar.timegm`. `time.mktime` reads the struct as *local* time
 # and guesses DST, so the constant named `_FIXED_INSTANT` moved with the
 # developer's timezone: 09:12Z in CI, 07:12Z in Europe/Rome, and the previous
@@ -38,17 +40,21 @@ _FIXED_INSTANT = time.strptime("2026-07-30 07:12:00", "%Y-%m-%d %H:%M:%S")
 INTERNAL_DATE = str(calendar.timegm(_FIXED_INSTANT) * 1000)
 
 
-def backend_root() -> Path:
-    """backend/, where `fixtures/` lives."""
-    return Path(__file__).resolve().parents[1]
+def mailbox(root: Path | None = None) -> dict[str, bytes]:
+    """The corpus, read from `fixtures/manifest.json`.
 
-
-def load_fixtures(root: Path) -> dict[str, bytes]:
-    messages: dict[str, bytes] = {}
-    for directory in FIXTURE_DIRS:
-        for path in sorted((root / directory).glob("*.eml")):
-            messages[path.stem] = path.read_bytes()
-    return messages
+    The same list `loop.harness.load_fixtures` reads and `gen_fixtures.py`
+    writes. A glob over two hard-coded directories was a second answer to "what
+    is the corpus": an `.eml` left out of the manifest was served to the
+    pipeline and never scored, and a directory added to the generator was
+    scored and never served — with the e2e run's placed/dropped counts quietly
+    measuring a smaller mailbox than the gate did.
+    """
+    base = root or backend_root()
+    return {
+        Path(case.path).stem: (base / case.path).read_bytes()
+        for case in load_fixtures(base)
+    }
 
 
 def _b64url(text: str) -> str:
@@ -169,7 +175,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def serve(port: int, root: Path) -> ThreadingHTTPServer:
-    Handler.messages = load_fixtures(root)
+    Handler.messages = mailbox(root)
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     return server
 

@@ -24,6 +24,7 @@ from typing import Any
 
 from loop.domain import normalise_message
 from loop.domain.messages import CalendarInvite, InviteMethod, MessageHeaders, RawMessage
+from loop.paths import backend_root
 
 DEFAULT_RECEIVED_AT = datetime(2026, 7, 30, 9, 12, tzinfo=UTC)
 
@@ -33,14 +34,6 @@ DEFAULT_RECEIVED_AT = datetime(2026, 7, 30, 9, 12, tzinfo=UTC)
 JsonObject = dict[str, Any]
 
 
-def repo_root() -> Path:
-    """`backend/`, which is where `fixtures/` and `rules/` live.
-
-    Named for what it was rather than what it is would be worse: every path
-    under it is written `fixtures/…` in `manifest.json`, and those stay
-    relative to this.
-    """
-    return Path(__file__).resolve().parents[2]
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,7 +65,7 @@ STALE_FIXTURES: Mapping[str, str] = {
 
 
 def load_fixtures(root: Path | None = None) -> list[FixtureCase]:
-    base = root or repo_root()
+    base = root or backend_root()
     manifest = json.loads((base / "fixtures" / "manifest.json").read_text(encoding="utf-8"))
     return [
         FixtureCase(
@@ -270,15 +263,20 @@ class Baseline:
 
 
 def default_baseline_path() -> Path:
-    return repo_root() / "fixtures" / "private" / "ladder-baseline.jsonl"
+    return backend_root() / "fixtures" / "private" / "ladder-baseline.jsonl"
 
 
 def load_baseline(path: Path | None = None) -> Baseline:
     source = path or default_baseline_path()
     if not source.exists():
         raise FileNotFoundError(
-            f"{source} does not exist. Produce it with `npm run export:baseline`, which "
-            "reads the mailbox once and writes the TypeScript's verdict for every message."
+            f"{source} does not exist. It is written by the TypeScript reference, "
+            "which this repository no longer contains — the exporter lives at commit "
+            "0ceb07c, an ancestor of main:\n\n"
+            "    git checkout 0ceb07c && npm install && npm run export:baseline\n"
+            "    git checkout -\n\n"
+            "It reads the mailbox once and writes the reference's verdict for every "
+            "message."
         )
 
     context = BaselineContext()

@@ -24,13 +24,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from loop.paths import backend_root
+
 DATE = "Thu, 30 Jul 2026 09:12:00 +0200"
 RECIPIENT = "you@example.com"
-
-
-def backend_root() -> Path:
-    """backend/, where `fixtures/` lives."""
-    return Path(__file__).resolve().parents[1]
 
 
 def eml(fixture: dict[str, Any]) -> str:

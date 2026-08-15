@@ -1,7 +1,11 @@
 """Diff the Python ladder against the TypeScript, message by message.
 
-    npm run export:baseline                                  # once, in the repo root
-    uv run --extra ladder python scripts/diff_against_ts.py
+    git checkout 0ceb07c && npm install && npm run export:baseline && git checkout -
+    uv run --extra all python scripts/diff_against_ts.py
+
+The exporter is not in this tree: it went with the rest of the TypeScript, and
+commit `0ceb07c` is the last one that holds it. `backend/README.md` says the
+same thing at more length.
 
 Prints only the disagreements. A difference the divergence table explains is
 reported and forgiven; anything else is a porting error and exits non-zero.
@@ -26,6 +30,10 @@ from loop.harness import (
     load_baseline,
 )
 from loop.ladder import ClassifierContext, RuleRegistry
+
+BASELINE_HOWTO = (
+    "git checkout 0ceb07c && npm install && npm run export:baseline && git checkout -"
+)
 
 
 def main() -> int:
@@ -89,7 +97,8 @@ def main() -> int:
 
     if not baseline.context.ats_vendors:
         print("\n  note: this baseline records no registry, so new vendors cannot be told")
-        print("        apart from porting errors. `npm run export:baseline` fixes that.")
+        print("        apart from porting errors. Re-exporting from 0ceb07c fixes that:")
+        print(f"        {BASELINE_HOWTO}")
 
     if unexpected:
         print(f"\n  {len(unexpected)} unexplained")

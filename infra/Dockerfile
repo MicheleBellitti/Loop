@@ -26,15 +26,13 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 # Dependencies before source: this layer is invalidated by a lock change, not by
 # every edit to a route.
 COPY backend/pyproject.toml backend/uv.lock ./
-RUN uv sync --frozen --no-install-project --no-dev \
-      --extra api --extra db --extra connector --extra push --extra ladder
+RUN uv sync --frozen --no-install-project --no-dev --extra all
 
 COPY backend/loop ./loop
 COPY backend/migrations ./migrations
 COPY backend/rules ./rules
 COPY backend/scripts ./scripts
-RUN uv sync --frozen --no-dev \
-      --extra api --extra db --extra connector --extra push --extra ladder
+RUN uv sync --frozen --no-dev --extra all
 
 # `loop/api/app.py` resolves the built client as `../frontend/dist` relative to
 # the package root, which is `/app` here — so this is the same relative place it
@@ -45,8 +43,12 @@ ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Nothing here needs root.
-RUN useradd --create-home --uid 10001 loop && chown -R loop:loop /app
+# Nothing here needs root, and nothing here needs to *write* either — the tree
+# is read and executed, never modified. So the user is created and switched to,
+# and no ownership is rewritten: a `chown -R /app` touches the metadata of every
+# file in the virtualenv, and overlayfs copies a whole file up when its metadata
+# changes, which stored a second complete copy of it in the image.
+RUN useradd --create-home --uid 10001 loop
 USER loop
 
 # Only the API serves HTTP. The queue-driven services answer this with a

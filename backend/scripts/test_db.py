@@ -16,7 +16,8 @@ import argparse
 import subprocess
 import sys
 import time
-from pathlib import Path
+
+from loop.paths import repo_root
 
 NAME = "loop-pg-test"
 IMAGE = "loop-postgres:16"
@@ -38,7 +39,7 @@ def _image_exists() -> bool:
 def up(port: str) -> None:
     if not _image_exists():
         print(f"building {IMAGE}…")
-        _docker("build", "-t", IMAGE, str(_repo_root() / "infra" / "postgres"))
+        _docker("build", "-t", IMAGE, str(repo_root() / "infra" / "postgres"))
 
     _docker("rm", "-f", NAME, check=False, quiet=True)
     _docker(
@@ -74,10 +75,6 @@ def up(port: str) -> None:
 
 def down() -> None:
     _docker("rm", "-f", NAME, check=False)
-
-
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
 
 
 def main() -> None:

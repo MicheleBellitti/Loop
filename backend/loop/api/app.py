@@ -30,6 +30,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from loop.db import Database
+from loop.paths import repo_root
 from loop.runtime import configure_logging
 from loop.services.push import VapidConfig
 
@@ -183,7 +184,7 @@ def _default_client_dir() -> Path | None:
     client to the same relative place, so one path serves both. `CLIENT_DIR`
     overrides it for anything that does neither.
     """
-    built = Path(__file__).resolve().parents[3] / "frontend" / "dist"
+    built = repo_root() / "frontend" / "dist"
     return built if built.is_dir() else None
 
 

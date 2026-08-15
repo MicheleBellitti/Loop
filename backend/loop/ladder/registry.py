@@ -9,7 +9,6 @@ matches on neither subject nor body is an error rather than a line the matcher
 skips at run time. Both were failures a rule author could not see.
 """
 
-import os
 import re
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
@@ -21,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from loop.domain import matches_domain_suffix
 from loop.domain.messages import Intent
+from loop.paths import rules_dir
 
 from .regex import compile_js
 
@@ -220,7 +220,4 @@ def default_rules_dir() -> Path:
     so they are deliberately not copied under `python/`. They move here when the
     TypeScript is retired; `LOOP_RULES_DIR` covers anything in between.
     """
-    override = os.environ.get("LOOP_RULES_DIR")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[2] / "rules" / "ats"
+    return rules_dir()

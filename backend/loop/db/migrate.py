@@ -13,6 +13,8 @@ from pathlib import Path
 
 import asyncpg
 
+from loop.paths import migrations_dir
+
 # Arbitrary and stable. Two services booting at once must not both try to
 # create the same type.
 _LOCK_KEY = 819660201
@@ -39,7 +41,7 @@ def default_migrations_dir() -> Path:
     two sources of truth for a constraint is how a differential stops meaning
     anything. There is one implementation now.
     """
-    return Path(__file__).resolve().parents[2] / "migrations"
+    return migrations_dir()
 
 
 def migrations_in(directory: Path) -> list[Path]:

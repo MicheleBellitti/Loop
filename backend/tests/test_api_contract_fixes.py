@@ -7,14 +7,17 @@ working page that is quietly wrong.
 """
 
 import base64
+import inspect
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from loop.api import Settings, create_app
-from loop.api.routes.applications import _DEFAULT_LIMIT, _SORTS
+from loop.api.routes.applications import _DEFAULT_LIMIT, _SORTS, list_applications
+from loop.db import Database
 
 pytestmark = pytest.mark.integration
 
@@ -24,15 +27,64 @@ class TestTheBoardsDefaults:
         # `client/src/mobile/Pipeline.tsx` is the one caller that sends no
         # `limit` at all. The port's default was 50, so the mobile board showed
         # half a pipeline and said nothing about the other half.
-        assert _DEFAULT_LIMIT == 100
+        #
+        # Read off the route's own signature, not compared to the constant:
+        # `assert _DEFAULT_LIMIT == 100` is the constant asserting about
+        # itself, and stays true while the handler's `Query(default=50)`
+        # quietly halves the board again.
+        limit = inspect.signature(list_applications).parameters["limit"]
+        assert limit.default.default == _DEFAULT_LIMIT == 100
         response = await client.get("/api/applications")
         assert response.status_code == 200
+
+    async def test_two_reads_of_a_tie_come_back_in_the_same_order(
+        self, client: AsyncClient, db: Database, user_id: str
+    ) -> None:
+        """The behaviour `_SORTS`' tiebreak exists for, asserted as behaviour.
+
+        A dictionary that ends every clause in `t.id asc` is a claim about a
+        dictionary. This is the claim about the board: five applications
+        sharing one `last_signal_at`, which is what a backfill produces by the
+        dozen, come back in one order and stay in it.
+        """
+        signal = datetime(2026, 7, 30, 9, 0, tzinfo=UTC)
+        async with db.session(user_id) as connection:
+            company = await connection.fetchval(
+                """
+                insert into companies (canonical_name) values ('Tied')
+                on conflict (lower(canonical_name), coalesce(domain, '')) do update
+                  set canonical_name = excluded.canonical_name
+                returning id
+                """
+            )
+            for n in range(5):
+                await connection.execute(
+                    """
+                    insert into applications
+                      (user_id, company_id, role_title, current_stage, current_phase,
+                       confidence, last_signal_at)
+                    values ($1,$2,$3,'applied','sent',1.0,$4)
+                    """,
+                    user_id,
+                    company,
+                    f"Engineer {n}",
+                    signal,
+                )
+
+        for sort in _SORTS:
+            reads = []
+            for _ in range(3):
+                body = (await client.get(f"/api/applications?sort={sort}")).json()
+                reads.append([row["id"] for row in body["rows"]])
+            assert len(reads[0]) == 5, sort
+            assert reads[0] == reads[1] == reads[2], sort
 
     async def test_every_order_ends_on_the_id(self) -> None:
         # Without a tiebreak two applications with the same last signal — which
         # a backfill produces by the dozen — come back in whatever order the
         # plan happened to produce, so the board reshuffles between two reads
         # that asked the same question.
+        #
         assert all(order.endswith("t.id asc") for order in _SORTS.values())
 
     async def test_the_cursor_is_absent_rather_than_wrong(

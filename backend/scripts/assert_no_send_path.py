@@ -23,6 +23,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from loop.paths import repo_root
+
 FORBIDDEN: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bnodemailer\b", re.I), "SMTP client"),
     (re.compile(r"\bsmtplib\b"), "Python SMTP client"),
@@ -43,6 +45,14 @@ FORBIDDEN: list[tuple[re.Pattern[str], str]] = [
         "a write scope",
     ),
 ]
+
+# One alternation over all of the above, tried first. The per-pattern loop then
+# runs only on the handful of lines it matches, to say *which* rule was broken.
+# The scan covers roughly forty thousand lines; thirteen searches each is half a
+# million regex passes per CI run to find, in the normal case, nothing.
+ANY_FORBIDDEN = re.compile(
+    "|".join(f"(?:{pattern.pattern})" for pattern, _ in FORBIDDEN), re.I
+)
 
 SKIP_DIRS = frozenset(
     {
@@ -97,8 +107,10 @@ def scan(root: Path, *, skip: Path | None = None) -> list[Violation]:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
+        if not ANY_FORBIDDEN.search(text):
+            continue  # The whole file in one pass, which is the usual answer.
         for number, line in enumerate(text.splitlines(), start=1):
-            if TALKING_ABOUT_IT.search(line):
+            if not ANY_FORBIDDEN.search(line) or TALKING_ABOUT_IT.search(line):
                 continue
             for pattern, why in FORBIDDEN:
                 if pattern.search(line):
@@ -109,7 +121,7 @@ def scan(root: Path, *, skip: Path | None = None) -> list[Violation]:
 
 
 def main() -> None:
-    root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else _repo_root()
+    root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else repo_root()
     violations = scan(root, skip=Path(__file__))
 
     if violations:
@@ -125,10 +137,6 @@ def main() -> None:
         raise SystemExit(1)
 
     print("no send path — Loop can draft a follow-up and cannot deliver one")
-
-
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
 
 
 if __name__ == "__main__":

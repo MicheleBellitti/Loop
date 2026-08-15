@@ -14,24 +14,29 @@ the table.
 """
 
 import asyncio
-import base64
 import os
 
 from loop.db import Database
-from loop.google.crypto import KEY_BYTES, Sealed, rewrap_dek
+from loop.google.crypto import Sealed, load_kek, rewrap_dek
 
 
 def _key(name: str) -> bytes:
+    """`load_kek`, which is what every service decodes a key with.
+
+    It takes an explicit value for exactly this caller. A second decoder here
+    was a second opinion about what a valid key is — this one used
+    `validate=True`, `load_kek` does not — so a `LOOP_KEK` with a stray
+    character could be accepted by the connector and rejected by the rotation,
+    or, the other way round, re-wrap every data key under a key the connector
+    cannot reproduce.
+    """
     raw = (os.environ.get(name) or "").strip()
     if not raw:
         raise SystemExit(f"{name} is not set. Both keys are base64, 32 bytes.")
     try:
-        key = base64.b64decode(raw, validate=True)
+        return load_kek(raw)
     except ValueError as error:
-        raise SystemExit(f"{name} is not valid base64") from error
-    if len(key) != KEY_BYTES:
-        raise SystemExit(f"{name} must decode to {KEY_BYTES} bytes, got {len(key)}")
-    return key
+        raise SystemExit(f"{name}: {error}") from error
 
 
 async def rotate(dsn: str, old_kek: bytes, new_kek: bytes) -> int:

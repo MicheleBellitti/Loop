@@ -7,13 +7,13 @@ abstain, what makes it park, and what it refuses to pass on from a model that
 answers something it should not have.
 """
 
-from datetime import UTC, datetime
 from typing import Any
 
 import httpx
 import pytest
+from conftest import LADDER_NOW, candidate_message
 
-from loop.domain.messages import CandidateMessage, MessageHeaders, RawMessage
+from loop.domain.messages import CandidateMessage
 from loop.domain.thresholds import MODEL_CONFIDENCE_DISCOUNT
 from loop.ladder import (
     Extracted,
@@ -28,7 +28,7 @@ from loop.ladder import (
 from loop.ladder.rung3 import SYSTEM_PROMPT
 
 REGISTRY = RuleRegistry.load()
-NOW = datetime(2026, 7, 30, 9, 0, tzinfo=UTC)
+NOW = LADDER_NOW
 
 ANSWER: dict[str, Any] = {
     "intent": "interview_invite",
@@ -46,23 +46,7 @@ ANSWER: dict[str, Any] = {
 def candidate(
     *, text: str = "something no rule has ever seen", subject: str = ""
 ) -> CandidateMessage:
-    message = RawMessage(
-        user_id="u",
-        mailbox_id="m",
-        provider_message_id="id",
-        thread_id=None,
-        received_at=NOW,
-        headers=MessageHeaders(
-            message_id="<1@x>",
-            sender="Giulia <giulia@example-recruiting.it>",
-            subject=subject,
-            date="",
-        ),
-        text=text,
-        body_sha256="",
-        invite=None,
-    )
-    return CandidateMessage(message=message, score=5, cheap_only=False)
+    return candidate_message(text=text, subject=subject)
 
 
 def stub(handler: Any) -> httpx.Client:

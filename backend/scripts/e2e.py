@@ -1,7 +1,6 @@
 """End to end, against the stub mailbox.
 
-    uv run --extra api --extra db --extra connector --extra ladder \
-        python scripts/e2e.py
+    uv run --extra all python scripts/e2e.py
 
 Starts the five pipeline services for real, connects a mailbox pointed at the
 fixture-replay server, runs a backfill, and asserts that applications appear with
@@ -29,19 +28,16 @@ import sys
 import time
 import uuid
 from contextlib import suppress
-from pathlib import Path
 
 import asyncpg
 
-from loop.google.crypto import generate_dek, seal, wrap_dek
+from loop.google.client import Tokens
+from loop.google.mailbox import store_mailbox
+from loop.paths import backend_root
 
 DEFAULT_DSN = "postgres://loop:loop@localhost:55432/loop"
 STUB_PORT = os.environ.get("STUB_PORT", "8787")
 SETTLE_ROUNDS = 60
-
-
-def backend_root() -> Path:
-    return Path(__file__).resolve().parents[1]
 
 
 class Fleet:
@@ -50,31 +46,47 @@ class Fleet:
     def __init__(self, env: dict[str, str], *, verbose: bool) -> None:
         self._env = env
         self._verbose = verbose
-        self._children: list[subprocess.Popen[bytes]] = []
+        self._children: list[tuple[str, subprocess.Popen[bytes]]] = []
 
-    def start(self, name: str, *args: str, role: str | None = None) -> None:
-        env = dict(self._env)
-        if role:
-            env["DB_ROLE"] = role
+    def start(self, name: str, *args: str) -> None:
         output = None if self._verbose else subprocess.DEVNULL
         self._children.append(
-            subprocess.Popen(
-                [sys.executable, *args],
-                env=env,
-                stdout=output,
-                stderr=None if self._verbose else subprocess.DEVNULL,
-                cwd=str(backend_root()),
+            (
+                name,
+                subprocess.Popen(
+                    [sys.executable, *args],
+                    env=dict(self._env),
+                    stdout=output,
+                    stderr=output,
+                    cwd=str(backend_root()),
+                ),
             )
         )
 
+    def check(self) -> None:
+        """Say which child died, rather than letting the settle loop time out.
+
+        A service that fails at startup — a missing grant, an import error —
+        used to be indistinguishable from a pipeline that produced nothing, and
+        its traceback had gone to `/dev/null`. Naming it, and pointing at
+        `--verbose`, is the difference between a two-minute fix and an hour.
+        """
+        for name, child in self._children:
+            code = child.poll()
+            if code is not None:
+                fail(
+                    f"{name} exited with {code} before the pipeline had run",
+                    "re-run with --verbose to see what it said",
+                )
+
     def stop(self) -> None:
-        for child in self._children:
+        for _, child in self._children:
             with suppress(ProcessLookupError):
                 child.send_signal(signal.SIGTERM)
-        for child in self._children:
+        for _, child in self._children:
             with suppress(subprocess.TimeoutExpired):
                 child.wait(timeout=10)
-        for child in self._children:
+        for _, child in self._children:
             if child.poll() is None:
                 child.kill()
 
@@ -90,6 +102,9 @@ async def run(dsn: str, *, verbose: bool) -> None:
     print("\n  end to end · stub mailbox → applications\n")
 
     kek = os.environ.get("LOOP_KEK") or base64.b64encode(bytes([3]) * 32).decode()
+    # This process seals the mailbox with the same key the fleet will open it
+    # with, and `store_mailbox` reads it the way every service does.
+    os.environ["LOOP_KEK"] = kek
     env = {
         **os.environ,
         "DATABASE_URL": dsn,
@@ -105,6 +120,10 @@ async def run(dsn: str, *, verbose: bool) -> None:
         "LOG_LEVEL": os.environ.get("LOG_LEVEL", "WARNING"),
         "QUIET_HOURS": "21:00-08:00",
     }
+    # `python -m loop <name>` maps each service to its own role. Naming them
+    # again here would be a second copy of that table, and an inherited
+    # `DB_ROLE` would override it for all five at once.
+    env.pop("DB_ROLE", None)
 
     connection = await asyncpg.connect(dsn)
     fleet = Fleet(env, verbose=verbose)
@@ -121,25 +140,21 @@ async def run(dsn: str, *, verbose: bool) -> None:
         print(f"  · tenant {user_id[:8]}")
 
         # ── a mailbox pointing at the stub ───────────────────────────────────
-        dek = generate_dek()
-        wrapped = wrap_dek(dek, base64.b64decode(kek))
-        sealed = seal(json.dumps({"refresh_token": "stub-refresh-token"}).encode(), dek)
-        mailbox_id = str(
-            await connection.fetchval(
-                """
-                insert into mailbox_accounts
-                  (user_id, provider, address, secret_ciphertext, secret_nonce,
-                   dek_wrapped, dek_nonce, scopes, status)
-                values ($1,'gmail',$2,$3,$4,$5,$6,'{gmail.readonly}','ok')
-                returning id
-                """,
-                user_id,
-                "you@example.com",
-                sealed.ciphertext,
-                sealed.nonce,
-                wrapped.ciphertext,
-                wrapped.nonce,
-            )
+        # `store_mailbox`, the function the OAuth callback calls — so the row
+        # this whole run starts from is written by the production path,
+        # envelope format and column set included, rather than by a copy of it
+        # that has to be kept in step by hand.
+        mailbox_id = await store_mailbox(
+            connection,
+            user_id=user_id,
+            provider="gmail",
+            address="you@example.com",
+            tokens=Tokens(
+                access_token="stub-access-token",
+                expires_in=3600,
+                scope="https://www.googleapis.com/auth/gmail.readonly",
+                refresh_token="stub-refresh-token",
+            ),
         )
         print(f"  · mailbox {mailbox_id[:8]} → stub")
 
@@ -147,16 +162,11 @@ async def run(dsn: str, *, verbose: bool) -> None:
         fleet.start("stub", "scripts/stub_google.py", "--port", STUB_PORT)
         await asyncio.sleep(1.0)
 
-        for name, role in (
-            ("classifier", "loop_classifier"),
-            ("extractor", "loop_extractor"),
-            ("resolver", "loop_resolver"),
-            ("pipeline", "loop_pipeline"),
-            ("connector", "loop_connector"),
-        ):
-            fleet.start(name, "-m", "loop", name, role=role)
+        for name in ("classifier", "extractor", "resolver", "pipeline", "connector"):
+            fleet.start(name, "-m", "loop", name)
         print("  · five services up")
         await asyncio.sleep(3.5)
+        fleet.check()
 
         # ── the first scan ──────────────────────────────────────────────────
         await connection.execute(
@@ -166,7 +176,7 @@ async def run(dsn: str, *, verbose: bool) -> None:
         )
         print("  · backfill requested")
 
-        applications, events = await _settle(connection, user_id)
+        applications, events = await _settle(connection, user_id, fleet)
         await _assert_the_pipeline_ran(connection, user_id, applications, events)
         await _report(connection, user_id)
     finally:
@@ -177,11 +187,14 @@ async def run(dsn: str, *, verbose: bool) -> None:
         await connection.close()
 
 
-async def _settle(connection: asyncpg.Connection, user_id: str) -> tuple[int, int]:
+async def _settle(
+    connection: asyncpg.Connection, user_id: str, fleet: "Fleet"
+) -> tuple[int, int]:
     """Wait until two consecutive rounds see the same counts."""
     applications = events = 0
     for round_number in range(SETTLE_ROUNDS):
         await asyncio.sleep(1.0)
+        fleet.check()
         now_applications = await connection.fetchval(
             "select count(*) from applications where user_id = $1", user_id
         )

@@ -1,16 +1,26 @@
-"""Thirteen numbers, in the one format everything already scrapes.
+"""Four numbers, in the one format everything already scrapes.
 
 Hand-rolled, and the reason is worth stating: a Prometheus client library brings
 a registry, a multiprocess mode, a WSGI app and a set of default collectors, to
-serialise thirty lines of text. The exposition format is a documented text
+serialise a dozen lines of text. The exposition format is a documented text
 format and this is a text formatter.
 
-What is measured is the same thirteen the reference registers, but where the
-reference's gateway served an empty registry — the counters live in the worker
-processes and nothing ever incremented one here — these are read from the
-database on request. The queue depths and the dead-letter count are facts about
-Postgres, and asking Postgres is both simpler than aggregating counters across
-processes and correct after a restart.
+**Four, not the thirteen §16 lists, and the gap is deliberate for now.** The
+four here — queue depth, dead letters, open review items, mailbox freshness —
+are facts about Postgres, so they are read from Postgres on request: simpler
+than aggregating counters across eight processes, and correct after a restart,
+which an in-process counter is not.
+
+The other nine are per-event counters that only the worker that emits the event
+can see: `messages_read_total`, `messages_dropped_total`, `extraction_total`,
+`model_latency_seconds`, `model_failures_total`, `resolver_decisions_total`,
+`denylist_violations_total`, `events_appended_total`, `notifications_sent_total`.
+The reference declared all nine and incremented them in the workers, and served
+them from a per-worker health port that this port does not open — so restoring
+them means giving the queue services an HTTP endpoint again, or writing the
+counts somewhere Postgres can be asked about them. Until one of those happens
+they are absent, and saying so here is better than a docstring that makes an
+absence look like a scrape failure.
 """
 
 from typing import Any, Final

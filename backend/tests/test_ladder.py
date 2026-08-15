@@ -1,8 +1,9 @@
 from datetime import UTC, datetime
 
 import pytest
+from conftest import LADDER_NOW, candidate_message
 
-from loop.domain.messages import CalendarInvite, CandidateMessage, MessageHeaders, RawMessage
+from loop.domain.messages import CalendarInvite, CandidateMessage
 from loop.ladder import (
     Extracted,
     Ignored,
@@ -22,30 +23,9 @@ from loop.ladder.company import (
 from loop.ladder.role import role_from_body
 
 REGISTRY = RuleRegistry.load()
-NOW = datetime(2026, 7, 30, 9, 0, tzinfo=UTC)
+NOW = LADDER_NOW
 
-
-def candidate(
-    *,
-    sender: str,
-    subject: str = "",
-    text: str = "",
-    thread_id: str | None = None,
-    invite: CalendarInvite | None = None,
-    cheap_only: bool = False,
-) -> CandidateMessage:
-    message = RawMessage(
-        user_id="u",
-        mailbox_id="m",
-        provider_message_id="id",
-        thread_id=thread_id,
-        received_at=NOW,
-        headers=MessageHeaders(message_id="<1@x>", sender=sender, subject=subject, date=""),
-        text=text,
-        body_sha256="",
-        invite=invite,
-    )
-    return CandidateMessage(message=message, score=5, cheap_only=cheap_only)
+candidate = candidate_message
 
 
 def read(msg: CandidateMessage, **over: object) -> Extracted | NeedsReview | Ignored:

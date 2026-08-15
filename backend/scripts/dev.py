@@ -21,8 +21,11 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 from contextlib import suppress
 from pathlib import Path
+
+from loop.paths import backend_root, repo_root
 
 # The API first, because it is the one you open. `python -m loop <name>` maps
 # each of these to its own role in `loop/__main__.py`, so nothing is repeated.
@@ -38,11 +41,6 @@ SERVICES = (
 )
 
 WIDTH = max(len(name) for name in SERVICES)
-
-
-def repo_root() -> Path:
-    """The repository, where `.env` lives — one above `backend/`."""
-    return Path(__file__).resolve().parents[2]
 
 
 def load_env(path: Path) -> dict[str, str]:
@@ -97,7 +95,7 @@ def main() -> None:
         child = subprocess.Popen(
             [sys.executable, "-m", "loop", name],
             env=env,
-            cwd=str(Path(__file__).resolve().parents[1]),
+            cwd=str(backend_root()),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -116,13 +114,30 @@ def main() -> None:
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
 
+    # Polled rather than waited on in start order. `api` is first and runs for
+    # ever, so `children[0].wait()` reported nothing about the classifier that
+    # died at startup behind it — the terminal looked healthy while mail piled
+    # up in `message_pending` with nothing consuming it. The first exit ends
+    # the fleet, which is what compose's `depends_on` would have done.
     try:
-        for child, name in zip(children, wanted, strict=True):
-            code = child.wait()
-            if code != 0:
-                print(f"{name:<{WIDTH}} │ exited with {code}", file=sys.stderr)
+        while True:
+            for child, name in zip(children, wanted, strict=True):
+                code = child.poll()
+                if code is None:
+                    continue
+                print(
+                    f"{name:<{WIDTH}} │ exited with {code}; stopping the rest",
+                    file=sys.stderr,
+                )
+                return
+            time.sleep(0.25)
+    except KeyboardInterrupt:
+        pass
     finally:
         stop()
+        for child in children:
+            with suppress(subprocess.TimeoutExpired):
+                child.wait(timeout=10)
 
 
 if __name__ == "__main__":

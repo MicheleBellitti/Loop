@@ -21,6 +21,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from loop.paths import backend_root
+
 # Domains that are the whole signal, and therefore must not be rewritten.
 #
 # Read out of `rules/ats/*.yaml` rather than copied, because a copy is a copy
@@ -110,11 +112,6 @@ def anonymise(raw: str) -> str:
     out = _DISPLAY_NAME.sub(a_display_name, out)
     out = _URL.sub(a_url, out)
     return _LONG_DIGITS.sub(some_digits, out)
-
-
-def backend_root() -> Path:
-    """backend/, where `fixtures/` lives."""
-    return Path(__file__).resolve().parents[1]
 
 
 AFTERWARDS = """

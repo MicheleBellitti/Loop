@@ -19,7 +19,6 @@ import asyncpg
 from loop.db import Database, Message, publish
 from loop.db.queue import Queue
 from loop.db.seen import Outcome, mark_seen
-from loop.domain import normalise_role
 from loop.domain.messages import Signal
 from loop.domain.thresholds import MERGE_UNDO_DAYS
 from loop.domain.wire import decode_signal, encode_pending_event
@@ -300,9 +299,9 @@ class ResolverService:
         company_id: str,
         embedding: list[float],
     ) -> str:
-        normalised = normalise_role(signal.role) if signal.role else None
-        # The same three the event payload carries, from the same function, so
-        # the row and the log cannot disagree about what a rebuild should find.
+        # Every derived value here comes from the one `role_facts` call, so the
+        # row and the log cannot disagree about what a rebuild should find —
+        # `role_normalised` included, which used to be parsed a second time.
         facts = role_facts(signal)
         return str(
             await connection.fetchval(
@@ -316,7 +315,7 @@ class ResolverService:
                 signal.user_id,
                 company_id,
                 (signal.role or "").strip() or "Unknown role",
-                signal.role_normalised or (normalised.role if normalised else None),
+                signal.role_normalised or facts.role,
                 to_vector(embedding),
                 facts.seniority,
                 facts.location,

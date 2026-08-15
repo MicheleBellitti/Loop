@@ -1078,6 +1078,18 @@ version = "0.1.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
+all = [
+    { name = "asyncpg" },
+    { name = "cryptography" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "pywebpush" },
+    { name = "pyyaml" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "webauthn" },
+]
 api = [
     { name = "fastapi" },
     { name = "pydantic" },
@@ -1122,6 +1134,11 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.115" },
     { name = "httpx", marker = "extra == 'connector'", specifier = ">=0.27" },
     { name = "httpx", marker = "extra == 'ladder'", specifier = ">=0.27" },
+    { name = "loop", extras = ["api"], marker = "extra == 'all'" },
+    { name = "loop", extras = ["connector"], marker = "extra == 'all'" },
+    { name = "loop", extras = ["db"], marker = "extra == 'all'" },
+    { name = "loop", extras = ["ladder"], marker = "extra == 'all'" },
+    { name = "loop", extras = ["push"], marker = "extra == 'all'" },
     { name = "pydantic", marker = "extra == 'api'", specifier = ">=2.9" },
     { name = "pydantic", marker = "extra == 'ladder'", specifier = ">=2.9" },
     { name = "pyjwt", extras = ["crypto"], marker = "extra == 'connector'", specifier = ">=2.9" },
@@ -1132,7 +1149,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'api'", specifier = ">=0.32" },
     { name = "webauthn", marker = "extra == 'api'", specifier = ">=2.5" },
 ]
-provides-extras = ["db", "api", "ladder", "ml", "push", "connector"]
+provides-extras = ["db", "api", "ladder", "ml", "push", "connector", "all"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -32,6 +32,18 @@ push = ["pywebpush>=2.0"]
 # The connector: an HTTP client for Google, and AES-GCM for the one secret this
 # system stores.
 connector = ["httpx>=0.27", "cryptography>=43", "pyjwt[crypto]>=2.9"]
+# Everything a full deployment runs, so CI, the image and the e2e script name
+# one extra rather than five in five orders — the copies had already drifted,
+# and the one missing `push` meant the end-to-end run imported a module from an
+# environment that need not have had `pywebpush` in it. `ml` is deliberately
+# out: it is the escape hatch, not part of the product.
+all = [
+  "loop[api]",
+  "loop[db]",
+  "loop[connector]",
+  "loop[push]",
+  "loop[ladder]",
+]
 
 [dependency-groups]
 dev = [

@@ -29,6 +29,12 @@ except ModuleNotFoundError:  # pragma: no cover - the pure suite runs without it
     asyncpg = None  # type: ignore[assignment]
 
 from loop.db import Database, Queue, migrate
+from loop.domain.messages import (
+    CalendarInvite,
+    CandidateMessage,
+    MessageHeaders,
+    RawMessage,
+)
 
 TEST_EMAIL_DOMAIN = "pytest.invalid"
 
@@ -282,3 +288,37 @@ async def connect_mailbox(
 async def mailbox_id(db: Database, user_id: str) -> str:
     """A connected Gmail account, which `seen_messages` needs to reference."""
     return await connect_mailbox(db, user_id)
+
+
+# ── the ladder's message builder ─────────────────────────────────────────────
+#
+# One builder, imported by `test_ladder` and `test_rung3`, because both were
+# constructing the same `RawMessage` at the same instant with the same message
+# id. `MessageHeaders` gains fields — `auto_submitted` was the last one — and a
+# second copy means the rung-3 suite starts failing for a reason that has
+# nothing to do with rung 3.
+
+LADDER_NOW = datetime(2026, 7, 30, 9, 0, tzinfo=UTC)
+
+
+def candidate_message(
+    *,
+    sender: str = "Giulia <giulia@example-recruiting.it>",
+    subject: str = "",
+    text: str = "",
+    thread_id: str | None = None,
+    invite: CalendarInvite | None = None,
+    cheap_only: bool = False,
+) -> CandidateMessage:
+    message = RawMessage(
+        user_id="u",
+        mailbox_id="m",
+        provider_message_id="id",
+        thread_id=thread_id,
+        received_at=LADDER_NOW,
+        headers=MessageHeaders(message_id="<1@x>", sender=sender, subject=subject, date=""),
+        text=text,
+        body_sha256="",
+        invite=invite,
+    )
+    return CandidateMessage(message=message, score=5, cheap_only=cheap_only)
