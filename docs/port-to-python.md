@@ -313,7 +313,8 @@ and `Clara Villamayor` became `Prima`.
 The real corpus needs the mailbox once:
 
 ```
-npm run export:baseline                                    # writes fixtures/private/
+git checkout typescript-final && npm install && npm run export:baseline
+git checkout -                                             # writes fixtures/private/
 uv run --extra ladder python scripts/diff_against_ts.py    # prints only disagreements
 ```
 
@@ -531,6 +532,18 @@ application to completion before returning a response, and a stream never
 completes, so an SSE test through it deadlocks rather than failing. The suite
 runs uvicorn on a port for that one case.
 
+**The port is finished, and the TypeScript is deleted.** `typescript-final`
+tags the last commit that holds it — which is what `npm run export:baseline`
+needs, and therefore the only way to re-baseline the differential harness from a
+mailbox. Everything below this line is what the port did not do, and it is
+therefore the plan for what comes next rather than a record of what happened.
+
+The six capabilities that were TypeScript-only when the retirement was proposed
+were ported first: rung 3, the projection rebuild, KEK rotation, the redacting
+log, the embedder escape hatch and the user-seeding bootstrap. Five behavioural
+divergences in the API were closed at the same time, two of them security
+regressions rather than design choices. `backend/README.md` names them.
+
 ### P4 · The ML that justified the rewrite
 
 Real embeddings, re-tuned thresholds, spaCy NER for company and role, the model
@@ -599,7 +612,21 @@ repository.
 
 ## 7 · What to keep running meanwhile
 
+*Historic. This section set the retirement condition and the condition was met.*
+
 Do not delete the TypeScript version when P0 starts. It is the reference for the
 differential harness and it is the thing that currently reads the mailbox. Retire
 it when P3 passes — when the PWA runs against the Python API — and keep the
 final TypeScript database dump as the fixture the port is diffed against.
+
+**What actually happened.** P3 passed at the route level and the audit that
+followed found six capabilities and five API behaviours that had not been
+ported at all, none of them visible from "the client works". They were closed
+first; the deletion is the commit after them. The reference is preserved as a
+tag rather than as a dump — `git checkout typescript-final` runs it, which is
+strictly more than a dump would have given, and it is what re-baselining needs.
+
+The `packages/` and `services/` paths throughout this document are left as
+written. They are the provenance of every decision recorded here, and rewriting
+them to point at files that no longer exist would make the argument harder to
+check rather than easier.

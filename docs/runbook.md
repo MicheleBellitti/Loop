@@ -53,7 +53,7 @@ status is on the dashboard and in `/health/deep`.
 ### Apply migrations
 
 ```bash
-npm run migrate
+cd backend && uv run python -m loop migrate
 ```
 
 Refuses to run a migration whose contents changed after it was applied. If you
@@ -66,16 +66,24 @@ need to alter something, write a new numbered file — that is what
 re-derived:
 
 ```bash
-node --import tsx -e "
-  import('@loop/db').then(async (db) => {
-    const pool = db.createPool();
-    await db.withUser(process.env.USER_ID, (sql) => db.rebuildAll(sql, process.env.USER_ID), pool, { role: 'loop_pipeline' });
-    await pool.end();
-  })"
+cd backend && USER_ID=… uv run --extra db python -c "
+import asyncio, os
+from loop.db import Database, rebuild_all
+
+async def main():
+    user = os.environ['USER_ID']
+    async with Database(os.environ['DATABASE_URL'], role='loop_pipeline') as db:
+        async with db.session(user) as connection:
+            print(await rebuild_all(connection, user), 'rebuilt')
+
+asyncio.run(main())"
 ```
 
-A test asserts this produces a byte-identical row, so a difference after a
-rebuild means the fold changed — which is sometimes exactly what you wanted.
+It blanks every derived column and re-folds, so a rebuild that produced the same
+row by accident — because the old value was still sitting there — does not pass.
+`tests/test_rebuild.py` asserts the result is byte-identical, so a difference
+after a rebuild means the fold changed, which is sometimes exactly what you
+wanted.
 
 ### Rotate the KEK
 
@@ -84,8 +92,13 @@ restore means reconnecting mailboxes — that is by design and it is stated here
 so it is not a surprise.
 
 ```bash
-LOOP_KEK_OLD=... LOOP_KEK=... npm run rotate:kek
+cd backend && LOOP_KEK_OLD=… LOOP_KEK=… \
+  uv run --extra db --extra connector python scripts/rotate_kek.py
 ```
+
+One transaction with `for update`, so it is every data key or none of them: a
+rotation that half-finished would leave some mailboxes readable under the old
+key and some under the new one, with no record of which.
 
 ### Back up
 
@@ -138,7 +151,8 @@ docker compose --profile batch down
 ## What is deliberately absent
 
 - **No send path.** Not SMTP, not the Gmail send API, not a hosted mail
-  provider. `npm run lint:no-send-path` fails the build if one appears.
+  provider. `backend/scripts/assert_no_send_path.py` fails the build if one
+  appears — over every `.py`, `.ts`, `.sql` and `.yaml` in the tree.
 - **No message bodies in any table.** `review_items.excerpt` is the single
   exception: ≤280 characters, redacted, deleted with the item.
 - **No hosted model by default.** `ALLOW_HOSTED_MODEL` must be explicitly true,

@@ -17,21 +17,24 @@ automated sources; manual add is the fallback. Running cost target: €0.
 
 ```bash
 cp .env.example .env
-node -e "console.log('LOOP_KEK=' + require('crypto').randomBytes(32).toString('base64'))" >> .env
-npm install
-npm run test:db:up          # Postgres 16 + pgvector + pg_cron, on :55432
-npm run migrate
-npm run seed:user -- you@example.com
+python3 -c "import os,base64;print('LOOP_KEK='+base64.b64encode(os.urandom(32)).decode())" >> .env
+python3 -c "import secrets;print('SESSION_SECRET='+secrets.token_urlsafe(32))" >> .env
+
+cd backend
+uv sync --extra api --extra db --extra connector --extra push --extra ladder
+uv run python scripts/test_db.py up     # Postgres 16 + pgvector + pg_cron, :55432
+uv run python -m loop migrate
+uv run python scripts/seed_user.py you@example.com
 ```
 
 Then, in two terminals:
 
 ```bash
-npm run dev
+cd backend && uv run python scripts/dev.py
 ```
 
 ```bash
-npm run client:dev
+cd frontend && npm install && npm run dev
 ```
 
 The app is at http://localhost:5173. Sign in with the recovery password the seed
@@ -45,52 +48,66 @@ You can watch the whole pipeline run against the golden corpus, with a stub
 standing in for Google and nothing else faked:
 
 ```bash
-npm run e2e
+cd backend && uv run python scripts/e2e.py
 ```
 
 ---
 
 ## What the commands do
 
+Everything below runs from `backend/`, under `uv run`.
+
 | Command | What it does |
 | --- | --- |
-| `npm test` | Unit tests. Pure, no I/O, run everywhere. |
-| `npm run test:integration` | Against a real Postgres: RLS, append-only, idempotency, rebuild, erasure. |
-| `npm run test:corpus` | The confusion matrix, with the §17 merge gates enforced. |
-| `npm run lint:no-send-path` | Asserts no SMTP or Gmail send API is reachable from anywhere in the tree. |
-| `npm run fixtures` | Regenerates the synthetic corpus. |
-| `npm run anonymise -- <dir>` | Turns your own mail into fixtures, locally, into a git-ignored directory. |
-| `npm run e2e` | The full pipeline against a stub mailbox. |
-| `npm run migrate` | Applies migrations. Refuses to run one that changed after it was applied. |
+| `pytest` | The lot. Pure tests everywhere; the integration ones skip without `DATABASE_URL`. |
+| `pytest -m "not integration"` | Pure only. No I/O, no database, under a second. |
+| `python scripts/corpus_gate.py` | The confusion matrix, with the §17 merge gates enforced. |
+| `python scripts/assert_no_send_path.py` | Asserts no SMTP or Gmail send API is reachable from anywhere in the tree. |
+| `python scripts/gen_fixtures.py` | Regenerates the synthetic corpus. `--check` asserts it has not drifted. |
+| `python scripts/anonymise.py <dir>` | Turns your own mail into fixtures, locally, into a git-ignored directory. |
+| `python scripts/e2e.py` | The full pipeline against a stub mailbox. |
+| `python -m loop migrate` | Applies migrations. Refuses to run one that changed after it was applied. |
+| `python scripts/seed_user.py <email>` | Creates the single user and prints a recovery password once. |
+| `python scripts/rotate_kek.py` | Re-wraps every data key under a new `LOOP_KEK`. |
+| `python scripts/test_db.py up\|down` | The integration-test Postgres, on :55432. |
+| `python scripts/dev.py` | All eight processes in one terminal, each with its own database role. |
+| `ruff check .` · `mypy loop` | The two static gates. |
+
+And from `frontend/`: `npm run dev`, `npm run build`, `npm run typecheck`.
 
 ---
 
 ## Layout
 
 ```
-packages/
-  domain/     types, stage machine, the fold, thresholds — pure, 100% unit-tested
-  db/         migrations, RLS helpers, envelope encryption, the projection
-  queue/      the queue wrapper: publish, consume, retry, dead-letter
-  rules/      the ATS template registry and its matcher
-  google/     the Gmail and Calendar client, and mailbox secret handling
-  runtime/    config, structured logging, metrics, service bootstrap
-services/
-  gateway/    Fastify: REST + SSE, sessions, serves the built client
-  connector/  Gmail watch + history sync, backfill, Calendar sync
-  classifier/ is-this-about-a-job — drops ~95% of an inbox
-  extractor/  rungs 1–3, the rule registry, the model adapter
-  resolver/   entity resolution, dedup, the review queue
-  pipeline/   event append + projection fold — the only writer
-  nudge/      the four rules and the budget
-  notifier/   web push
-client/       the PWA: mobile, desktop dashboard, onboarding
-rules/ats/    *.yaml templates — data, reviewed like code
-fixtures/     the golden corpus, plus negatives that must be dropped
-infra/        compose.yaml, Caddyfile, the Postgres image, backups
-docs/         decisions.md — read this before changing anything normative
-design/       the original handoff bundle, unmodified
+backend/
+  loop/
+    domain/     the fold, stages, thresholds, nudges, wire codecs — pure
+    ladder/     classifier, the rule registry, rungs 1–3, the signal
+    resolver/   embedder, matching, company identity, intent → event — pure
+    connector/  a Gmail message and an .ics, read — pure
+    google/     the API client, the sealed secret, the mailbox row
+    db/         asyncpg, the tenant session, the queue, migrations, rebuild
+    services/   the eight long-running processes
+    api/        FastAPI: REST + SSE, sessions, serves the built client
+    runtime/    the redacting log
+    harness/    the corpus, the runner, the divergence table
+  migrations/   numbered .sql — schema, RLS, grants, the queue, the sweeps
+  rules/ats/    *.yaml templates — data, reviewed like code
+  fixtures/     the golden corpus, plus negatives that must be dropped
+  scripts/      seed, migrate, replay, e2e, the corpus gate, the stub Google
+  tests/
+frontend/       the PWA: mobile, desktop dashboard, onboarding
+infra/          compose.yaml, Caddyfile, the Postgres image, backups
+docs/           decisions.md — read this before changing anything normative
+design/         the original handoff bundle, unmodified
 ```
+
+`loop.domain` imports nothing outside the standard library, which is why its
+tests run in a tenth of a second. `loop.ladder` adds PyYAML, httpx and Pydantic;
+nothing depends on the harness. The eight processes each connect as their own
+database role, so the grants in `migrations/003_rls.sql` are the enforcement of
+"only the pipeline writes to the event log" rather than a convention.
 
 ---
 
@@ -100,11 +117,11 @@ design/       the original handoff bundle, unmodified
 by confidence; that rule cannot advance an application past its own ATS
 auto-reply, and the bundle's worked example proves it. The implemented rule is
 recency-first with a human pin. [docs/decisions.md](docs/decisions.md) §A1 has
-the full argument, and `packages/domain/src/fold.test.ts` has the case.
+the full argument, and `backend/tests/test_fold.py` has the case.
 
 **There is no send path.** Loop drafts a follow-up and opens your mail client.
-Nothing in this repository can deliver a message, `npm run lint:no-send-path`
-enforces that, and the weekly digest is a page plus a push rather than an email
+Nothing in this repository can deliver a message,
+`backend/scripts/assert_no_send_path.py` enforces that, and the weekly digest is a page plus a push rather than an email
 for the same reason.
 
 **Every displayed figure carries its denominator.** A ratio without its
@@ -133,6 +150,6 @@ run rather than only in a test. Turn the model on with `MODEL_BASE_URL`.
 
 Phase 1 is the project's go/no-go and it is not the interface: read twelve
 months of your own inbox and measure. Target ≥0.85 application-level recall with
-zero wrong merges. `npm run anonymise` and `npm run test:corpus` are how you
-measure it. If extraction is not accurate enough to trust, no amount of
+zero wrong merges. `scripts/anonymise.py` and `scripts/corpus_gate.py` are how
+you measure it. If extraction is not accurate enough to trust, no amount of
 interface work saves the product.

@@ -20,13 +20,26 @@ x-service: &service
   depends_on:
     postgres:
       condition: service_healthy
+    # Every service but `migrate` itself waits for the schema. Without this a
+    # worker starts against a database with no tables, crashes, and restarts
+    # until the migration happens to land — which works, and fills the log with
+    # a failure that is really a race.
+    migrate:
+      condition: service_completed_successfully
   networks: [internal]
+  # Only the API serves HTTP. The image's healthcheck asks `/health` for a
+  # port the queue-driven services do not open, so it is off by default and
+  # turned back on for the one container that can answer it.
+  healthcheck:
+    disable: true
   environment: &service-env
-    NODE_ENV: production
     LOG_LEVEL: ${LOG_LEVEL:-info}
+    # JSON lines, because these are shipped somewhere rather than read in a
+    # terminal. `loop.runtime.log` allow-lists the fields either way.
+    LOG_FORMAT: json
     # Derived here rather than read from .env, and `environment` outranks
     # `env_file` so this wins. The DATABASE_URL in .env is the one host-side
-    # tooling uses — migrate, seed:user, npm run dev — and it necessarily names
+    # tooling uses — migrate, seed_user, dev.py — and it necessarily names
     # a published port on localhost. Inside this network there is no published
     # port and the host is `postgres`, so the two cannot be the same string.
     # Composing it from POSTGRES_PASSWORD is also what stops the URL and the
@@ -66,64 +79,78 @@ services:
   migrate:
     <<: *service
     restart: 'no'
-    command: ['node', 'packages/db/dist/migrate.js']
+    # Overridden: this is the thing every other service waits for.
+    depends_on:
+      postgres: { condition: service_healthy }
+    command: ['python', '-m', 'loop', 'migrate']
 
   gateway:
     <<: *service
-    command: ['node', 'services/gateway/dist/index.js']
+    # `api`, not `gateway`. The container keeps the old name so the Caddyfile
+    # and every `docker compose logs gateway` in the runbook still work; the
+    # process inside it is `python -m loop api`.
+    command: ['python', '-m', 'loop', 'api']
     environment:
       <<: *service-env
       DB_ROLE: loop_gateway
-    depends_on:
-      postgres: { condition: service_healthy }
-      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import urllib.request, sys
+          sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3000/health').status == 200 else 1)
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
     expose: ['3000']
 
   connector:
     <<: *service
-    command: ['node', 'services/connector/dist/index.js']
+    command: ['python', '-m', 'loop', 'connector']
     environment:
       <<: *service-env
       DB_ROLE: loop_connector
 
   classifier:
     <<: *service
-    command: ['node', 'services/classifier/dist/index.js']
+    command: ['python', '-m', 'loop', 'classifier']
     environment:
       <<: *service-env
       DB_ROLE: loop_classifier
 
   extractor:
     <<: *service
-    command: ['node', 'services/extractor/dist/index.js']
+    command: ['python', '-m', 'loop', 'extractor']
     environment:
       <<: *service-env
       DB_ROLE: loop_extractor
 
   resolver:
     <<: *service
-    command: ['node', 'services/resolver/dist/index.js']
+    command: ['python', '-m', 'loop', 'resolver']
     environment:
       <<: *service-env
       DB_ROLE: loop_resolver
 
   pipeline:
     <<: *service
-    command: ['node', 'services/pipeline/dist/index.js']
+    command: ['python', '-m', 'loop', 'pipeline']
     environment:
       <<: *service-env
       DB_ROLE: loop_pipeline
 
   nudge:
     <<: *service
-    command: ['node', 'services/nudge/dist/index.js']
+    command: ['python', '-m', 'loop', 'nudge']
     environment:
       <<: *service-env
       DB_ROLE: loop_nudge
 
   notifier:
     <<: *service
-    command: ['node', 'services/notifier/dist/index.js']
+    command: ['python', '-m', 'loop', 'notifier']
     environment:
       <<: *service-env
       DB_ROLE: loop_notifier

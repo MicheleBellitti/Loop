@@ -3,7 +3,7 @@
 This is the one step nobody can do for you: the OAuth client belongs to your
 Google account. It takes about ten minutes and costs nothing.
 
-Until it exists, everything else works — `npm run e2e` runs the whole pipeline
+Until it exists, everything else works — `cd backend && uv run python scripts/e2e.py` runs the whole pipeline
 against a stub mailbox, and quick-add covers applications by hand.
 
 ---
