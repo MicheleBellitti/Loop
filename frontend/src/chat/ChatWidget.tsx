@@ -483,7 +483,8 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
           disabled={!configured || streaming || blind}
           title={
             blind
-              ? 'This model cannot see images — start llama.cpp with --mmproj'
+              ? 'This model cannot see images — serve one with a vision projector, '
+                + 'e.g. llama-server -hf ggml-org/gemma-3-4b-it-GGUF'
               : 'Attach an image'
           }
           onClick={() => fileInput.current?.click()}

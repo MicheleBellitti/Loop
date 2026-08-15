@@ -47,8 +47,10 @@ _BUDGET_NOTE: Final = (
 
 _NO_VISION_NOTE: Final = (
     "This model cannot see images, so the attachment was left out and the "
-    "question answered from its text alone. Start llama.cpp with --mmproj, or "
-    "pick a model that reads images, to have it looked at."
+    "question answered from its text alone. To have one looked at, serve a "
+    "model that has a vision projector — `llama-server -hf "
+    "ggml-org/gemma-3-4b-it-GGUF` fetches both — and add its URL to "
+    "MODEL_BASE_URL."
 )
 
 # What a server says when it was handed a picture it cannot look at. llama.cpp
