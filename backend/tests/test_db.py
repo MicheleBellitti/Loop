@@ -688,3 +688,67 @@ class TestThePoolsWiring:
                 "select current_setting('idle_in_transaction_session_timeout')"
             )
         assert setting == "30s"
+
+
+class TestTheReadOnlySession:
+    """`set transaction read only`, which the reference opened every read route
+    with and the port had dropped.
+
+    Not redundant with the grants. Migration 014 gives `loop_gateway` real
+    INSERT on `companies` and `applications`, because quick add is the one place
+    the user rather than the mailbox is the source of truth — so "a GET does not
+    write" is a convention on this side of the port, and this is what makes the
+    database hold it instead.
+    """
+
+    async def test_a_read_only_session_still_reads(
+        self, db: Database, user_id: str
+    ) -> None:
+        application_id = await _application(db, user_id)
+        async with db.session(user_id, read_only=True) as connection:
+            found = await connection.fetchval(
+                "select role_title from applications where id = $1", application_id
+            )
+        assert found == "Backend Engineer"
+
+    async def test_and_refuses_to_write(self, db: Database, user_id: str) -> None:
+        application_id = await _application(db, user_id)
+        with pytest.raises(asyncpg.exceptions.ReadOnlySQLTransactionError):
+            async with db.session(user_id, read_only=True) as connection:
+                await connection.execute(
+                    "update applications set role_title = 'nope' where id = $1",
+                    application_id,
+                )
+
+    async def test_the_default_is_still_read_write(
+        self, db: Database, user_id: str
+    ) -> None:
+        # Every write route shares this method, so a default that flipped would
+        # take the whole product down rather than one handler.
+        application_id = await _application(db, user_id)
+        async with db.session(user_id) as connection:
+            await connection.execute(
+                "update applications set role_title = 'Staff Engineer' where id = $1",
+                application_id,
+            )
+            assert (
+                await connection.fetchval(
+                    "select role_title from applications where id = $1", application_id
+                )
+                == "Staff Engineer"
+            )
+
+    async def test_it_is_the_first_statement_in_the_transaction(
+        self, dsn: str, user_id: str
+    ) -> None:
+        # Postgres refuses `set transaction` once the transaction has done
+        # anything, so ordering it after `set local role` or the tenant config
+        # would raise on every read route — as the role the API actually runs as.
+        async with (
+            Database(dsn, role="loop_gateway") as gateway,
+            gateway.session(user_id, read_only=True) as connection,
+        ):
+            setting = await connection.fetchval(
+                "select current_setting('transaction_read_only')"
+            )
+        assert setting == "on"

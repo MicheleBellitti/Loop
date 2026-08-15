@@ -47,7 +47,7 @@ async def list_suggestions(request: Request) -> dict[str, Any]:
     implementations share a database.
     """
     session = auth.require(getattr(request.state, "session", None))
-    async with request.app.state.db.session(session.user_id) as connection:
+    async with request.app.state.db.session(session.user_id, read_only=True) as connection:
         rows = await connection.fetch(_OPEN, session.user_id)
     return {
         "suggestions": [
@@ -107,7 +107,7 @@ async def draft(request: Request, key: str) -> dict[str, Any]:
     reasonable thing to ask and the card's status has nothing to do with it.
     """
     session = auth.require(getattr(request.state, "session", None))
-    async with request.app.state.db.session(session.user_id) as connection:
+    async with request.app.state.db.session(session.user_id, read_only=True) as connection:
         application_ids = await connection.fetchval(
             "select application_ids from suggestions where user_id = $1 and key = $2",
             session.user_id,
@@ -133,7 +133,7 @@ async def application_draft(request: Request, application_id: str) -> dict[str, 
     applications a nudge rule happened to have fired for, and 404ed on the rest.
     """
     session = auth.require(getattr(request.state, "session", None))
-    async with request.app.state.db.session(session.user_id) as connection:
+    async with request.app.state.db.session(session.user_id, read_only=True) as connection:
         composed = await _compose(connection, session.user_id, application_id)
     if composed is None:
         raise ApiError(404, "not_found", "no such application")

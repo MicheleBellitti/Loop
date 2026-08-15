@@ -68,7 +68,7 @@ _jwks: Any = None
 async def list_mailboxes(request: Request) -> dict[str, Any]:
     """The health of the connection, not a list of rows — see `loop.api.mailbox`."""
     session = auth.require(getattr(request.state, "session", None))
-    async with request.app.state.db.session(session.user_id) as connection:
+    async with request.app.state.db.session(session.user_id, read_only=True) as connection:
         return await mailbox_health(connection, session.user_id)
 
 

@@ -50,7 +50,7 @@ select id, kind, evidence_ref, excerpt, candidates, application_id,
 @router.get("/review")
 async def list_review_items(request: Request) -> dict[str, Any]:
     session = auth.require(getattr(request.state, "session", None))
-    async with request.app.state.db.session(session.user_id) as connection:
+    async with request.app.state.db.session(session.user_id, read_only=True) as connection:
         rows = await connection.fetch(_OPEN_ITEMS, session.user_id)
     return {"items": [_item(row) for row in rows]}
 

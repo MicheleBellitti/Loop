@@ -78,7 +78,7 @@ async def today(request: Request) -> dict[str, Any]:
     session = auth.require(getattr(request.state, "session", None))
     now = datetime.now(UTC)
 
-    async with request.app.state.db.session(session.user_id) as connection:
+    async with request.app.state.db.session(session.user_id, read_only=True) as connection:
         tz = (
             await connection.fetchval("select tz from users where id = $1", session.user_id)
             or "UTC"

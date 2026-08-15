@@ -136,7 +136,7 @@ async def list_applications(
     )
 
     now = datetime.now(UTC)
-    async with db.session(session.user_id) as connection:
+    async with db.session(session.user_id, read_only=True) as connection:
         stages = await load_stage_table(connection, session.user_id)
         rows = await connection.fetch(sql, *params)
         tally = await connection.fetch(_TALLY, session.user_id)
@@ -203,7 +203,7 @@ async def get_application(request: Request, application_id: str) -> dict[str, An
 
     db = request.app.state.db
     now = datetime.now(UTC)
-    async with db.session(session.user_id) as connection:
+    async with db.session(session.user_id, read_only=True) as connection:
         stages = await load_stage_table(connection, session.user_id)
         tz = await connection.fetchval("select tz from users where id = $1", session.user_id)
         row = await connection.fetchrow(

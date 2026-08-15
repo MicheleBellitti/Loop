@@ -81,7 +81,7 @@ async def export(request: Request, format: str = "json", ids: str | None = None)
     session = auth.require(getattr(request.state, "session", None))
     selected = _ids(ids)
 
-    async with request.app.state.db.session(session.user_id) as connection:
+    async with request.app.state.db.session(session.user_id, read_only=True) as connection:
         if format == "csv":
             # Only the applications, and only that query: the reference ran all
             # five and discarded four.

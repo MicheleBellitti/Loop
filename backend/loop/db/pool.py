@@ -130,14 +130,31 @@ class Database:
         return self._pool
 
     @asynccontextmanager
-    async def session(self, user_id: str) -> AsyncIterator[asyncpg.Connection]:
+    async def session(
+        self, user_id: str, *, read_only: bool = False
+    ) -> AsyncIterator[asyncpg.Connection]:
         """A transaction that can see one user's rows, and only theirs.
 
         Short by construction. Nothing that waits on a network — a model, an
         API, a queue poll — belongs inside one: the connection is held for the
         whole block, and a pool of ten is exhausted by ten slow calls.
+
+        `read_only=True` adds `set transaction read only`, which the reference's
+        `withUserReadOnly` opened every read route with and which the port had
+        dropped. It is not redundant with the grants: migration 014 gives
+        `loop_gateway` real INSERT on `companies` and `applications`, because
+        quick add is the one place the user rather than the mailbox is the
+        source of truth — so "a GET does not write" is a convention here, and
+        this is the line that makes the database enforce it instead. Free: a
+        read-write transaction that never writes costs exactly the same.
+
+        It must be the first statement in the transaction — Postgres refuses
+        `set transaction` once the transaction has done anything — which is why
+        it goes before the role and the tenant.
         """
         async with self.pool.acquire() as connection, connection.transaction():
+            if read_only:
+                await connection.execute("set transaction read only")
             if self._role:
                 await connection.execute(f"set local role {_quoted(self._role)}")
             await connection.execute(

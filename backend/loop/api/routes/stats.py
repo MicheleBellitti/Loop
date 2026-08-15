@@ -222,7 +222,7 @@ async def stats(request: Request, period: str = _DEFAULT_PERIOD) -> dict[str, An
     session = auth.require(getattr(request.state, "session", None))
     window = period if period in _WINDOW else _DEFAULT_PERIOD
 
-    async with request.app.state.db.session(session.user_id) as connection:
+    async with request.app.state.db.session(session.user_id, read_only=True) as connection:
         stages = await load_stage_table(connection, session.user_id)
         currency = await connection.fetchval(
             "select display_currency from users where id = $1", session.user_id
