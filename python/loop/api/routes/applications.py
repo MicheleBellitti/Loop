@@ -22,12 +22,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from loop.api import activity_sql, auth, narrate
 from loop.api.errors import ApiError
 from loop.api.json import read_json
 from loop.api.posting import BlockedUrl, Posting, fetch_posting, parse_posting
+from loop.api.ratelimit import QUICK_ADD, limit
 from loop.api.serialise import confidence, iso_z, num, quoted
 from loop.db import Queue, load_stage_table, publish
 from loop.domain import compute_flag, days_quiet, display_stage, is_closed, quiet_label
@@ -52,13 +53,22 @@ _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 # Ordered from the wrapper below, so the names are the row's own and not the
 # joins' — `activity` is an expression and cannot be filtered on where it is
 # computed.
+# Every order ends on the id. Without a tiebreak two applications with the same
+# last signal — which a backfill produces by the dozen, since it stamps a
+# thread's messages within seconds of each other — come back in whatever order
+# the plan happened to produce, so the board reshuffles between two reads that
+# asked the same question.
 _SORTS = {
-    "last_signal": "t.last_signal_at desc nulls last",
-    "stage_depth": "t.depth desc nulls last",
-    "company": "t.company asc",
+    "last_signal": "t.last_signal_at desc nulls last, t.id asc",
+    "stage_depth": "t.depth desc nulls last, t.id asc",
+    "company": "t.company asc, t.id asc",
 }
 _DEFAULT_SORT = "last_signal"
 _MAX_LIMIT = 200
+# What the client gets when it does not ask. The reference's was 100 and the
+# mobile pipeline is the one caller that sends no `limit` at all, so halving it
+# here silently halved that board.
+_DEFAULT_LIMIT = 100
 
 # The reference called the deadline lateral `d`; the activity fragment needs
 # that name for the dwell it reads, so the deadline is `dl` here and the dwell
@@ -101,7 +111,7 @@ async def list_applications(
     status: str | None = None,
     activity: str | None = None,
     sort: str = _DEFAULT_SORT,
-    limit: int = Query(default=50, ge=1, le=_MAX_LIMIT),
+    limit: int = Query(default=_DEFAULT_LIMIT, ge=1, le=_MAX_LIMIT),
 ) -> dict[str, Any]:
     session = auth.require(getattr(request.state, "session", None))
     db = request.app.state.db
@@ -143,8 +153,19 @@ async def list_applications(
 
     return {
         "rows": [_row(row, now=now, tz=tz or "UTC", stages=stages) for row in rows],
-        # Never paginated today: the client asks for 200 and this mailbox has
-        # dozens. Present and null so the shape does not change when it is.
+        # Present and null, so the shape does not change when there is one.
+        #
+        # Deliberately not the reference's. That paginated with `a.id > cursor`
+        # while ordering by `last_signal_at desc, id asc` — a keyset predicate
+        # on a column that is not the sort key, which skips arbitrary rows and
+        # returns others twice. It was never noticed because no client sends
+        # `cursor`, and porting it would have moved a silent bug into a
+        # codebase that has just spent a phase removing them.
+        #
+        # A correct cursor here is a keyset over the ordered tuple, per sort,
+        # with `nulls last` on two of the three leading keys. That is real work
+        # for a board this mailbox fills with dozens of rows and the client
+        # already asks 200 of, so it waits until something actually pages.
         "next_cursor": None,
         "counts": counts,
     }
@@ -240,7 +261,7 @@ _CORRECTABLE = frozenset(
 )
 
 
-@router.post("/applications", status_code=201)
+@router.post("/applications", status_code=201, dependencies=[Depends(limit(QUICK_ADD))])
 async def quick_add(request: Request) -> dict[str, Any]:
     """The one place the user, not the mailbox, is the source of truth.
 

@@ -29,13 +29,14 @@ import secrets
 import time
 from typing import Any, Final
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse, Response
 
 from loop.api import auth
 from loop.api.errors import ApiError
 from loop.api.json import read_json
 from loop.api.mailbox import mailbox_health
+from loop.api.ratelimit import PUSH, limit
 from loop.google.client import GoogleAuthError, GoogleClient
 from loop.google.crypto import Sealed, open_sealed, unwrap_dek
 from loop.google.mailbox import NoRefreshToken, store_mailbox
@@ -43,6 +44,10 @@ from loop.google.mailbox import NoRefreshToken, store_mailbox
 router = APIRouter(prefix="/api")
 
 _log = logging.getLogger("loop.api.mailboxes")
+
+# The scope list this consent was given against. Bumped when the list changes,
+# so a stored consent says which set of permissions the user actually saw.
+SCOPE_VERSION: Final = "2026-07-30.readonly"
 
 # Long enough to read a consent screen, short enough that a link left in a chat
 # is worthless tomorrow.
@@ -114,13 +119,20 @@ async def callback(request: Request, code: str = "", state: str = "") -> Respons
         tokens = await client.exchange_code(code, _redirect_uri(settings), claims["v"])
         profile = await client.profile(tokens.access_token)
         async with request.app.state.db.session(claims["u"]) as connection:
-            await store_mailbox(
-                connection,
-                user_id=claims["u"],
-                provider="gmail",
-                address=profile["emailAddress"],
-                tokens=tokens,
-            )
+            for provider in ("gmail", "google_calendar"):
+                # Two rows for one grant. The calendar is read by the same
+                # connector on the same secret, and it is a separate row because
+                # each provider carries its own cursor — a Gmail history id and
+                # a Calendar sync token are not interchangeable, and a single
+                # row would make the second connector's first run a full list.
+                await store_mailbox(
+                    connection,
+                    user_id=claims["u"],
+                    provider=provider,
+                    address=profile["emailAddress"],
+                    tokens=tokens,
+                )
+            await _record_consent(connection, claims["u"], tokens.scope)
     except NoRefreshToken:
         # Google withholds the refresh token when a grant already exists.
         # Storing what it did send would overwrite a working mailbox with a
@@ -221,7 +233,7 @@ async def disconnect(request: Request, mailbox_id: str) -> dict[str, Any]:
     return {"ok": True}
 
 
-@router.post("/gmail/push")
+@router.post("/gmail/push", dependencies=[Depends(limit(PUSH))])
 async def pubsub(request: Request) -> Response:
     """Google says there is new mail. It does not say what, and nor does this.
 
@@ -277,6 +289,23 @@ async def _google_signed(token: str, settings: Any) -> bool:
     except Exception:
         return False
     return True
+
+
+async def _record_consent(connection: Any, user_id: str, granted: str) -> None:
+    """"Consent, captured at step 2 of onboarding with the scope list version
+    stored alongside the timestamp" — a row, not a promise.
+
+    What Google actually granted, not what was asked for: a user may decline
+    the calendar half at the consent screen, and the record has to say which of
+    the two this is or it answers a subject-access request with a guess.
+    """
+    await connection.execute(
+        "insert into consents (user_id, kind, version, detail)"
+        " values ($1,'mailbox_scopes',$2,$3)",
+        user_id,
+        SCOPE_VERSION,
+        json.dumps({"scopes": granted.split()}),
+    )
 
 
 def _client(settings: Any) -> GoogleClient:

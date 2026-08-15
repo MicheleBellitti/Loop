@@ -119,7 +119,7 @@ class Settings:
         client = os.environ.get("CLIENT_DIR")
         return cls(
             dsn=os.environ["DATABASE_URL"],
-            session_secret=os.environ.get("SESSION_SECRET", "dev-secret"),
+            session_secret=_session_secret(),
             public_origin=os.environ.get("PUBLIC_ORIGIN", "http://localhost:3000"),
             client_dir=Path(client) if client else _default_client_dir(),
             vapid=VapidConfig(
@@ -138,6 +138,28 @@ class Settings:
                 rp_name=os.environ.get("RP_NAME", "Loop"),
             ),
         )
+
+
+def _session_secret() -> str:
+    """Required, with no default, and that is the whole of it.
+
+    Every CSRF token is `HMAC(secret, "csrf:" + session_id)` and every OAuth
+    `state` is signed with the same key. A default — this had `"dev-secret"` —
+    means a deployment that forgets the variable boots happily and derives both
+    from a string that is printed in this file, so any reader can mint a CSRF
+    token for any session id and forge the callback that connects a mailbox.
+
+    Failing to start is the correct behaviour: the alternative is a system that
+    looks fine and is not, which is the failure mode this codebase spends most
+    of its comments avoiding.
+    """
+    secret = (os.environ.get("SESSION_SECRET") or "").strip()
+    if not secret:
+        raise RuntimeError(
+            "SESSION_SECRET is not set. Generate one with: "
+            'python -c "import secrets;print(secrets.token_urlsafe(32))"'
+        )
+    return secret
 
 
 def _trimmed(name: str) -> str | None:
@@ -170,6 +192,9 @@ def create_app(settings: Settings) -> FastAPI:
             app.state.db = db
             app.state.sessions = auth.Sessions(db, settings.session_secret)
             app.state.settings = settings
+            # One rate-limit window per guarded route, created on first use and
+            # discarded with the application — see `loop.api.ratelimit`.
+            app.state.limits = {}
             # One `listen` per process, opened here so a stream that arrives a
             # millisecond after boot has something to attach to.
             broadcaster = stream.Broadcaster(settings.dsn)
@@ -211,7 +236,9 @@ def create_app(settings: Settings) -> FastAPI:
 def _install_error_handling(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _coded(_request: Request, error: ApiError) -> JSONResponse:
-        return JSONResponse(error.body(), status_code=error.status)
+        # `headers()` is how a 429 carries its `retry-after`. Every other error
+        # returns an empty mapping, so the envelope is unchanged for all of them.
+        return JSONResponse(error.body(), status_code=error.status, headers=error.headers())
 
     @app.exception_handler(RequestValidationError)
     async def _unparseable(_request: Request, error: RequestValidationError) -> JSONResponse:
@@ -315,34 +342,6 @@ def _install_client(app: FastAPI, settings: Settings) -> None:
     async def _health() -> dict[str, object]:
         return {"ok": True}
 
-    @app.get("/{filename}")
-    async def _root_file(filename: str) -> Response:
-        """The handful of files that have to sit at the root to work at all.
-
-        `sw.js` is the reason this exists. A service worker's scope is the
-        directory it is served from, so one served from `/assets` could only
-        control `/assets` — it has to be at the root or it controls nothing.
-        `manifest.webmanifest` and the icons are the same story for a different
-        reason: the manifest is what makes the app installable, and a browser
-        looks for it where the page said it was.
-
-        Registered after every route that means something, so it can only ever
-        answer for a path nothing else claimed, and it answers only for a file
-        that is really there — `/pipeline` falls through to the single-page
-        handler below, as it must.
-        """
-        candidate = directory / filename if directory else None
-        if (
-            candidate is None
-            or filename != Path(filename).name
-            or not candidate.is_file()
-        ):
-            # A plain 404 rather than a coded one, deliberately: this has to
-            # fall through to the handler below, which is what decides between
-            # a missing file and a route the single-page app owns.
-            raise HTTPException(status_code=404)
-        return FileResponse(candidate)
-
     @app.exception_handler(404)
     async def _missing(request: Request, _error: Exception) -> Response:
         path = request.url.path
@@ -354,11 +353,70 @@ def _install_client(app: FastAPI, settings: Settings) -> None:
             return FileResponse(index)
         return JSONResponse(envelope("not_found", "no such file"), status_code=404)
 
+    if directory is None:
+        # Nothing built to serve, so no catch-all. Registering one that can only
+        # ever answer 404 would shadow every route added after `create_app`
+        # returns for no benefit — the 404 handler above already covers the
+        # single-page fallback, and without a build there is nothing to fall
+        # back to.
+        return
+
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"])
+    async def _built_file(path: str) -> Response:
+        """Anything the build emitted, wherever in the tree it emitted it.
+
+        `sw.js` is the reason this exists at the root. A service worker's scope
+        is the directory it is served from, so one served from `/assets` could
+        only control `/assets` — it has to be at the root or it controls
+        nothing. `manifest.webmanifest` and the icons are the same story for a
+        different reason: the manifest is what makes the app installable, and a
+        browser looks for it where the page said it was.
+
+        `:path` rather than a single segment, because "the root files plus
+        `/assets`" is a description of what Vite emits today rather than a rule.
+        A future `icons/apple-touch-icon.png` would 404 under the narrower
+        version, and it would 404 only in production, where the build output is
+        what is being served.
+
+        HEAD as well as GET: the reference served these through
+        `@fastify/static`, which answers both, and a service worker checking a
+        cached asset with HEAD would otherwise get a 405.
+
+        Registered after every route that means something, so it can only ever
+        answer for a path nothing else claimed, and it answers only for a file
+        that is really there — `/pipeline` falls through to the single-page
+        handler above, as it must.
+        """
+        candidate = _within(directory, path)
+        if candidate is None or not candidate.is_file():
+            # A plain 404 rather than a coded one, deliberately: this has to
+            # reach the handler above, which is what decides between a missing
+            # file and a route the single-page app owns.
+            raise HTTPException(status_code=404)
+        return FileResponse(candidate)
+
 
 def _looks_like_a_file(path: str) -> bool:
     suffix = Path(path).suffix.lstrip(".")
     low, high = _LOOKS_LIKE_A_FILE_SUFFIX
     return low <= len(suffix) <= high
+
+
+def _within(root: Path | None, path: str) -> Path | None:
+    """The file `path` names under `root`, or None if it names anything else.
+
+    Serving a whole subtree means the traversal question has to be answered
+    rather than avoided. Starlette normalises `..` out of the path before
+    routing, so this is belt and braces — and belt and braces is the correct
+    amount of caution for a function whose failure mode is handing out
+    `/etc/passwd`. Resolved on both sides so a symlink out of the build
+    directory is caught too.
+    """
+    if root is None or not path:
+        return None
+    candidate = (root / path).resolve()
+    base = root.resolve()
+    return candidate if candidate.is_relative_to(base) else None
 
 
 def app_from_env() -> FastAPI:

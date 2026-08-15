@@ -28,6 +28,10 @@ class ApiError(Exception):
     def body(self) -> dict[str, Any]:
         return envelope(self.code, self.message, self.field)
 
+    def headers(self) -> dict[str, str]:
+        """Response headers this failure needs. Only a 429 has any."""
+        return {}
+
 
 def envelope(code: str, message: str, field: str | None = None) -> dict[str, Any]:
     error: dict[str, Any] = {"code": code, "message": message}

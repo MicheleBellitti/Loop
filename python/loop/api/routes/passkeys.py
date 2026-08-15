@@ -28,11 +28,12 @@ import logging
 import secrets
 from typing import Any, Final
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 
 from loop.api import auth
 from loop.api.errors import ApiError
 from loop.api.json import read_json
+from loop.api.ratelimit import LOGIN, limit
 
 router = APIRouter(prefix="/api")
 
@@ -169,7 +170,7 @@ async def register_verify(request: Request) -> dict[str, Any]:
     return {"ok": True}
 
 
-@router.post("/auth/login/options")
+@router.post("/auth/login/options", dependencies=[Depends(limit(LOGIN))])
 async def login_options(request: Request) -> dict[str, Any]:
     """Public: this is the screen you see before you are anybody."""
     settings = request.app.state.settings
@@ -205,7 +206,7 @@ async def login_options(request: Request) -> dict[str, Any]:
     }
 
 
-@router.post("/auth/login/verify")
+@router.post("/auth/login/verify", dependencies=[Depends(limit(LOGIN))])
 async def login_verify(request: Request, response: Response) -> dict[str, Any]:
     settings = request.app.state.settings
     db = request.app.state.db

@@ -8,11 +8,12 @@ the PWA renders nothing at all, which is why they are the first thing ported.
 
 from typing import Any
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 
 from loop.api import auth
 from loop.api.errors import ApiError
 from loop.api.json import read_json
+from loop.api.ratelimit import RECOVER, limit
 
 router = APIRouter(prefix="/api")
 
@@ -30,7 +31,7 @@ async def auth_state(request: Request) -> dict[str, Any]:
     return {"seeded": True, "has_passkey": await auth.has_passkey(db, user_id)}
 
 
-@router.post("/auth/recover")
+@router.post("/auth/recover", dependencies=[Depends(limit(RECOVER))])
 async def recover(request: Request, response: Response) -> dict[str, Any]:
     """The recovery code. Currently the only working way into the product."""
     body = await read_json(request)
