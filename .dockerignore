@@ -1,0 +1,24 @@
+# The build context is the repository root, because the image needs `backend/`
+# and `frontend/` both. Without this file that means uploading `.git`, the
+# developer's `node_modules`, and `infra/data/` — the gitignored Postgres data
+# directory, which is gigabytes on any machine that has run compose — to the
+# daemon before a single instruction executes.
+.git
+.gitignore
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/*.pyc
+.mypy_cache
+.pytest_cache
+.ruff_cache
+
+# The database's own files, and anything a run of the fleet leaves behind.
+infra/data
+
+# Real mail. It is gitignored for the same reason it must not reach a build.
+backend/fixtures/private
+
+.env
+*.log
