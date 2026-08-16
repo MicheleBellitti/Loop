@@ -429,12 +429,18 @@ async def _resolve_application(
     Returns the id, or a failure the model can act on: no match names the
     fallback, several matches list themselves so the next call can be exact.
     """
+    # An id wins, as the docstring above promises — so it is read first. The
+    # other order let a name sent alongside an id beat it, which put a model
+    # that had just been handed a candidate id straight back into the same
+    # ambiguity, and a six-round budget does not survive that twice.
+    given = [args.get("application_id"), args.get("application")]
+    ids = [v.strip() for v in given if isinstance(v, str) and _UUID.match(v.strip())]
+    if ids:
+        return ids[0], None
     raw = args.get("application") or args.get("application_id")
     if not isinstance(raw, str) or not raw.strip():
         return None, _bad("name the application: its company, its role, or its id")
     value = raw.strip()
-    if _UUID.match(value):
-        return value, None
 
     async with context.db.session(context.user_id) as connection:
         rows = await connection.fetch(_MATCHES, context.user_id, f"%{value}%", value)

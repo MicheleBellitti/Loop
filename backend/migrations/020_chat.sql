@@ -4,11 +4,16 @@
 -- user-scoped, all disposable: nothing downstream derives from them and
 -- deleting a conversation deletes everything it carried.
 --
--- One rule from §04 holds here with no exception: no table ever stores message
--- bodies. A chat tool that reads an email fetches it from the provider by id,
--- the text lives in the model's context for the length of one turn, and what
--- persists is `tool_trace` — the tool's name, its arguments and a one-line
--- outcome, never its output.
+-- §04's rule — no table ever stores message bodies — holds here on the path
+-- this schema controls. A chat tool that reads an email fetches it from the
+-- provider by id, the text lives in the model's context for the length of one
+-- turn, and what persists is `tool_trace`: the tool's name, its arguments and
+-- a one-line outcome, never its output.
+--
+-- `messages.content` is the exception to know about. It is the model's answer,
+-- not a message, but an answer that transcribed an email would carry one in
+-- here — so the system prompt forbids transcribing, and that instruction is
+-- what the rule rests on for this column. Nothing in the schema can enforce it.
 
 create table chat_conversations (
   id              uuid primary key default uuid_generate_v7(),

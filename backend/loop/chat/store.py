@@ -5,8 +5,14 @@ messages with their tool traces and attachment ids. The model shape is what the
 agent is given as history: OpenAI-format turns, user images inlined as data
 URIs, and — deliberately — no tool payloads from previous turns. Email text
 read by a tool exists only inside the turn that read it; if the model needs it
-again, it reads it again, which costs one Gmail call and keeps §04's "no table
-ever stores message bodies" true of the chat as well.
+again, it reads it again, which costs one Gmail call.
+
+That keeps a message body out of this table by construction on the one path
+this module controls: no tool payload is ever written here. The other path is
+the answer, which is the model's own words and is stored — so §04 holds across
+the chat only as far as the rule in `prompt.py` that says to describe an email
+and never transcribe it. Construction where it can be construction, an
+instruction where it cannot: worth knowing which of the two you are relying on.
 """
 
 import base64
@@ -18,6 +24,10 @@ from loop.domain.clock import iso_z
 # How much of a conversation the model sees. Beyond this the transcript is
 # still on screen — it is only the context that forgets.
 _MODEL_TURNS: Final = 24
+
+# What the pictures in the window may weigh together when the history is
+# rebuilt. Generous next to one screenshot, small next to twenty-four of them.
+_MODEL_IMAGE_BYTES: Final = 8 * 1024 * 1024
 
 # The first user message becomes the title, trimmed to a listing.
 _TITLE_CHARS: Final = 80
@@ -281,18 +291,40 @@ async def model_history(
             user_id,
             _MODEL_TURNS,
         )
+        # Sizes first, bytes second, and only for what fits. Every turn used to
+        # re-read and re-inline every picture in the window, one query each —
+        # so a conversation with a few screenshots in it re-sent tens of
+        # megabytes on every question. The newest win: a picture from three
+        # questions ago is context, and context is what a budget is for.
+        wanted = [str(a) for row in rows for a in row["attachment_ids"]]
         attachments: dict[str, tuple[str, bytes]] = {}
-        for row in rows:
-            for attachment_id in row["attachment_ids"]:
-                record = await connection.fetchrow(
-                    "select media_type, bytes from chat_attachments where id = $1",
-                    attachment_id,
+        if wanted:
+            sizes = {
+                str(record["id"]): int(record["size"])
+                for record in await connection.fetch(
+                    "select id, octet_length(bytes) as size"
+                    " from chat_attachments where id = any($1::uuid[])",
+                    wanted,
                 )
-                if record is not None:
-                    attachments[str(attachment_id)] = (
-                        record["media_type"],
-                        bytes(record["bytes"]),
-                    )
+            }
+            budget = _MODEL_IMAGE_BYTES
+            keep: list[str] = []
+            for row in rows:  # newest first, as fetched
+                for attachment_id in row["attachment_ids"]:
+                    size = sizes.get(str(attachment_id))
+                    if size is None or size > budget:
+                        continue
+                    budget -= size
+                    keep.append(str(attachment_id))
+            for record in await connection.fetch(
+                "select id, media_type, bytes from chat_attachments"
+                " where id = any($1::uuid[])",
+                keep,
+            ):
+                attachments[str(record["id"])] = (
+                    record["media_type"],
+                    bytes(record["bytes"]),
+                )
 
     history: list[dict[str, Any]] = []
     for row in reversed(rows):

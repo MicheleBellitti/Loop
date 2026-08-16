@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { api, type ApplicationDetail } from '../api.js';
+import { ApiError, api, type ApplicationDetail } from '../api.js';
 import { encodeImage, retryChat, streamChat, type StreamHandlers } from './stream.js';
 import { useViewedApplication } from './viewing.js';
 import type { ChatConversation, ChatMessage, ChatModels, LiveToolCall, ToolTraceEntry } from './types.js';
@@ -70,6 +70,12 @@ function remember(id: string | null): void {
   } catch {
     /* nothing to do about it, and nothing depends on it */
   }
+}
+
+/** A thread the server says is gone — as opposed to one we merely could not
+ *  reach. Only the first is a reason to forget it. */
+function isMissing(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404;
 }
 
 export function ChatWidget() {
@@ -137,21 +143,29 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
     retry: false,
   });
 
-  // Show a conversation, and remember it past the panel closing.
+  // Show a conversation, and remember it past the panel closing. The model
+  // goes back to unset: it is the thread's property, not the panel's, and
+  // carrying the last pick into the next thread silently repins that thread
+  // to a model the user never chose for it.
   const show = (id: string | null): void => {
     running.current?.abort();
     setConversationId(id);
     remember(id);
     setStream(null);
     setNotice(null);
+    setModel(null);
   };
 
   // The remembered thread may have been deleted since — from another tab, or
   // by this user last week. Falling back to a new one beats an empty panel.
+  //
+  // Only for a 404, though. Every other failure — offline, a 500, an expired
+  // session — says nothing about whether the thread exists, and forgetting it
+  // on one of those loses a conversation the server still has.
   useEffect(() => {
-    if (messages.isError) show(null);
+    if (messages.isError && isMissing(messages.error)) show(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages.isError]);
+  }, [messages.isError, messages.error]);
 
   // What the user has open elsewhere in the app, which the assistant is told
   // about so "this one" resolves. The name comes from the cache the detail
@@ -286,7 +300,14 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
     setNotice(null);
     setStream({ text: '', tools: [], failed: null, stopped: false });
     // The answer goes now rather than when the replacement lands: leaving it
-    // on screen under a spinner reads as a second answer being written.
+    // on screen under a spinner reads as a second answer being written. Keep
+    // what was removed, because the request that is meant to replace it can
+    // fail before the server has deleted anything — and then the only copy of
+    // that answer is the one we just dropped from the cache.
+    const previous = queryClient.getQueryData<{ messages: ChatMessage[] }>([
+      'chat-messages',
+      id,
+    ]);
     queryClient.setQueryData<{ messages: ChatMessage[] }>(['chat-messages', id], (old) =>
       old ? { messages: old.messages.slice(0, -1) } : old,
     );
@@ -300,6 +321,10 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
         controller.signal,
       );
     } catch (err) {
+      if (previous) {
+        queryClient.setQueryData(['chat-messages', id], previous);
+      }
+      void queryClient.invalidateQueries({ queryKey: ['chat-messages', id] });
       stopped(err, setStream);
     }
   };
@@ -405,7 +430,13 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
               trace={m.tool_trace}
               // Only the last answer can be replaced: redoing an earlier one
               // would rewrite what everything after it was said in reply to.
-              onRetry={i === rows.length - 1 && answered && !streaming ? () => void again() : undefined}
+              // And only while there is a model to answer with — otherwise the
+              // button removes an answer to earn a 503.
+              onRetry={
+                i === rows.length - 1 && answered && !streaming && configured
+                  ? () => void again()
+                  : undefined
+              }
             />
           ),
         )}

@@ -153,6 +153,29 @@ async def _served_by(
     return names, sees
 
 
+def _offered(request: Request) -> frozenset[str]:
+    """The names known to be servable: the default, plus what has been seen."""
+    settings = request.app.state.settings
+    where: dict[str, str] = getattr(request.app.state, "model_servers", None) or {}
+    return frozenset({str(settings.model_name), *where})
+
+
+async def _offers(request: Request, model: str) -> bool:
+    """Whether any configured server serves this name — asking if nobody has.
+
+    Listing the models is what usually fills `model_servers` in, and that is
+    also what fills the picker, so the answer is normally already here. A name
+    nobody has seen is worth one round of asking before it is turned down: a
+    turn may arrive before any listing has, and refusing a real model because
+    of the order two requests happened to arrive in is its own bug.
+    """
+    if model in _offered(request):
+        return True
+    for base_url in request.app.state.settings.model_servers:
+        await _served_by(request, base_url)
+    return model in _offered(request)
+
+
 async def _server_for(request: Request, model: str) -> str:
     """Which server serves this model — asking once if nobody has looked yet.
 
@@ -501,15 +524,27 @@ async def _resolve_model(
     chosen = body.get("model")
     if isinstance(chosen, str) and chosen.strip():
         model = chosen.strip()[:200]
-        await store.set_model(request.app.state.db, user_id, conversation_id, model)
-        return model
+        # Only a name this deployment actually serves. The picker offers the
+        # union of what the servers report, so anything else is a name nobody
+        # typed — and an unrecognised one used to reach `_cached_chat_model`,
+        # where every distinct string mints a client and its connection pool.
+        if await _offers(request, model):
+            await store.set_model(
+                request.app.state.db, user_id, conversation_id, model
+            )
+            return model
     async with request.app.state.db.session(user_id) as connection:
         stored = await connection.fetchval(
             "select model from chat_conversations where id = $1 and user_id = $2",
             conversation_id,
             user_id,
         )
-    return str(stored) if stored else str(settings.model_name)
+    # A stored name is checked too: the server that served it may be gone,
+    # and a thread pinned to a name nothing answers is a thread that cannot
+    # run until someone picks again.
+    if stored and await _offers(request, str(stored)):
+        return str(stored)
+    return str(settings.model_name)
 
 
 def _attachment_ids(body: dict[str, Any]) -> list[str]:
