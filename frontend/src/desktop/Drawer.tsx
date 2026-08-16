@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type ApplicationDetail } from '../api.js';
 import { Button, Mark, Provenance, Skeleton, Tag, Toast } from '../components.js';
+import { useShowing } from '../chat/viewing.js';
 import { DraftSheet } from '../sheets/DraftSheet.js';
 import { StagePicker } from '../components.js';
 
@@ -19,6 +20,8 @@ import { StagePicker } from '../components.js';
  */
 export function Drawer({ id, onClose }: { id: string; onClose: () => void }) {
   const queryClient = useQueryClient();
+  // While this is open, "this application" means this one — to the assistant too.
+  useShowing(id);
   const [correcting, setCorrecting] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);

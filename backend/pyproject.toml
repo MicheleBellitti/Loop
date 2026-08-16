@@ -22,6 +22,25 @@ api = [
     "webauthn>=2.5",
     "pydantic>=2.9",
     "uvicorn[standard]>=0.32",
+    # The chat assistant, on maintained libraries rather than rewrites
+    # (decisions.md LIB-1): the openai SDK speaks the model wire format —
+    # llama.cpp serves it — LangGraph runs the agent loop, and sse-starlette
+    # emits the event stream. httpx also carries the Gmail reads, through the
+    # same client the connector uses.
+    "httpx>=0.27",
+    # openai 3 is the floor, not a preference: below it the SDK is built on
+    # httpx rather than httpx2, and `loop.chat.llama` imports httpx2 directly.
+    "openai>=3.0",
+    "langchain>=1.0",
+    "langchain-openai>=0.3",
+    "sse-starlette>=2.1",
+    # Imported directly rather than reached through openai and langchain.
+    # A dependency you import but do not declare is one an upstream minor
+    # bump can take away, and these fail at import time — which takes the
+    # whole gateway down, not just the chat.
+    "httpx2>=2.7",
+    "langchain-core>=1.0",
+    "langgraph>=1.0",
 ]
 ladder = ["pyyaml>=6.0", "httpx>=0.27", "pydantic>=2.9"]
 ml = ["sentence-transformers>=3.3", "rapidfuzz>=3.10"]

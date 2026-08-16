@@ -783,3 +783,342 @@ td.emphasis { font: 600 14px var(--font-heading); color: var(--color-accent-800)
   .desktop-only { display: none; }
   .mobile-only { display: block; }
 }
+
+
+/* ── the assistant ───────────────────────────────────────────────────────── */
+
+/* The panel takes its width out of the page instead of covering it, so an
+   application record and the assistant asking about it are readable at once.
+   Everything anchored to the right edge moves with it; below the breakpoint
+   the panel is the whole screen and there is nothing to move. */
+:root { --chat-width: 400px; }
+
+@media (min-width: 700px) {
+  body.chat-open #root { padding-right: var(--chat-width); }
+  body.chat-open .drawer,
+  body.chat-open .sheet,
+  body.chat-open .sheet-full,
+  body.chat-open .scrim { right: var(--chat-width); }
+  body.chat-open .toast { transform: translateX(calc(-50% - var(--chat-width) / 2)); }
+}
+
+/* Above the drawer and its scrim (40, 41), not below them: the record you have
+   open is exactly what you want to ask about, and a toggle behind the scrim
+   makes that the one moment the assistant cannot be reached. The toast (60)
+   still outranks everything, as it must. */
+.chat-toggle {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 43;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+}
+.chat-toggle:hover { background: var(--color-accent-700); }
+
+.chat-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--chat-width);
+  max-width: 100vw;
+  z-index: 42;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  border-left: 1px solid var(--color-divider);
+  box-shadow: var(--shadow-lg);
+  animation: drawer-in 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-panel { animation: none; }
+}
+@media (max-width: 700px) {
+  /* Leave the toggle reachable: the panel stops short of the bottom bar. */
+  .chat-panel { width: 100vw; }
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.chat-select {
+  border: 1px solid var(--color-divider);
+  background: transparent;
+  font: 500 12.5px var(--font-body);
+  padding: 4px var(--space-2);
+  max-width: 170px;
+}
+
+.chat-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-divider);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.chat-icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.chat-send {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.chat-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.chat-user {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--color-accent-100);
+  border: 1px solid var(--color-accent-400);
+  padding: var(--space-2) var(--space-3);
+  font-size: 13.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Markdown, rendered — block spacing comes from the elements, not from
+ * pre-wrap on the container: react-markdown puts a newline text node between
+ * every pair of blocks, and preserving those would open a blank line between
+ * each one. */
+.chat-assistant {
+  max-width: 95%;
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* Newlines survive inside a block, though. Nothing asks the model for
+ * markdown — the system prompt only asks it to be brief — so an answer that
+ * puts three applications on three plain lines is ordinary, and CommonMark
+ * would otherwise fold it into one run-on sentence. */
+.chat-assistant p,
+.chat-assistant li {
+  white-space: pre-wrap;
+}
+.chat-assistant p { margin: 0 0 var(--space-2); }
+.chat-assistant p:last-child { margin-bottom: 0; }
+.chat-assistant ul, .chat-assistant ol { margin: 0 0 var(--space-2); padding-left: 18px; }
+.chat-assistant li { margin-bottom: 2px; }
+.chat-assistant h1, .chat-assistant h2, .chat-assistant h3, .chat-assistant h4 {
+  font: 600 13px var(--font-heading);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: var(--space-3) 0 var(--space-2);
+}
+.chat-assistant code {
+  font-size: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  padding: 0 3px;
+}
+.chat-assistant pre {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  overflow-x: auto;
+}
+.chat-assistant pre code { border: 0; padding: 0; background: none; }
+.chat-assistant table { border-collapse: collapse; margin: 0 0 var(--space-2); font-size: 12.5px; }
+.chat-assistant th, .chat-assistant td {
+  border: 1px solid var(--color-divider);
+  padding: 3px var(--space-2);
+  text-align: left;
+}
+.chat-assistant blockquote {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-accent-400);
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+
+.chat-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  margin-left: 2px;
+  background: var(--color-accent);
+  animation: chat-blink 1s steps(2) infinite;
+  vertical-align: text-bottom;
+}
+@keyframes chat-blink { 50% { opacity: 0; } }
+
+/* Provenance for the answer: which tools ran, and how each ended. */
+.chat-tools { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chat-tool {
+  border: 1px solid var(--color-divider);
+  padding: 1px var(--space-2);
+  font: 600 11px var(--font-heading);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.chat-tool-failed { border-color: var(--color-accent-700); color: var(--color-accent-700); }
+.chat-tool-name { color: var(--color-accent-800); }
+
+.chat-note {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+
+/* Under every message: take it, ask again, see where it came from. Quiet
+   until the message is hovered or focused, like every chat window that does
+   this well — and always visible where there is no hover to speak of. */
+.chat-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.chat-line:hover .chat-actions,
+.chat-line:focus-within .chat-actions { opacity: 1; }
+@media (hover: none) {
+  .chat-actions { opacity: 1; }
+}
+.chat-line-user .chat-actions { justify-content: flex-end; }
+.chat-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: none;
+  padding: 2px 3px;
+  font: 600 10.5px var(--font-heading);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.chat-action:hover { color: var(--color-accent-800); }
+
+/* The provenance, once asked for. */
+.chat-trace {
+  display: grid;
+  gap: var(--space-2);
+  border-left: 2px solid var(--color-divider);
+  padding: var(--space-2) 0 var(--space-2) var(--space-3);
+  font-size: 12px;
+}
+.chat-trace code {
+  display: block;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  overflow-x: auto;
+}
+.chat-trace-failed .chat-tool-name { color: var(--color-accent-700); }
+
+.chat-stopped {
+  margin: 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+/* What the assistant is being told the user has open. Above the composer,
+   where it is read on the way to typing rather than after sending. */
+.chat-context {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.chat-context strong { color: var(--color-text); font-weight: 500; }
+
+.chat-attach-row {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  flex-wrap: wrap;
+}
+.chat-thumb-wrap { position: relative; display: inline-flex; }
+.chat-thumb {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border: 1px solid var(--color-divider);
+}
+.chat-thumb-wrap button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 17px;
+  height: 17px;
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-divider);
+}
+.chat-input {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--color-divider);
+  background: transparent;
+  font: 400 13.5px var(--font-body);
+  padding: var(--space-2) var(--space-3);
+  min-height: 32px;
+  max-height: 120px;
+}
+
+.chat-model-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+.chat-backfill {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+  display: grid;
+  gap: var(--space-2);
+}
+.chat-months {
+  width: 64px;
+  border: 1px solid var(--color-divider);
+  background: transparent;
+  font: 500 13px var(--font-body);
+  padding: 4px var(--space-2);
+}

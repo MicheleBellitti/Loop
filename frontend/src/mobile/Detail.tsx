@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft } from 'lucide-react';
 import { api, type ApplicationDetail } from '../api.js';
 import { Button, Mark, Provenance, Skeleton, StagePicker, Tag, Toast } from '../components.js';
+import { useShowing } from '../chat/viewing.js';
 import { failure } from '../desktop/Drawer.js';
 
 /**
@@ -21,6 +22,8 @@ export function Detail({
   onDraft: (applicationId: string) => void;
 }) {
   const queryClient = useQueryClient();
+  // While this is open, "this application" means this one — to the assistant too.
+  useShowing(id);
   const [correcting, setCorrecting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 

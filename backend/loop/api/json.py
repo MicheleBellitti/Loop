@@ -11,6 +11,11 @@ equivalent, so `await request.body()` would buffer whatever arrived — on a box
 the README sizes at under 700 MB idle, reachable without a session on
 `/api/auth/recover` and `/api/auth/login/verify`. Every JSON body this API
 accepts is a handful of fields; a megabyte is four orders of magnitude of room.
+
+One route is not a handful of fields: an image the user attaches to a chat
+message arrives base64-encoded, which is a third larger than the picture. It
+asks for its own ceiling rather than raising this one, so the exception is
+visible where it is taken and the default stays where every other route is.
 """
 
 import json
@@ -23,8 +28,8 @@ from .errors import ApiError
 MAX_BODY_BYTES: Final = 1_000_000
 
 
-async def read_json(request: Request) -> dict[str, Any]:
-    raw = await _bounded_body(request)
+async def read_json(request: Request, limit: int = MAX_BODY_BYTES) -> dict[str, Any]:
+    raw = await _bounded_body(request, limit)
     if not raw:
         return {}
     try:
@@ -37,7 +42,7 @@ async def read_json(request: Request) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
-async def _bounded_body(request: Request) -> bytes:
+async def _bounded_body(request: Request, limit: int = MAX_BODY_BYTES) -> bytes:
     """The body, or a 413 as soon as it is clear there will be too much of it.
 
     `Content-Length` is checked first because it costs nothing and stops the
@@ -49,14 +54,14 @@ async def _bounded_body(request: Request) -> bytes:
         return bytes(cached)
 
     declared = request.headers.get("content-length")
-    if declared and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+    if declared and declared.isdigit() and int(declared) > limit:
         raise ApiError(413, "body_too_large", "request body is too large")
 
     chunks: list[bytes] = []
     seen = 0
     async for chunk in request.stream():
         seen += len(chunk)
-        if seen > MAX_BODY_BYTES:
+        if seen > limit:
             raise ApiError(413, "body_too_large", "request body is too large")
         chunks.append(chunk)
 
