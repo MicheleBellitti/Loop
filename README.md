@@ -98,7 +98,8 @@ backend/
   scripts/      seed, migrate, replay, e2e, the corpus gate, the stub Google
   tests/
 frontend/       the PWA: mobile, desktop dashboard, onboarding
-infra/          compose.yaml, Caddyfile, the Postgres image, backups
+compose.yaml    the stack — at the root so `.env` beside it is found with no flag
+infra/          Dockerfile, Caddyfile, the Postgres image, backups
 docs/           decisions.md — read this before changing anything normative
 design/         the original handoff bundle, unmodified
 ```

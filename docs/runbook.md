@@ -23,7 +23,7 @@ on.
 | dead-letter count | > 0 | alert — a message failed five times |
 
 ```bash
-curl -s localhost:3000/health/deep | jq
+curl -sk https://localhost/health/deep | jq     # compose; see "Bring it up"
 ```
 
 ---
@@ -49,6 +49,33 @@ status is on the dashboard and in `/health/deep`.
 ---
 
 ## Common operations
+
+### Bring it up
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+From the repository root, where `compose.yaml` and `.env` both are. Every
+`docker compose` line below assumes the same, and none of them needs a flag.
+
+The one thing to get right is that `POSTGRES_PASSWORD` must be **non-empty**:
+`${POSTGRES_PASSWORD:?…}` counts an empty value as missing, so a `.env` copied
+from `.env.example` and left unedited fails exactly as if there were no `.env`
+at all — at parse time, before anything is built.
+
+### Ask whether it is healthy
+
+```bash
+curl -sk https://localhost/health/deep | jq
+```
+
+Caddy is the single ingress and the gateway publishes no port, so this goes
+through 443 rather than 3000; `-k` is for the certificate Caddy issues itself
+when `LOOP_DOMAIN` is unset. Running the services by hand instead — `cd backend
+&& uv run python scripts/dev.py` — binds the gateway directly, and there the
+address is `localhost:3000`.
 
 ### Apply migrations
 

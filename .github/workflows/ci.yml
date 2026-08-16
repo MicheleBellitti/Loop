@@ -71,3 +71,26 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+
+  # The image is what actually deploys, and until now nothing built it. Both
+  # jobs above were green on a tree whose `docker compose build` could not get
+  # past parsing — so this job exists to make "CI passed" cover the artefact
+  # that ships, not only the two it is assembled from.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # compose interpolates `${POSTGRES_PASSWORD:?…}` at parse time and reads
+      # it from the project directory, so a real file has to be there before
+      # anything is built. Copying the example is also the check that the
+      # example still carries every variable compose requires — and that this
+      # is a plain `cp` with no `--env-file` after it is the assertion that
+      # compose.yaml is still somewhere the root `.env` reaches.
+      - name: Write the .env compose parses
+        run: |
+          cp .env.example .env
+          sed -i 's/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=ci-not-a-secret/' .env
+
+      # Nine services, one `image:`, so this builds once rather than nine times.
+      - run: docker compose build
