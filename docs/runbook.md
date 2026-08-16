@@ -23,7 +23,7 @@ on.
 | dead-letter count | > 0 | alert — a message failed five times |
 
 ```bash
-curl -s localhost:3000/health/deep | jq
+curl -sk https://localhost/health/deep | jq     # compose; see "Bring it up"
 ```
 
 ---
@@ -50,21 +50,32 @@ status is on the dashboard and in `/health/deep`.
 
 ## Common operations
 
-### Run compose at all
+### Bring it up
 
 ```bash
-cd infra && docker compose --env-file ../.env build
-cd infra && docker compose --env-file ../.env up -d
+docker compose build
+docker compose up -d
 ```
 
-Every `docker compose` line below assumes both: run from `infra/`, and pass
-`--env-file ../.env`. The flag is what supplies `POSTGRES_PASSWORD`, and
-`compose.yaml` refuses to parse without it — `env_file: ../.env` covers what a
-container sees at run time, not what this file interpolates at parse time, and
-interpolation looks only in `infra/`. `POSTGRES_PASSWORD` must also be
-non-empty: `${POSTGRES_PASSWORD:?…}` counts an empty value as missing, so a
-`.env` copied from `.env.example` and left unedited fails the same way as no
-`.env` at all.
+From the repository root, where `compose.yaml` and `.env` both are. Every
+`docker compose` line below assumes the same, and none of them needs a flag.
+
+The one thing to get right is that `POSTGRES_PASSWORD` must be **non-empty**:
+`${POSTGRES_PASSWORD:?…}` counts an empty value as missing, so a `.env` copied
+from `.env.example` and left unedited fails exactly as if there were no `.env`
+at all — at parse time, before anything is built.
+
+### Ask whether it is healthy
+
+```bash
+curl -sk https://localhost/health/deep | jq
+```
+
+Caddy is the single ingress and the gateway publishes no port, so this goes
+through 443 rather than 3000; `-k` is for the certificate Caddy issues itself
+when `LOOP_DOMAIN` is unset. Running the services by hand instead — `cd backend
+&& uv run python scripts/dev.py` — binds the gateway directly, and there the
+address is `localhost:3000`.
 
 ### Apply migrations
 

@@ -9,25 +9,29 @@
 # are the enforcement of "only the pipeline writes to the event log" — and RLS
 # actually applies, which it does not for a superuser.
 #
-# Run it from this directory, and name the environment file explicitly:
+# Run it from the repository root, with no flags:
 #
-#     cd infra && docker compose --env-file ../.env build
-#     cd infra && docker compose --env-file ../.env up -d
+#     docker compose build
+#     docker compose up -d
 #
-# The flag is not optional and `env_file:` below is not a substitute for it.
-# They are two different mechanisms: `env_file:` puts variables inside a
-# container at run time, while `${POSTGRES_PASSWORD}` here is interpolated into
-# this file at parse time — and interpolation reads only the shell environment
-# and the `.env` sitting in compose's project directory, which is `infra/`.
-# The file `.env.example` tells you to create is at the repository root, so
-# without `--env-file` compose parses this with nothing to substitute and stops
-# before it builds anything.
+# This file lives at the root rather than in `infra/` for one reason, and it is
+# not tidiness. `${POSTGRES_PASSWORD}` below is interpolated at parse time, and
+# interpolation reads only the shell environment and the `.env` in compose's
+# *project directory* — which is wherever this file sits. `env_file:` is a
+# different mechanism entirely: it puts variables inside a container at run
+# time and contributes nothing to parsing. So with this file under `infra/`,
+# the `.env` that `.env.example` tells you to write was in the one place
+# compose would not look, and every documented command needed
+# `--env-file ../.env` or stopped before building anything.
+#
+# The build context was already `..`, which was the other half of the same
+# tell: this file describes the whole repository, so it belongs beside it.
 
 name: loop
 
 x-service: &service
   build:
-    context: ..
+    context: .
     dockerfile: infra/Dockerfile
   # One image, named — which is what makes the Dockerfile's opening line true.
   # Without it each service takes compose's default name, `loop-gateway`,
@@ -37,7 +41,7 @@ x-service: &service
   # nine copies of it cloned the same wheels at once.
   image: loop:local
   restart: always
-  env_file: ../.env
+  env_file: .env
   depends_on:
     postgres:
       condition: service_healthy
@@ -73,7 +77,7 @@ services:
     restart: always
     ports: ['80:80', '443:443']
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     networks: [internal, edge]
@@ -81,14 +85,14 @@ services:
 
   postgres:
     build:
-      context: ./postgres
+      context: ./infra/postgres
     restart: always
     environment:
       POSTGRES_USER: loop
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: loop
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./infra/data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U loop -d loop']
       interval: 5s
@@ -187,7 +191,7 @@ services:
     restart: unless-stopped
     command: ['--host', '0.0.0.0', '--port', '8080', '-ngl', '0', '-m', '/models/model.gguf']
     volumes:
-      - ../models:/models:ro
+      - ./models:/models:ro
     networks: [internal]
     expose: ['8080']
 

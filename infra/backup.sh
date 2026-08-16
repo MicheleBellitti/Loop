@@ -11,7 +11,7 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 
 mkdir -p "$DEST"
 
-docker compose -f "$(dirname "$0")/compose.yaml" exec -T postgres \
+docker compose -f "$(dirname "$0")/../compose.yaml" exec -T postgres \
   pg_dump -U loop -d loop --format=custom --no-owner \
   | age -r "$BACKUP_AGE_RECIPIENT" -o "$DEST/loop-$STAMP.dump.age"
 
